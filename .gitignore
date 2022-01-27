@@ -1,0 +1,8 @@
+target/
+.idea
+.swp
+local.*
+.bsb/
+.bsp
+.java-version
+**/.DS_store
