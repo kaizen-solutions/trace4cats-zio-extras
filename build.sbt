@@ -4,7 +4,8 @@ inThisBuild {
   Seq(
     scalaVersion       := scala213,
     crossScalaVersions := Seq(scala212, scala213),
-    scalacOptions += "-Xsource:3"
+    scalacOptions += "-Xsource:3",
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
   )
 }
 
@@ -37,7 +38,9 @@ lazy val core = project
         trace4cats %% "trace4cats-inject" % trace4catsV,
         typelevel  %% "cats-effect"       % catsEffectV,
         zio        %% "zio"               % zioV,
-        zio        %% "zio-interop-cats"  % zioInteropV
+        zio        %% "zio-interop-cats"  % zioInteropV,
+        zio        %% "zio-test"          % zioV % Test,
+        zio        %% "zio-test-sbt"      % zioV % Test
       )
     }
   )

@@ -76,6 +76,9 @@ final case class ZTracer private (
     }.use(span => current.locally(Some(span))(fn(span)))
 }
 object ZTracer {
+  def make(current: FiberRef[Option[ZSpan]], entryPoint: ZEntryPoint): ZTracer =
+    new ZTracer(current, entryPoint)
+
   def span[R <: Has[?], E, A](
     name: String,
     kind: SpanKind = SpanKind.Internal,
@@ -92,6 +95,6 @@ object ZTracer {
     ZLayer.fromServiceM[ZEntryPoint, Any, Nothing, ZTracer](ep =>
       FiberRef
         .make[Option[ZSpan]](None)
-        .map(spanRef => ZTracer(spanRef, ep))
+        .map(spanRef => ZTracer.make(spanRef, ep))
     )
 }

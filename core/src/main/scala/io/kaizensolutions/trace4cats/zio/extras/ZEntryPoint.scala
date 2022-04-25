@@ -3,7 +3,7 @@ package io.kaizensolutions.trace4cats.zio.extras
 import io.janstenpickle.trace4cats.ErrorHandler
 import io.janstenpickle.trace4cats.inject.EntryPoint
 import io.janstenpickle.trace4cats.model.{SpanKind, TraceHeaders}
-import zio.interop.catz._
+import zio.interop.catz.*
 import zio.{Task, UManaged}
 
 /**

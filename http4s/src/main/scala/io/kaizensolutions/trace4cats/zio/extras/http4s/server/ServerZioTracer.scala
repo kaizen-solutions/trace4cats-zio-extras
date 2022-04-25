@@ -12,7 +12,7 @@ import io.janstenpickle.trace4cats.model.{SpanKind, SpanStatus}
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import org.http4s.{HttpRoutes, Request, Response}
 import org.typelevel.ci.CIString
-import zio._
+import zio.*
 
 object ServerZioTracer {
   def traceRoutes[R <: Has[?]](
