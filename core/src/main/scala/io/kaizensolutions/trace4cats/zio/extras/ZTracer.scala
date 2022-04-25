@@ -15,7 +15,7 @@ import zio._
  */
 final case class ZTracer private (
   private val current: FiberRef[Option[ZSpan]],
-  private val entryPoint: ZEntryPoint
+  private[extras] val entryPoint: ZEntryPoint
 ) {
   def context: UIO[SpanContext] =
     current.get.map(_.fold(SpanContext.invalid)(_.context))

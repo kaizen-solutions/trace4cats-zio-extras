@@ -1,10 +1,19 @@
-ThisBuild / version            := "0.1.0-SNAPSHOT"
-ThisBuild / scalaVersion       := "2.13.8"
-ThisBuild / crossScalaVersions := Seq("2.12.15")
-ThisBuild / scalacOptions ++= Seq(
-)
+inThisBuild {
+  val scala212 = "2.12.15"
+  val scala213 = "2.13.8"
+  Seq(
+    scalaVersion       := scala213,
+    crossScalaVersions := Seq(scala212, scala213)
+  )
+}
 
-lazy val root = project
+lazy val root =
+  project
+    .in(file("."))
+    .settings(publish / skip := true)
+    .aggregate(core, http4s)
+
+lazy val core = project
   .in(file("core"))
   .settings(
     name                              := "trace4cats-zio-extras",
@@ -18,7 +27,7 @@ lazy val root = project
 
       val catsEffectV = "3.3.11"
       val sourceCodeV = "0.2.8"
-      val trace4catsV = "0.12.0"
+      val trace4catsV = "0.13.1"
       val zioV        = "1.0.14"
       val zioInteropV = "3.2.9.1" // upgrade to 2 when published
       Seq(
@@ -31,3 +40,16 @@ lazy val root = project
       )
     }
   )
+
+lazy val http4s = project
+  .in(file("http4s"))
+  .settings(
+    name                              := "trace4cats-zio-extras-http4s",
+    organization                      := "io.kaizen-solutions",
+    addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full)),
+    libraryDependencies ++= Seq(
+      "io.janstenpickle" %% "trace4cats-http4s-common" % "0.13.1",
+      "org.http4s"       %% "http4s-core"              % "0.23.11"
+    )
+  )
+  .dependsOn(core)
