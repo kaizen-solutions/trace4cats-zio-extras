@@ -1,9 +1,9 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
 import cats.data.NonEmptyList
-import io.janstenpickle.trace4cats.model._
+import io.janstenpickle.trace4cats.model.*
 import io.janstenpickle.trace4cats.{ErrorHandler, Span}
-import zio.interop.catz._
+import zio.interop.catz.*
 import zio.{NonEmptyChunk, Task, UIO, UManaged}
 
 /**
@@ -29,11 +29,13 @@ final class ZSpan(private val underlying: Span[Task]) extends AnyVal {
   def addLinks(links: NonEmptyChunk[Link]): UIO[Unit] =
     underlying.addLinks(NonEmptyList.of(links.head, links.tail: _*)).ignore
 
-  private[extras] def child(implicit file: sourcecode.File, line: sourcecode.Line): UManaged[ZSpan] =
-    child(s"${file.value}:${line.value}", SpanKind.Internal)
+  private[extras] def child(implicit fileName: sourcecode.FileName, line: sourcecode.Line): UManaged[ZSpan] =
+    child(s"${fileName.value}:${line.value}", SpanKind.Internal)
 
-  private[extras] def child(kind: SpanKind)(implicit file: sourcecode.File, line: sourcecode.Line): UManaged[ZSpan] =
-    child(s"${file.value}:${line.value}", kind)
+  private[extras] def child(
+    kind: SpanKind
+  )(implicit fileName: sourcecode.FileName, line: sourcecode.Line): UManaged[ZSpan] =
+    child(s"${fileName.value}:${line.value}", kind)
 
   private[extras] def child(name: String, kind: SpanKind): UManaged[ZSpan] =
     underlying.child(name, kind).map(new ZSpan(_)).toManagedZIO.orDie

@@ -2,7 +2,7 @@ package io.kaizensolutions.trace4cats.zio.extras
 
 import io.janstenpickle.trace4cats.model.{AttributeValue, SpanContext, SpanKind, TraceHeaders}
 import io.janstenpickle.trace4cats.{ErrorHandler, ToHeaders}
-import zio._
+import zio.*
 
 /**
  * ZTracer is a ZIO wrapper around the Trace4Cats Span. The abstraction utilizes
@@ -16,7 +16,7 @@ import zio._
 final case class ZTracer private (
   private val current: FiberRef[Option[ZSpan]],
   private[extras] val entryPoint: ZEntryPoint
-) {
+) { self =>
   def context: UIO[SpanContext] =
     current.get.map(_.fold(SpanContext.invalid)(_.context))
 
@@ -25,6 +25,15 @@ final case class ZTracer private (
       case Some(span) => headerTypes.fromContext(span.context)
       case None       => headerTypes.fromContext(SpanContext.invalid)
     }
+
+  def fromHeaders[R, E, A](
+    headers: TraceHeaders,
+    kind: SpanKind = SpanKind.Internal,
+    nameWhenMissingHeaders: String = "root"
+  )(fn: ZSpan => ZIO[R, E, A]): ZIO[R, E, A] =
+    entryPoint
+      .fromHeadersOtherwiseRoot(headers, kind, nameWhenMissingHeaders)
+      .use(child => current.locally(Some(child))(fn(child)))
 
   def put(key: String, value: AttributeValue): UIO[Unit] =
     current.get.flatMap {
@@ -40,10 +49,10 @@ final case class ZTracer private (
 
   def spanSource[R, E, A](
     kind: SpanKind = SpanKind.Internal
-  )(zio: ZIO[R, E, A])(implicit file: sourcecode.File, line: sourcecode.Line): ZIO[R, E, A] =
+  )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R, E, A] =
     current.get.toManaged_.flatMap {
       case Some(span) => span.child(kind)
-      case None       => entryPoint.rootSpan(s"${file.value}:${line.value}", kind)
+      case None       => entryPoint.rootSpan(s"${fileName.value}:${line.value}", kind)
     }.use(span => current.locally(Some(span))(zio))
 
   def span[R, E, A](
@@ -67,22 +76,22 @@ final case class ZTracer private (
     }.use(span => current.locally(Some(span))(fn(span)))
 }
 object ZTracer {
+  def span[R <: Has[?], E, A](
+    name: String,
+    kind: SpanKind = SpanKind.Internal,
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  )(zio: ZIO[R, E, A]): ZIO[R & Has[ZTracer], E, A] =
+    ZIO.service[ZTracer].flatMap(_.span(name, kind, errorHandler)(zio))
+
+  def spanSource[R <: Has[?], E, A](
+    kind: SpanKind = SpanKind.Internal
+  )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R & Has[ZTracer], E, A] =
+    ZIO.service[ZTracer].flatMap(_.spanSource(kind)(zio)(fileName, line))
+
   val live: URLayer[Has[ZEntryPoint], Has[ZTracer]] =
     ZLayer.fromServiceM[ZEntryPoint, Any, Nothing, ZTracer](ep =>
       FiberRef
         .make[Option[ZSpan]](None)
         .map(spanRef => ZTracer(spanRef, ep))
-    )
-
-  def fromHeaders(
-    headers: TraceHeaders,
-    kind: SpanKind = SpanKind.Internal,
-    nameWhenMissingHeaders: String = "root"
-  ): URManaged[Has[ZTracer], ZTracer] =
-    ZManaged.serviceWithManaged[ZTracer](tracer =>
-      tracer.entryPoint
-        .fromHeadersOtherwiseRoot(headers, kind, nameWhenMissingHeaders)
-        .mapM(span => FiberRef.make(Option(span)))
-        .map(spanRef => tracer.copy(current = spanRef))
     )
 }

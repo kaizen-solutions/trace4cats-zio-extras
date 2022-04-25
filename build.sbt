@@ -3,7 +3,8 @@ inThisBuild {
   val scala213 = "2.13.8"
   Seq(
     scalaVersion       := scala213,
-    crossScalaVersions := Seq(scala212, scala213)
+    crossScalaVersions := Seq(scala212, scala213),
+    scalacOptions += "-Xsource:3"
   )
 }
 
@@ -47,9 +48,6 @@ lazy val http4s = project
     name                              := "trace4cats-zio-extras-http4s",
     organization                      := "io.kaizen-solutions",
     addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full)),
-    libraryDependencies ++= Seq(
-      "io.janstenpickle" %% "trace4cats-http4s-common" % "0.13.1",
-      "org.http4s"       %% "http4s-core"              % "0.23.11"
-    )
+    libraryDependencies ++= Seq("io.janstenpickle" %% "trace4cats-http4s-common" % "0.13.1")
   )
   .dependsOn(core)
