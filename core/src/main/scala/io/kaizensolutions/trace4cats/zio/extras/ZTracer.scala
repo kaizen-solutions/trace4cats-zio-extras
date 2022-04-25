@@ -29,10 +29,11 @@ final case class ZTracer private (
   def fromHeaders[R, E, A](
     headers: TraceHeaders,
     kind: SpanKind = SpanKind.Internal,
-    nameWhenMissingHeaders: String = "root"
+    nameWhenMissingHeaders: String = "root",
+    errorHandler: ErrorHandler = ErrorHandler.empty
   )(fn: ZSpan => ZIO[R, E, A]): ZIO[R, E, A] =
     entryPoint
-      .fromHeadersOtherwiseRoot(headers, kind, nameWhenMissingHeaders)
+      .fromHeadersOtherwiseRoot(headers, kind, nameWhenMissingHeaders, errorHandler)
       .use(child => current.locally(Some(child))(fn(child)))
 
   def put(key: String, value: AttributeValue): UIO[Unit] =
@@ -44,7 +45,7 @@ final case class ZTracer private (
   def putAll(fields: (String, AttributeValue)*): UIO[Unit] =
     current.get.flatMap {
       case None       => UIO.unit
-      case Some(span) => span.putAll(fields: _*)
+      case Some(span) => span.putAll(fields *)
     }
 
   def spanSource[R, E, A](

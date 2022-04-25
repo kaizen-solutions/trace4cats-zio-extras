@@ -26,10 +26,11 @@ final class ZEntryPoint(private val underlying: EntryPoint[Task]) extends AnyVal
   def fromHeadersOtherwiseRoot(
     headers: TraceHeaders,
     kind: SpanKind = SpanKind.Internal,
-    name: String = "root"
+    name: String = "root",
+    errorHandler: ErrorHandler = ErrorHandler.empty
   ): UManaged[ZSpan] =
     underlying
-      .continueOrElseRoot(name, kind, headers)
+      .continueOrElseRoot(name, kind, headers, errorHandler)
       .toManagedZIO
       .orDie
       .map(ZSpan.make)
