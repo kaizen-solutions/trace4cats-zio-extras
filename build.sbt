@@ -13,7 +13,7 @@ lazy val root =
   project
     .in(file("."))
     .settings(publish / skip := true)
-    .aggregate(core, http4s)
+    .aggregate(core, http4s, http4sExample)
 
 lazy val core = project
   .in(file("core"))
@@ -54,3 +54,26 @@ lazy val http4s = project
     libraryDependencies ++= Seq("io.janstenpickle" %% "trace4cats-http4s-common" % "0.13.1")
   )
   .dependsOn(core)
+
+lazy val http4sExample =
+  project
+    .in(file("http4s-examples"))
+    .settings(
+      name                              := "trace4cats-zio-extras-http4s-examples",
+      organization                      := "io.kaizen-solutions",
+      publish / skip                    := true,
+      addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full)),
+      libraryDependencies ++= {
+        val http4s     = "org.http4s"
+        val trace4cats = "io.janstenpickle"
+
+        val http4sV     = "0.23.11"
+        val trace4catsV = "0.13.1"
+        Seq(
+          http4s     %% "http4s-blaze-server"               % http4sV,
+          http4s     %% "http4s-blaze-client"               % http4sV,
+          trace4cats %% "trace4cats-newrelic-http-exporter" % trace4catsV
+        )
+      }
+    )
+    .dependsOn(http4s)

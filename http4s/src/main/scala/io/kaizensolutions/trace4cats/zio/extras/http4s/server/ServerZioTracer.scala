@@ -41,10 +41,10 @@ object ServerZioTracer {
    */
   def traceRoutes[R <: Has[?]](
     tracer: ZTracer,
+    routes: HttpRoutes[RIO[R, *]],
     spanNamer: Http4sSpanNamer = Http4sSpanNamer.methodWithPath,
     dropHeadersWhen: CIString => Boolean = _ => false,
-    errorHandler: ErrorHandler = ErrorHandler.empty,
-    routes: HttpRoutes[RIO[R, *]]
+    errorHandler: ErrorHandler = ErrorHandler.empty
   ): HttpRoutes[RIO[R, *]] =
     Kleisli[
       OptionT[RIO[R, *], *],
@@ -102,10 +102,10 @@ object ServerZioTracer {
    */
   def traceApp[R <: Has[?]](
     tracer: ZTracer,
+    app: HttpApp[RIO[R, *]],
     spanNamer: Http4sSpanNamer = Http4sSpanNamer.methodWithPath,
     dropHeadersWhen: CIString => Boolean = _ => false,
-    errorHandler: ErrorHandler = ErrorHandler.empty,
-    app: HttpApp[RIO[R, *]]
+    errorHandler: ErrorHandler = ErrorHandler.empty
   ): HttpApp[RIO[R, *]] =
     Kleisli[
       RIO[R, *],
