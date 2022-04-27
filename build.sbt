@@ -51,7 +51,17 @@ lazy val http4s = project
     name                              := "trace4cats-zio-extras-http4s",
     organization                      := "io.kaizen-solutions",
     addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full)),
-    libraryDependencies ++= Seq("io.janstenpickle" %% "trace4cats-http4s-common" % "0.13.1")
+    libraryDependencies ++= {
+      val trace4Cats = "io.janstenpickle"
+      val http4s     = "org.http4s"
+
+      val trace4CatsV = "0.13.1"
+      val http4sV     = "0.23.11"
+      Seq(
+        trace4Cats %% "trace4cats-http4s-common" % trace4CatsV,
+        http4s     %% "http4s-client"            % http4sV
+      )
+    }
   )
   .dependsOn(core)
 

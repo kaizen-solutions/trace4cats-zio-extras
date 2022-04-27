@@ -13,13 +13,12 @@ import zio.interop.catz.*
 
 import scala.util.Try
 
-object ExampleApp extends App {
+object ExampleServerApp extends App {
   def routes: HttpRoutes[Effect] = {
     object dsl extends Http4sDsl[Effect]
     import dsl.*
 
     HttpRoutes.of {
-
       case GET -> Root / "hello" / id =>
         val myId = Try(id.toInt).getOrElse(1)
         ZTracer

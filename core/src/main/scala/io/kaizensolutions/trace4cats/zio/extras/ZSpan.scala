@@ -2,7 +2,7 @@ package io.kaizensolutions.trace4cats.zio.extras
 
 import cats.data.NonEmptyList
 import io.janstenpickle.trace4cats.model.*
-import io.janstenpickle.trace4cats.{ErrorHandler, Span}
+import io.janstenpickle.trace4cats.{ErrorHandler, Span, ToHeaders}
 import zio.interop.catz.*
 import zio.{NonEmptyChunk, Task, UIO, UManaged}
 
@@ -28,6 +28,9 @@ final class ZSpan(private val underlying: Span[Task]) extends AnyVal {
 
   def addLinks(links: NonEmptyChunk[Link]): UIO[Unit] =
     underlying.addLinks(NonEmptyList.of(links.head, links.tail: _*)).ignore
+
+  def extractHeaders(headerTypes: ToHeaders): TraceHeaders =
+    headerTypes.fromContext(underlying.context)
 
   private[extras] def child(implicit fileName: sourcecode.FileName, line: sourcecode.Line): UManaged[ZSpan] =
     child(s"${fileName.value}:${line.value}", SpanKind.Internal)
