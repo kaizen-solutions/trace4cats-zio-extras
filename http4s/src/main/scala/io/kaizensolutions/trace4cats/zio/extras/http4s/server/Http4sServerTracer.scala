@@ -39,17 +39,17 @@ object Http4sServerTracer {
    * @return
    *   an HttpRoutes that traces the underlying HttpRoutes
    */
-  def traceRoutes[R <: Has[?]](
+  def traceRoutes[R, E](
     tracer: ZTracer,
-    routes: HttpRoutes[RIO[R, *]],
+    routes: HttpRoutes[ZIO[R, E, *]],
     spanNamer: Http4sSpanNamer = Http4sSpanNamer.methodWithPath,
     dropHeadersWhen: CIString => Boolean = Headers.SensitiveHeaders.contains,
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): HttpRoutes[RIO[R, *]] =
+  ): HttpRoutes[ZIO[R, E, *]] =
     Kleisli[
-      OptionT[RIO[R, *], *],
-      Request[RIO[R, *]],
-      Response[RIO[R, *]]
+      OptionT[ZIO[R, E, *], *],
+      Request[ZIO[R, E, *]],
+      Response[ZIO[R, E, *]]
     ] { request =>
       val reqFields    = Http4sHeaders.requestFields(request: Request_, dropHeadersWhen)
       val traceHeaders = Http4sHeaders.converter.from(request.headers)
@@ -100,17 +100,17 @@ object Http4sServerTracer {
    * @return
    *   an HttpApp that traces the underlying HttpRoutes
    */
-  def traceApp[R <: Has[?]](
+  def traceApp[R, E](
     tracer: ZTracer,
-    app: HttpApp[RIO[R, *]],
+    app: HttpApp[ZIO[R, E, *]],
     spanNamer: Http4sSpanNamer = Http4sSpanNamer.methodWithPath,
     dropHeadersWhen: CIString => Boolean = _ => false,
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): HttpApp[RIO[R, *]] =
+  ): HttpApp[ZIO[R, E, *]] =
     Kleisli[
-      RIO[R, *],
-      Request[RIO[R, *]],
-      Response[RIO[R, *]]
+      ZIO[R, E, *],
+      Request[ZIO[R, E, *]],
+      Response[ZIO[R, E, *]]
     ] { request =>
       val reqFields    = Http4sHeaders.requestFields(request: Request_, dropHeadersWhen)
       val traceHeaders = Http4sHeaders.converter.from(request.headers)

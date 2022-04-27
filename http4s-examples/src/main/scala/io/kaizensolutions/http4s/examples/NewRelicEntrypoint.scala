@@ -14,7 +14,7 @@ import zio.interop.catz.*
 object NewRelicEntrypoint {
   val live: URLayer[Clock & Blocking, Has[ZEntryPoint]] = ZLayer
     .fromManaged(
-      entryPoint(TraceProcess("Example-app"))
+      entryPoint(TraceProcess("http4s-example-app"))
     )
     .orDie
 
@@ -30,5 +30,4 @@ object NewRelicEntrypoint {
                      )
       } yield EntryPoint[Task](SpanSampler.always[Task], completer)).toZManaged
     }
-
 }
