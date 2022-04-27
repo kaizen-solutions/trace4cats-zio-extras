@@ -1,10 +1,11 @@
-package io.kaizensolutions.trace4cats.zio.extras.ziohttp
+package io.kaizensolutions.trace4cats.zio.extras.ziohttp.server
 
 import io.janstenpickle.trace4cats.ErrorHandler
-import io.janstenpickle.trace4cats.model.{AttributeValue, SpanKind, SpanStatus, TraceHeaders}
 import io.janstenpickle.trace4cats.model.AttributeValue.{LongValue, StringValue}
 import io.janstenpickle.trace4cats.model.SemanticAttributeKeys.*
+import io.janstenpickle.trace4cats.model.{AttributeValue, SpanKind, SpanStatus}
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
+import io.kaizensolutions.trace4cats.zio.extras.ziohttp.{extractTraceHeaders, toSpanStatus}
 import zhttp.http.*
 import zio.{Chunk, Exit}
 
@@ -63,9 +64,6 @@ object ZioHttpServerTracer {
       dropHeadersWhen
     )
 
-  private def extractTraceHeaders(headers: Headers): TraceHeaders =
-    TraceHeaders.of(headers.toChunk.map { case (k, v) => (String.valueOf(k), String.valueOf(v)) }.toMap)
-
   private def headerFields(
     headers: Headers,
     `type`: String,
@@ -75,20 +73,6 @@ object ZioHttpServerTracer {
       case (name, value) if !dropWhen(String.valueOf(name)) =>
         s"${`type`}.header.$name" -> AttributeValue.stringToTraceValue(String.valueOf(value))
     }
-
-  // Adapted from io.janstenpickle.trace4cats.http4s.common.Http4sStatusMapping
-  private def toSpanStatus(s: Status): SpanStatus = s match {
-    case Status.BadRequest          => SpanStatus.Internal("Bad Request")
-    case Status.Unauthorized        => SpanStatus.Unauthenticated
-    case Status.Forbidden           => SpanStatus.PermissionDenied
-    case Status.NotFound            => SpanStatus.NotFound
-    case Status.TooManyRequests     => SpanStatus.Unavailable
-    case Status.BadGateway          => SpanStatus.Unavailable
-    case Status.ServiceUnavailable  => SpanStatus.Unavailable
-    case Status.GatewayTimeout      => SpanStatus.Unavailable
-    case status if status.isSuccess => SpanStatus.Ok
-    case _                          => SpanStatus.Unknown
-  }
 
   val SensitiveHeaders: Set[String] = Set(
     HeaderNames.authorization,

@@ -1,7 +1,7 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziohttp.examples
 
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
-import io.kaizensolutions.trace4cats.zio.extras.ziohttp.ZioHttpServerTracer
+import io.kaizensolutions.trace4cats.zio.extras.ziohttp.server.ZioHttpServerTracer
 import zhttp.http.*
 import zhttp.service.Server
 import zio.*
@@ -9,7 +9,7 @@ import zio.clock.Clock
 import zio.duration.*
 import zio.random.Random
 
-object ExampleApp extends App {
+object ExampleServerApp extends App {
   val app: Http[Clock & Random & Has[Db] & Has[ZTracer], Throwable, Request, Response] =
     Http.collectZIO[Request] {
 

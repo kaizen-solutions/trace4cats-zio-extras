@@ -106,6 +106,7 @@ ZManaged
 The example generates the following trace in New Relic:
 ![http4s-tracing-example](https://user-images.githubusercontent.com/14280155/165553739-3fd112db-e2fe-4f8e-905b-721ceeacd687.png)
 
+We provide integrations for both the server and client.
 
 ## ZIO-HTTP integration
 
@@ -163,3 +164,5 @@ object ExampleApp extends App {
 
 The example generates the following trace in New Relic when `/plaintext` is queried:
 ![newrelic-zio-http-trace](https://user-images.githubusercontent.com/14280155/165549664-b0608ec3-1d6a-47c1-8e0b-f46260fc6b22.png)
+
+We provide integrations for both the server and client.
