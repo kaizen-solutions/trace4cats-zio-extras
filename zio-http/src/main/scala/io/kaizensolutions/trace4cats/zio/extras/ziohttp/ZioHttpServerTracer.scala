@@ -13,10 +13,11 @@ object ZioHttpServerTracer {
 
   def traceApp[R, E](
     tracer: ZTracer,
+    httpApp: HttpApp[R, E],
     dropHeadersWhen: String => Boolean = SensitiveHeaders.contains,
     spanNamer: SpanNamer = req => s"${req.method.toString()} ${req.url.path.toString()}",
     errorHandler: ErrorHandler = ErrorHandler.empty
-  )(httpApp: HttpApp[R, E]): HttpApp[R, E] =
+  ): HttpApp[R, E] =
     Http.fromOptionFunction[Request] { request =>
       val reqFields    = requestFields(request, dropHeadersWhen)
       val traceHeaders = extractTraceHeaders(request.headers)
@@ -37,7 +38,6 @@ object ZioHttpServerTracer {
             case Exit.Failure(cause) =>
               span.setStatus(SpanStatus.Internal(cause.prettyPrint))
           }
-
       }
     }
 
@@ -53,7 +53,7 @@ object ZioHttpServerTracer {
       req.url.host.map(host => serviceHostname -> StringValue(host)) ++
       req.url.port.map(port => servicePort -> LongValue(port.toLong))
 
-  def responseFields(
+  private def responseFields(
     resp: Response,
     dropHeadersWhen: String => Boolean
   ): List[(String, AttributeValue)] =
@@ -77,7 +77,7 @@ object ZioHttpServerTracer {
     }
 
   // Adapted from io.janstenpickle.trace4cats.http4s.common.Http4sStatusMapping
-  def toSpanStatus(s: Status): SpanStatus = s match {
+  private def toSpanStatus(s: Status): SpanStatus = s match {
     case Status.BadRequest          => SpanStatus.Internal("Bad Request")
     case Status.Unauthorized        => SpanStatus.Unauthenticated
     case Status.Forbidden           => SpanStatus.PermissionDenied

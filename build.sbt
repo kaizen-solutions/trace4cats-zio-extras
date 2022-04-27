@@ -96,6 +96,17 @@ lazy val zioHttpExample =
       name                              := "trace4cats-zio-extras-zio-http-examples",
       organization                      := "io.kaizen-solutions",
       publish / skip                    := true,
-      addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full))
+      addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full)),
+      libraryDependencies ++= {
+        val http4s     = "org.http4s"
+        val trace4cats = "io.janstenpickle"
+
+        val http4sV     = "0.23.11"
+        val trace4catsV = "0.13.1"
+        Seq(
+          http4s     %% "http4s-blaze-client"               % http4sV,
+          trace4cats %% "trace4cats-newrelic-http-exporter" % trace4catsV
+        )
+      }
     )
     .dependsOn(zioHttp)
