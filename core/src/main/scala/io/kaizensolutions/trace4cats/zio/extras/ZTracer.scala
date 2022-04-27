@@ -87,6 +87,13 @@ object ZTracer {
   )(zio: ZIO[R, E, A]): ZIO[R & Has[ZTracer], E, A] =
     ZIO.service[ZTracer].flatMap(_.span(name, kind, errorHandler)(zio))
 
+  def withSpan[R <: Has[?], E, A](
+    name: String,
+    kind: SpanKind = SpanKind.Internal,
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  )(fn: ZSpan => ZIO[R, E, A]): ZIO[R & Has[ZTracer], E, A] =
+    ZIO.service[ZTracer].flatMap(_.withSpan(name, kind, errorHandler)(fn))
+
   def spanSource[R <: Has[?], E, A](
     kind: SpanKind = SpanKind.Internal
   )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R & Has[ZTracer], E, A] =
