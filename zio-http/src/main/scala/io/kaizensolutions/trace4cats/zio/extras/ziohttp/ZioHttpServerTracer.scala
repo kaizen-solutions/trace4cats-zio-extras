@@ -26,7 +26,7 @@ object ZioHttpServerTracer {
       tracer.fromHeaders(
         headers = traceHeaders,
         kind = SpanKind.Server,
-        nameWhenMissingHeaders = nameOfSpan,
+        name = nameOfSpan,
         errorHandler = errorHandler
       ) { span =>
         span.putAll(reqFields *) *>

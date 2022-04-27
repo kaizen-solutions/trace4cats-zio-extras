@@ -59,7 +59,7 @@ object Http4sServerTracer {
         tracer.fromHeaders(
           headers = traceHeaders,
           kind = SpanKind.Server,
-          nameWhenMissingHeaders = nameOfSpan,
+          name = nameOfSpan,
           errorHandler = errorHandler
         ) { span =>
           span.putAll(reqFields *) *>
@@ -119,7 +119,7 @@ object Http4sServerTracer {
       tracer.fromHeaders(
         headers = traceHeaders,
         kind = SpanKind.Server,
-        nameWhenMissingHeaders = nameOfSpan,
+        name = nameOfSpan,
         errorHandler = errorHandler
       ) { span =>
         span.putAll(reqFields *) *>

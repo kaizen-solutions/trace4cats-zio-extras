@@ -26,15 +26,64 @@ final case class ZTracer private (
       case None       => headerTypes.fromContext(SpanContext.invalid)
     }
 
+  /**
+   * Allows you to obtain a span from the trace headers
+   *
+   * @param headers
+   *   are trace headers coming from your upstream services that you are
+   *   integrating with
+   * @param kind
+   *   is the kind of span you are creating (Client/Server/Internal)
+   * @param name
+   *   is the name of the span you are creating
+   * @param errorHandler
+   *   is the error handler to use when an error occurs with the span
+   * @param fn
+   *   is the function that will be executed within the context of the span
+   * @tparam R
+   *   is the ZIO environment type
+   * @tparam E
+   *   is the ZIO error type
+   * @tparam A
+   *   is the ZIO success type
+   * @return
+   *   the result of the function along with sending the tracing results
+   *   transparently
+   */
   def fromHeaders[R, E, A](
     headers: TraceHeaders,
     kind: SpanKind = SpanKind.Internal,
-    nameWhenMissingHeaders: String = "root",
+    name: String = "root",
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(fn: ZSpan => ZIO[R, E, A]): ZIO[R, E, A] =
-    entryPoint
-      .fromHeadersOtherwiseRoot(headers, kind, nameWhenMissingHeaders, errorHandler)
+    fromHeadersManaged(headers, kind, name, errorHandler)
       .use(child => current.locally(Some(child))(fn(child)))
+
+  /**
+   * Allows you to obtain a ZSpan from trace headers This is a low level
+   * operator and you are responsible for manipulating the current span
+   * (updateCurrentSpan and removeCurrentSpan). For example, we would recommend
+   * doing the following:
+   *
+   * {{{
+   * fromHeadersManaged(yourHeaders)      // produces a ZSpan
+   *   .tapM(updateCurrentSpan)           // sets the current span to the span we just produced
+   *   .onExit(_ => removeCurrentSpan)    // removes the current span when the resource finaliztion takes place
+   * }}}
+   *
+   * @param headers
+   * @param kind
+   * @param name
+   * @param errorHandler
+   * @return
+   */
+  def fromHeadersManaged(
+    headers: TraceHeaders,
+    kind: SpanKind = SpanKind.Internal,
+    name: String = "root",
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  ): UManaged[ZSpan] =
+    entryPoint.fromHeadersOtherwiseRoot(headers, kind, name, errorHandler)
 
   def put(key: String, value: AttributeValue): UIO[Unit] =
     current.get.flatMap {
@@ -62,7 +111,14 @@ final case class ZTracer private (
 
   /**
    * This is a low level operator and you are responsible for manipulating the
-   * current span (updateCurrentSpan and removeCurrentSpan)
+   * current span (updateCurrentSpan and removeCurrentSpan). For example, we
+   * would recommend doing the following:
+   *
+   * {{{
+   * spanManaged("mySpan")                // produces a ZSpan
+   *   .tapM(updateCurrentSpan)           // sets the current span to the span we just produced
+   *   .onExit(_ => removeCurrentSpan)    // removes the current span when the resource finaliztion takes place
+   * }}}
    *
    * @param name
    *   is the name of the span
