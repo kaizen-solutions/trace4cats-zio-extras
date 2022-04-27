@@ -13,7 +13,7 @@ lazy val root =
   project
     .in(file("."))
     .settings(publish / skip := true)
-    .aggregate(core, http4s, http4sExample)
+    .aggregate(core, http4s, http4sExample, zioHttp)
 
 lazy val core = project
   .in(file("core"))
@@ -77,3 +77,14 @@ lazy val http4sExample =
       }
     )
     .dependsOn(http4s)
+
+lazy val zioHttp =
+  project
+    .in(file("zio-http"))
+    .settings(
+      name                              := "trace4cats-zio-extras-zio-http",
+      organization                      := "io.kaizen-solutions",
+      addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full)),
+      libraryDependencies += "io.d11"   %% "zhttp"          % "1.0.0.0-RC27"
+    )
+    .dependsOn(core)

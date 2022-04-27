@@ -1,7 +1,7 @@
 package io.kaizensolutions.http4s.examples
 
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
-import io.kaizensolutions.trace4cats.zio.extras.http4s.server.ServerZioTracer
+import io.kaizensolutions.trace4cats.zio.extras.http4s.server.Http4sServerTracer
 import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{HttpApp, HttpRoutes}
@@ -37,7 +37,7 @@ object ExampleApp extends App {
       .flatMap { implicit rts =>
         val _ = rts
         ZManaged.service[ZTracer].flatMap { tracer =>
-          val httpApp: HttpApp[Effect] = ServerZioTracer.traceRoutes(tracer, routes).orNotFound
+          val httpApp: HttpApp[Effect] = Http4sServerTracer.traceRoutes(tracer, routes).orNotFound
 
           BlazeServerBuilder[Effect]
             .bindHttp(8080, "localhost")

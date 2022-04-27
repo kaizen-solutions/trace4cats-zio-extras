@@ -11,11 +11,11 @@ import io.janstenpickle.trace4cats.http4s.common.{
 }
 import io.janstenpickle.trace4cats.model.{SpanKind, SpanStatus}
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
-import org.http4s.{HttpApp, HttpRoutes, Request, Response}
+import org.http4s.{Headers, HttpApp, HttpRoutes, Request, Response}
 import org.typelevel.ci.CIString
 import zio.*
 
-object ServerZioTracer {
+object Http4sServerTracer {
 
   /**
    * This has been adapted from
@@ -43,7 +43,7 @@ object ServerZioTracer {
     tracer: ZTracer,
     routes: HttpRoutes[RIO[R, *]],
     spanNamer: Http4sSpanNamer = Http4sSpanNamer.methodWithPath,
-    dropHeadersWhen: CIString => Boolean = _ => false,
+    dropHeadersWhen: CIString => Boolean = Headers.SensitiveHeaders.contains,
     errorHandler: ErrorHandler = ErrorHandler.empty
   ): HttpRoutes[RIO[R, *]] =
     Kleisli[
