@@ -10,7 +10,8 @@ inThisBuild {
     githubWorkflowPublishTargetBranches := Seq.empty,
     scalacOptions += "-Xsource:3",
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    publishTo := None
+    publishTo := None,
+    publish   := (())
   )
 }
 
