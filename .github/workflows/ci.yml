@@ -57,7 +57,7 @@ jobs:
         run: sbt ++${{ matrix.scala }} test
 
       - name: Compress target directories
-        run: tar cf targets.tar http4s/target target zio-http/target zio-http-examples/target http4s-examples/target core/target project/target
+        run: tar cf targets.tar sttp/target http4s/target target zio-http/target zio-http-examples/target http4s-examples/target core/target project/target
 
       - name: Upload target directories
         uses: actions/upload-artifact@v2
