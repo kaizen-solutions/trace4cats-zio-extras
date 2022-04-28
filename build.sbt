@@ -18,7 +18,7 @@ lazy val root =
 lazy val core = project
   .in(file("core"))
   .settings(
-    name                              := "trace4cats-zio-extras",
+    name                              := "trace4cats-zio-extras-core",
     organization                      := "io.kaizen-solutions",
     addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full)),
     libraryDependencies ++= {
