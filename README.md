@@ -11,11 +11,16 @@ experience for the user.
 ## Getting started
 ```scala
 resolvers += "jitpack" at "https://jitpack.io"
-libraryDependencies ++= Seq(
-  "com.github.kaizen-solutions.trace4cats-zio-extras" %% "trace4cats-zio-extras" % "<See Latest Release on JitPack>"
-)
+libraryDependencies ++= {
+  val org = "com.github.kaizen-solutions.trace4cats-zio-extras"
+  Seq(
+    org %% "trace4cats-zio-extras-core"     % "<See Latest Release on JitPack>",  // core only
+    org %% "trace4cats-zio-extras-zio-http" % "<See Latest Release on JitPack>",  // core + zio http server + client integration
+    org %% "trace4cats-zio-extras-http4s"   % "<See Latest Release on JitPack>",  // core + http4s server + client integration
+    org %% "trace4cats-zio-extras-sttp"     % "<See Latest Release on JitPack>"   // core + sttp client integration
+  )
+}
 ```
-
 
 Take a look at the example projects in this repository in order to get started.
 
