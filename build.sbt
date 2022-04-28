@@ -44,6 +44,7 @@ lazy val core = project
   .settings(
     name                              := "trace4cats-zio-extras-core",
     organization                      := "io.kaizen-solutions",
+    organizationName                  := "kaizen-solutions",
     addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full)),
     libraryDependencies ++= {
       val liHaoyi    = "com.lihaoyi"
@@ -75,6 +76,7 @@ lazy val http4s = project
   .settings(
     name                              := "trace4cats-zio-extras-http4s",
     organization                      := "io.kaizen-solutions",
+    organizationName                  := "kaizen-solutions",
     addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full)),
     libraryDependencies ++= {
       val trace4Cats = "io.janstenpickle"
@@ -96,6 +98,7 @@ lazy val http4sExample =
     .settings(
       name                              := "trace4cats-zio-extras-http4s-examples",
       organization                      := "io.kaizen-solutions",
+      organizationName                  := "kaizen-solutions",
       publish / skip                    := true,
       addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full)),
       libraryDependencies ++= {
@@ -120,6 +123,7 @@ lazy val zioHttp =
     .settings(
       name                              := "trace4cats-zio-extras-zio-http",
       organization                      := "io.kaizen-solutions",
+      organizationName                  := "kaizen-solutions",
       addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full)),
       libraryDependencies += "io.d11"   %% "zhttp"          % "1.0.0.0-RC27"
     )
@@ -131,6 +135,7 @@ lazy val zioHttpExample =
     .settings(
       name                              := "trace4cats-zio-extras-zio-http-examples",
       organization                      := "io.kaizen-solutions",
+      organizationName                  := "kaizen-solutions",
       publish / skip                    := true,
       addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full)),
       libraryDependencies ++= {
@@ -154,6 +159,7 @@ lazy val sttp =
     .settings(
       name                                                   := "trace4cats-zio-extras-sttp",
       organization                                           := "io.kaizen-solutions",
+      organizationName                                       := "kaizen-solutions",
       addCompilerPlugin(("org.typelevel"                      % "kind-projector"          % "0.13.2").cross(CrossVersion.full)),
       libraryDependencies += "com.softwaremill.sttp.client3" %% "httpclient-backend-zio1" % "3.5.2"
     )
@@ -165,6 +171,7 @@ lazy val sttpExample =
     .settings(
       name                              := "trace4cats-zio-extras-zio-sttp-examples",
       organization                      := "io.kaizen-solutions",
+      organizationName                  := "kaizen-solutions",
       publish / skip                    := true,
       addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full)),
       libraryDependencies ++= Seq(
