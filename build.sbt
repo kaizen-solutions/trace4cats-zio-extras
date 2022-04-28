@@ -9,13 +9,13 @@ inThisBuild {
     crossScalaVersions                  := Seq(scala212, scala213),
     githubWorkflowPublishTargetBranches := Seq.empty,
     scalacOptions += "-Xsource:3",
-    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    publishTo := None
   )
 }
 
 def releaseSettings: Seq[Def.Setting[_]] =
   Seq(
-    publishTo                   := None,
     versionScheme               := Some("early-semver"),
     releaseIgnoreUntrackedFiles := true,
     releaseTagName              := s"${version.value}",
