@@ -5,8 +5,9 @@ inThisBuild {
   val scala212 = "2.12.15"
   val scala213 = "2.13.8"
   Seq(
-    scalaVersion       := scala213,
-    crossScalaVersions := Seq(scala212, scala213),
+    scalaVersion                        := scala213,
+    crossScalaVersions                  := Seq(scala212, scala213),
+    githubWorkflowPublishTargetBranches := Seq.empty,
     scalacOptions += "-Xsource:3",
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
   )
