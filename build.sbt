@@ -9,9 +9,7 @@ inThisBuild {
     crossScalaVersions                  := Seq(scala212, scala213),
     githubWorkflowPublishTargetBranches := Seq.empty,
     scalacOptions += "-Xsource:3",
-    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    publishTo := None,
-    publish   := (())
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
   )
 }
 
@@ -31,7 +29,9 @@ def releaseSettings: Seq[Def.Setting[_]] =
       setNextVersion,
       commitNextVersion,
       pushChanges
-    )
+    ),
+    publishTo := None,
+    publish   := (())
   )
 
 lazy val root =
