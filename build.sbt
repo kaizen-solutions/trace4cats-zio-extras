@@ -125,7 +125,7 @@ lazy val sttp =
   project
     .in(file("sttp"))
     .settings(
-      name                                                   := "trace4cats-zio-extras-zio-http",
+      name                                                   := "trace4cats-zio-extras-sttp",
       organization                                           := "io.kaizen-solutions",
       addCompilerPlugin(("org.typelevel"                      % "kind-projector"          % "0.13.2").cross(CrossVersion.full)),
       libraryDependencies += "com.softwaremill.sttp.client3" %% "httpclient-backend-zio1" % "3.5.2"

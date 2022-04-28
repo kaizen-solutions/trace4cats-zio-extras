@@ -1,5 +1,8 @@
 # Trace4Cats ZIO Extras
 
+![Build Status](https://github.com/kaizen-solutions/trace4cats-zio-extras/actions/workflows/ci.yml/badge.svg)
+[![Jitpack](https://jitpack.io/v/kaizen-solutions/trace4cats-zio-extras.svg)](https://jitpack.io/#kaizen-solutions/trace4cats-zio-extras)
+
 Provides a variety of ZIO tracing integrations (with http4s and zio-http) and abstractions (`ZTracer`) for use with 
 Trace4Cats without making use of the typeclasses inside trace4cats (eg. `Provide`, etc.) and instead uses the ZIO 
 environment (`R`) and `FiberRef`s directly to call the underlying Trace4Cats APIs in order to provide a better ZIO API 
@@ -8,8 +11,11 @@ experience for the user.
 ## Getting started
 ```scala
 resolvers += "jitpack" at "https://jitpack.io"
-// Coming soon
+libraryDependencies ++= Seq(
+  "com.github.kaizen-solutions.trace4cats-zio-extras" %% "trace4cats-zio-extras" % "<See Latest Release on JitPack>"
+)
 ```
+
 
 Take a look at the example projects in this repository in order to get started.
 
