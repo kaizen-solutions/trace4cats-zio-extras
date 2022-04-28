@@ -239,3 +239,55 @@ ZIO
 
 This would generate the following trace in New Relic:
 ![sttp-client-example-trace](https://user-images.githubusercontent.com/14280155/165789418-7dd3fcc7-cca1-4278-948f-09bfd214f7ec.png)
+
+## Local setup
+
+We include a local setup of Jaegar along with its UI for easy testing. Bring it up using `docker-compose up`. 
+All the examples in the repository connect to it, so you can have a playground to try out the examples.
+
+Visit [the Jaegar UI](http://localhost:16686) and look through the traces:
+
+![Jaegar-UI-example](https://user-images.githubusercontent.com/14280155/165848829-31d39798-bb69-480b-aed9-72c7707df80d.png)
+
+Alternatively, if you prefer using New Relic, you can to connect to it instead:
+```sbt
+libraryDependencies ++= Seq(
+  "io.janstenpickle" %% "trace4cats-newrelic-http-exporter" % "0.13.1",
+  "org.http4s"       %% "http4s-blaze-client"               % "0.23.11"
+)
+```
+
+```scala
+import io.janstenpickle.trace4cats.inject.EntryPoint
+import io.janstenpickle.trace4cats.kernel.SpanSampler
+import io.janstenpickle.trace4cats.model.TraceProcess
+import io.janstenpickle.trace4cats.newrelic.{Endpoint, NewRelicSpanCompleter}
+import io.kaizensolutions.trace4cats.zio.extras.*
+import org.http4s.blaze.client.BlazeClientBuilder
+import zio.blocking.Blocking
+import zio.clock.Clock
+import zio.interop.catz.*
+import zio.*
+
+object NewRelicEntrypoint {
+  val live: URLayer[Clock & Blocking, Has[ZEntryPoint]] =
+    ZLayer
+      .fromManaged(
+        entryPoint(TraceProcess("zio-http-example-app"))
+      )
+      .orDie
+
+  def entryPoint(process: TraceProcess): RManaged[Clock & Blocking, ZEntryPoint] =
+    ZManaged.runtime[Clock & Blocking].flatMap { implicit rts =>
+      (for {
+        client <- BlazeClientBuilder[Task].resource
+        completer <- NewRelicSpanCompleter[Task](
+                       client = client,
+                       process = process,
+                       apiKey = "136bcc149f079eac2b2da7663aba7df6FFFFNRAL", // Insert your New Relic API key here
+                       endpoint = Endpoint.US
+                     )
+      } yield EntryPoint[Task](SpanSampler.always[Task], completer)).toZManaged
+    }
+}
+```

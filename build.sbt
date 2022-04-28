@@ -133,7 +133,7 @@ lazy val http4sExample =
         Seq(
           http4s     %% "http4s-blaze-server"               % http4sV,
           http4s     %% "http4s-blaze-client"               % http4sV,
-          trace4cats %% "trace4cats-newrelic-http-exporter" % trace4catsV
+          trace4cats %% "trace4cats-jaeger-thrift-exporter" % trace4catsV
         )
       }
     )
@@ -167,10 +167,7 @@ lazy val zioHttpExample =
 
         val http4sV     = "0.23.11"
         val trace4catsV = "0.13.1"
-        Seq(
-          http4s     %% "http4s-blaze-client"               % http4sV,
-          trace4cats %% "trace4cats-newrelic-http-exporter" % trace4catsV
-        )
+        Seq(trace4cats %% "trace4cats-jaeger-thrift-exporter" % trace4catsV)
       }
     )
     .dependsOn(zioHttp)
@@ -197,9 +194,6 @@ lazy val sttpExample =
       organization     := "io.kaizen-solutions",
       organizationName := "kaizen-solutions",
       publish / skip   := true,
-      libraryDependencies ++= Seq(
-        "io.janstenpickle" %% "trace4cats-newrelic-http-exporter" % "0.13.1",
-        "org.http4s"       %% "http4s-blaze-client"               % "0.23.11"
-      )
+      libraryDependencies ++= Seq("io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % "0.13.1")
     )
     .dependsOn(sttp)
