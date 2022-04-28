@@ -15,6 +15,7 @@ inThisBuild {
 
 def releaseSettings: Seq[Def.Setting[_]] =
   Seq(
+    publishTo                   := None,
     versionScheme               := Some("early-semver"),
     releaseIgnoreUntrackedFiles := true,
     releaseTagName              := s"${version.value}",
