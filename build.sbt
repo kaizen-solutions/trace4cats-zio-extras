@@ -13,7 +13,7 @@ lazy val root =
   project
     .in(file("."))
     .settings(publish / skip := true)
-    .aggregate(core, http4s, http4sExample, zioHttp, zioHttpExample)
+    .aggregate(core, http4s, http4sExample, zioHttp, zioHttpExample, sttp, sttpExample)
 
 lazy val core = project
   .in(file("core"))
@@ -131,3 +131,18 @@ lazy val sttp =
       libraryDependencies += "com.softwaremill.sttp.client3" %% "httpclient-backend-zio1" % "3.5.2"
     )
     .dependsOn(core)
+
+lazy val sttpExample =
+  project
+    .in(file("sttp-examples"))
+    .settings(
+      name                              := "trace4cats-zio-extras-zio-sttp-examples",
+      organization                      := "io.kaizen-solutions",
+      publish / skip                    := true,
+      addCompilerPlugin(("org.typelevel" % "kind-projector" % "0.13.2").cross(CrossVersion.full)),
+      libraryDependencies ++= Seq(
+        "io.janstenpickle" %% "trace4cats-newrelic-http-exporter" % "0.13.1",
+        "org.http4s"       %% "http4s-blaze-client"               % "0.23.11"
+      )
+    )
+    .dependsOn(sttp)

@@ -7,7 +7,6 @@ import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import sttp.capabilities.Effect
 import sttp.client3.impl.zio.RIOMonadAsyncError
 import sttp.client3.{HttpError, Request, Response, SttpBackend}
-import sttp.model.HeaderNames.isSensitive
 import sttp.model.{Header, HeaderNames, Headers, StatusCode}
 import sttp.monad.MonadError
 import zio.Task
@@ -96,20 +95,20 @@ object SttpBackendTracer {
 
   private def requestFields(
     hs: Headers,
-    dropHeadersWhen: String => Boolean = isSensitive
+    dropHeadersWhen: String => Boolean
   ): List[(String, AttributeValue)] =
     headerFields(hs, "req", dropHeadersWhen)
 
   private def responseFields(
     hs: Headers,
-    dropHeadersWhen: String => Boolean = isSensitive
+    dropHeadersWhen: String => Boolean
   ): List[(String, AttributeValue)] =
     headerFields(hs, "resp", dropHeadersWhen)
 
   private def headerFields(
     hs: Headers,
     `type`: String,
-    dropHeadersWhen: String => Boolean = isSensitive
+    dropHeadersWhen: String => Boolean
   ): List[(String, AttributeValue)] =
     hs.headers
       .filter(h => !dropHeadersWhen(h.name))
