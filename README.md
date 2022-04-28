@@ -166,3 +166,65 @@ The example generates the following trace in New Relic when `/plaintext` is quer
 ![newrelic-zio-http-trace](https://user-images.githubusercontent.com/14280155/165549664-b0608ec3-1d6a-47c1-8e0b-f46260fc6b22.png)
 
 We provide integrations for both the server and client.
+
+## STTP client integration
+
+We provide an integration for sttp clients that support ZIO's `Task`.
+
+```scala
+import io.kaizensolutions.trace4cats.zio.extras.ZTracer
+import io.kaizensolutions.trace4cats.zio.extras.sttp.SttpBackendTracer
+import sttp.capabilities
+import sttp.capabilities.zio.ZioStreams
+import sttp.client3.httpclient.zio.HttpClientZioBackend
+import zio.*
+import zio.blocking.Blocking
+import zio.clock.Clock
+
+type SttpClient = SttpBackend[Task, ZioStreams & capabilities.WebSockets]
+
+val tracedBackendManaged: URManaged[Has[ZTracer], SttpClient] =
+  (for {
+    tracer  <- ZManaged.service[ZTracer]
+    backend <- HttpClientZioBackend.managed()
+  } yield SttpBackendTracer(tracer, backend)).orDie
+
+val dependencies: URLayer[Clock & Blocking, Has[ZTracer] & Has[SttpClient]] = {
+  val tracerLayer: URLayer[Clock & Blocking, Has[ZTracer]]     = NewRelicEntrypoint.live >>> ZTracer.live
+  val sttpBackendLayer: URLayer[Has[ZTracer], Has[SttpClient]] = tracedBackendManaged.toLayer
+  tracerLayer >+> sttpBackendLayer
+}
+```
+
+We can now used the traced client:
+```scala
+import sttp.client3.*
+
+ZIO
+  .service[SttpClient]
+  .flatMap { client =>
+    val sayHello =
+      client
+        .send(basicRequest.get(uri"http://localhost:8080/hello/1"))
+        .tap(r => ZTracer.spanSource()(ZIO.debug(r.statusText) *> ZIO.debug(r.body)))
+
+    val error =
+      client
+        .send(basicRequest.get(uri"http://localhost:8080/error"))
+        .tap(r =>
+          ZTracer.span("headers-error")(
+            ZTracer.span("printing-body-status-error")(ZIO.debug(r.statusText) *> ZIO.debug(r.body))
+          )
+        )
+
+    ZTracer
+      .span("sttp-client-hello-error-par") {
+        sayHello
+          .zipPar(error)
+          .repeat(Schedule.recurs(10) *> Schedule.spaced(1.second))
+      }
+  }
+```
+
+This would generate the following trace in New Relic:
+![sttp-client-example-trace](https://user-images.githubusercontent.com/14280155/165789418-7dd3fcc7-cca1-4278-948f-09bfd214f7ec.png)
