@@ -1,3 +1,4 @@
+import sbt.Def
 import sbtrelease.ReleaseStateTransformations._
 
 inThisBuild {
@@ -7,8 +8,13 @@ inThisBuild {
     scalaVersion       := scala213,
     crossScalaVersions := Seq(scala212, scala213),
     scalacOptions += "-Xsource:3",
-    versionScheme := Some("early-semver"),
-    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
+  )
+}
+
+def releaseSettings: Seq[Def.Setting[_]] =
+  Seq(
+    versionScheme               := Some("early-semver"),
     releaseIgnoreUntrackedFiles := true,
     releaseTagName              := s"${version.value}",
     releaseProcess := Seq[ReleaseStep](
@@ -24,7 +30,6 @@ inThisBuild {
       pushChanges
     )
   )
-}
 
 lazy val root =
   project
@@ -34,6 +39,7 @@ lazy val root =
 
 lazy val core = project
   .in(file("core"))
+  .settings(releaseSettings: _*)
   .settings(
     name                              := "trace4cats-zio-extras-core",
     organization                      := "io.kaizen-solutions",
@@ -64,6 +70,7 @@ lazy val core = project
 
 lazy val http4s = project
   .in(file("http4s"))
+  .settings(releaseSettings: _*)
   .settings(
     name                              := "trace4cats-zio-extras-http4s",
     organization                      := "io.kaizen-solutions",
@@ -108,6 +115,7 @@ lazy val http4sExample =
 lazy val zioHttp =
   project
     .in(file("zio-http"))
+    .settings(releaseSettings: _*)
     .settings(
       name                              := "trace4cats-zio-extras-zio-http",
       organization                      := "io.kaizen-solutions",
@@ -141,6 +149,7 @@ lazy val zioHttpExample =
 lazy val sttp =
   project
     .in(file("sttp"))
+    .settings(releaseSettings: _*)
     .settings(
       name                                                   := "trace4cats-zio-extras-sttp",
       organization                                           := "io.kaizen-solutions",
