@@ -7,6 +7,7 @@ inThisBuild {
     scalaVersion       := scala213,
     crossScalaVersions := Seq(scala212, scala213),
     scalacOptions += "-Xsource:3",
+    versionScheme := Some("early-semver"),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     releaseIgnoreUntrackedFiles := true,
     releaseTagName              := s"${version.value}",
