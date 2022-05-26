@@ -59,7 +59,19 @@ lazy val root =
   project
     .in(file("."))
     .settings(publish / skip := true)
-    .aggregate(core, http4s, http4sExample, zioHttp, zioHttpExample, sttp, sttpExample, tapir, tapirExample)
+    .aggregate(
+      core,
+      http4s,
+      http4sExample,
+      zioHttp,
+      zioHttpExample,
+      sttp,
+      sttpExample,
+      tapir,
+      tapirExample,
+      virgil,
+      virgilExample
+    )
 
 lazy val core = project
   .in(file("core"))
@@ -215,3 +227,31 @@ lazy val tapirExample =
         )
     )
     .dependsOn(tapir)
+
+lazy val virgil =
+  project
+    .in(file("virgil"))
+    .settings(kindProjectorSettings: _*)
+    .settings(releaseSettings: _*)
+    .settings(
+      resolvers += "jitpack".at("https://jitpack.io"),
+      name                                                        := "trace4cats-zio-extras-virgil",
+      organization                                                := "io.kaizen-solutions",
+      organizationName                                            := "kaizen-solutions",
+      libraryDependencies += "com.github.kaizen-solutions.virgil" %% "virgil" % Versions.virgil
+    )
+    .dependsOn(core)
+
+lazy val virgilExample =
+  project
+    .in(file("virgil-examples"))
+    .settings(kindProjectorSettings: _*)
+    .settings(releaseSettings: _*)
+    .settings(
+      resolvers += "jitpack".at("https://jitpack.io"),
+      name                                      := "trace4cats-zio-extras-virgil",
+      organization                              := "io.kaizen-solutions",
+      organizationName                          := "kaizen-solutions",
+      libraryDependencies += "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats
+    )
+    .dependsOn(virgil)

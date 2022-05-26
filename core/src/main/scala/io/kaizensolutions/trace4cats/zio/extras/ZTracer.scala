@@ -94,7 +94,7 @@ final case class ZTracer private (
   def putAll(fields: (String, AttributeValue)*): UIO[Unit] =
     current.get.flatMap {
       case None       => UIO.unit
-      case Some(span) => span.putAll(fields *)
+      case Some(span) => span.putAll(fields*)
     }
 
   def spanSource[R, E, A](
@@ -117,7 +117,7 @@ final case class ZTracer private (
    * {{{
    * spanManaged("mySpan")                // produces a ZSpan
    *   .tapM(updateCurrentSpan)           // sets the current span to the span we just produced
-   *   .onExit(_ => removeCurrentSpan)    // removes the current span when the resource finaliztion takes place
+   *   .onExit(_ => removeCurrentSpan)    // removes the current span when the resource finalization takes place
    * }}}
    *
    * @param name
