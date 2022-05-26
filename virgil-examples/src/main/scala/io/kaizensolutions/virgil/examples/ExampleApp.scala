@@ -3,6 +3,7 @@ package io.kaizensolutions.virgil.examples
 import com.datastax.oss.driver.api.core.CqlSession
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.virgil.*
+import io.kaizensolutions.virgil.codecs.CqlRowDecoder
 import io.kaizensolutions.virgil.cql.CqlStringContext
 import io.kaizensolutions.virgil.dsl.InsertBuilder
 import zio.*
@@ -74,3 +75,7 @@ object ExampleApp extends App {
 }
 
 final case class Person(id: Int, age: Int, name: String)
+object Person {
+  implicit val cqlRowDecoderForPerson: CqlRowDecoder.Object[Person] =
+    CqlRowDecoder.derive[Person]
+}
