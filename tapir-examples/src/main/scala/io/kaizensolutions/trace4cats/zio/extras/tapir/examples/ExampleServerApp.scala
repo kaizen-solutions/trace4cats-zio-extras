@@ -51,17 +51,17 @@ object ExampleServerApp extends App {
   override def run(args: List[String]): URIO[ZEnv, ExitCode] = {
     val program =
       ZIO.runtime[Clock & Blocking].flatMap { implicit rts =>
-        for {
-          tracer  <- ZIO.service[ZTracer]
-          endpoint = tracedServerEndpoint(tracer)
-          httpApp  = Http4sServerInterpreter[Task]().toRoutes(endpoint).orNotFound
-          server <- BlazeServerBuilder[Task]
-                      .bindHttp(8080, "localhost")
-                      .withHttpApp(httpApp)
-                      .resource
-                      .toManagedZIO
-                      .useForever
-        } yield server
+        val server =
+          for {
+            tracer  <- ZIO.service[ZTracer]
+            endpoint = tracedServerEndpoint(tracer)
+            httpApp  = Http4sServerInterpreter[Task]().toRoutes(endpoint).orNotFound
+            server = BlazeServerBuilder[Task]
+                       .bindHttp(8080, "localhost")
+                       .withHttpApp(httpApp)
+          } yield server
+
+        server.flatMap(_.resource.toManagedZIO.useForever)
       }
 
     program.exitCode

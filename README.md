@@ -240,6 +240,62 @@ ZIO
 This would generate the following trace in New Relic:
 ![sttp-client-example-trace](https://user-images.githubusercontent.com/14280155/165789418-7dd3fcc7-cca1-4278-948f-09bfd214f7ec.png)
 
+## Tapir Integration
+
+We provide preliminary support for tracing Tapir server endpoints, users of the API have to explicitly perform additional 
+mappings to extract headers and not enough information is present to gather status codes. If you can, just trace the 
+underlying interpreters instead as they provide greater insights and more information in traces.
+
+Here is a small example:
+
+```scala
+  def countCharacters(tracer: ZTracer)(in: Request): UIO[Either[NoCharacters, Int]] = {
+    val l = in.input.length
+    val out = tracer.spanSource() {
+      if (l > 0) ZIO.succeed(l)
+      else ZIO.fail(NoCharacters("Please supply at least 1 character to count"))
+    }
+
+    out.either
+  }
+
+  val countCharactersEndpoint: Endpoint[Unit, Request, NoCharacters, Int, Any] =
+    endpoint.post
+      .in(stringBody(Charset.defaultCharset()))
+      .in(headers)
+      .mapIn(raw => Request(raw._1, Headers(raw._2)))(r => (r.input, r.headers.headers.toList))
+      .errorOut(statusCode(StatusCode.BadRequest).and(jsonBody[NoCharacters]))
+      .out(plainBody[Int])
+
+  def serverEndpoint(tracer: ZTracer): ServerEndpoint.Full[Unit, Unit, Request, NoCharacters, Int, Any, Task] =
+    countCharactersEndpoint.serverLogic(countCharacters(tracer))
+
+  def tracedServerEndpoint(tracer: ZTracer): ServerEndpoint.Full[Unit, Unit, Request, NoCharacters, Int, Any, Task] =
+    TapirServerTracer
+      .traceEndpoint[Request, NoCharacters, Int, Any, Any, Throwable](
+        tracer = tracer,
+        serverEndpoint = serverEndpoint(tracer),
+        extractRequestHeaders = _.headers,
+        extractResponseHeaders = _ => Headers(Nil)
+      )
+
+  val program =
+    ZIO.runtime[Clock & Blocking].flatMap { implicit rts =>
+      val server =
+        for {
+          tracer  <- ZIO.service[ZTracer]
+          endpoint = tracedServerEndpoint(tracer)
+          httpApp  = Http4sServerInterpreter[Task]().toRoutes(endpoint).orNotFound
+          server = BlazeServerBuilder[Task]
+            .bindHttp(8080, "localhost")
+            .withHttpApp(httpApp)
+        } yield server
+        
+    server.flatMap(_.resource.toManagedZIO.useForever)
+  }
+```
+
+
 ## Local setup
 
 We include a local setup of Jaegar along with its UI for easy testing. Bring it up using `docker-compose up`. 
