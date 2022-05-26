@@ -59,7 +59,7 @@ lazy val root =
   project
     .in(file("."))
     .settings(publish / skip := true)
-    .aggregate(core, http4s, http4sExample, zioHttp, zioHttpExample, sttp, sttpExample)
+    .aggregate(core, http4s, http4sExample, zioHttp, zioHttpExample, sttp, sttpExample, tapir, tapirExample)
 
 lazy val core = project
   .in(file("core"))
@@ -75,20 +75,15 @@ lazy val core = project
       val typelevel  = "org.typelevel"
       val zio        = "dev.zio"
 
-      val catsEffectV = "3.3.11"
-      val sourceCodeV = "0.2.8"
-      val trace4catsV = "0.13.1"
-      val zioV        = "1.0.14"
-      val zioInteropV = "3.2.9.1" // upgrade to 2 when published
       Seq(
-        liHaoyi    %% "sourcecode"        % sourceCodeV,
-        trace4cats %% "trace4cats-core"   % trace4catsV,
-        trace4cats %% "trace4cats-inject" % trace4catsV,
-        typelevel  %% "cats-effect"       % catsEffectV,
-        zio        %% "zio"               % zioV,
-        zio        %% "zio-interop-cats"  % zioInteropV,
-        zio        %% "zio-test"          % zioV % Test,
-        zio        %% "zio-test-sbt"      % zioV % Test
+        liHaoyi    %% "sourcecode"        % Versions.sourceCode,
+        trace4cats %% "trace4cats-core"   % Versions.trace4Cats,
+        trace4cats %% "trace4cats-inject" % Versions.trace4Cats,
+        typelevel  %% "cats-effect"       % Versions.catsEffect,
+        zio        %% "zio"               % Versions.zio,
+        zio        %% "zio-interop-cats"  % Versions.zioInteropCats,
+        zio        %% "zio-test"          % Versions.zio % Test,
+        zio        %% "zio-test-sbt"      % Versions.zio % Test
       )
     }
   )
@@ -105,11 +100,9 @@ lazy val http4s = project
       val trace4Cats = "io.janstenpickle"
       val http4s     = "org.http4s"
 
-      val trace4CatsV = "0.13.1"
-      val http4sV     = "0.23.11"
       Seq(
-        trace4Cats %% "trace4cats-http4s-common" % trace4CatsV,
-        http4s     %% "http4s-client"            % http4sV
+        trace4Cats %% "trace4cats-http4s-common" % Versions.trace4Cats,
+        http4s     %% "http4s-client"            % Versions.http4s
       )
     }
   )
@@ -128,12 +121,10 @@ lazy val http4sExample =
         val http4s     = "org.http4s"
         val trace4cats = "io.janstenpickle"
 
-        val http4sV     = "0.23.11"
-        val trace4catsV = "0.13.1"
         Seq(
-          http4s     %% "http4s-blaze-server"               % http4sV,
-          http4s     %% "http4s-blaze-client"               % http4sV,
-          trace4cats %% "trace4cats-jaeger-thrift-exporter" % trace4catsV
+          http4s     %% "http4s-blaze-server"               % Versions.http4s,
+          http4s     %% "http4s-blaze-client"               % Versions.http4s,
+          trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats
         )
       }
     )
@@ -148,7 +139,7 @@ lazy val zioHttp =
       name                            := "trace4cats-zio-extras-zio-http",
       organization                    := "io.kaizen-solutions",
       organizationName                := "kaizen-solutions",
-      libraryDependencies += "io.d11" %% "zhttp" % "1.0.0.0-RC27"
+      libraryDependencies += "io.d11" %% "zhttp" % Versions.zhttp
     )
     .dependsOn(core)
 
@@ -162,12 +153,8 @@ lazy val zioHttpExample =
       organizationName := "kaizen-solutions",
       publish / skip   := true,
       libraryDependencies ++= {
-        val http4s     = "org.http4s"
         val trace4cats = "io.janstenpickle"
-
-        val http4sV     = "0.23.11"
-        val trace4catsV = "0.13.1"
-        Seq(trace4cats %% "trace4cats-jaeger-thrift-exporter" % trace4catsV)
+        Seq(trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats)
       }
     )
     .dependsOn(zioHttp)
@@ -181,7 +168,7 @@ lazy val sttp =
       name                                                   := "trace4cats-zio-extras-sttp",
       organization                                           := "io.kaizen-solutions",
       organizationName                                       := "kaizen-solutions",
-      libraryDependencies += "com.softwaremill.sttp.client3" %% "httpclient-backend-zio1" % "3.5.2"
+      libraryDependencies += "com.softwaremill.sttp.client3" %% "httpclient-backend-zio1" % Versions.sttp
     )
     .dependsOn(core)
 
@@ -194,6 +181,37 @@ lazy val sttpExample =
       organization     := "io.kaizen-solutions",
       organizationName := "kaizen-solutions",
       publish / skip   := true,
-      libraryDependencies ++= Seq("io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % "0.13.1")
+      libraryDependencies ++= Seq("io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats)
     )
     .dependsOn(sttp)
+
+lazy val tapir =
+  project
+    .in(file("tapir"))
+    .settings(kindProjectorSettings: _*)
+    .settings(releaseSettings: _*)
+    .settings(
+      name                                                 := "trace4cats-zio-extras-tapir",
+      organization                                         := "io.kaizen-solutions",
+      organizationName                                     := "kaizen-solutions",
+      libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-core" % Versions.tapir
+    )
+    .dependsOn(core)
+
+lazy val tapirExample =
+  project
+    .in(file("tapir-examples"))
+    .settings(
+      name             := "trace4cats-zio-extras-zio-sttp-examples",
+      organization     := "io.kaizen-solutions",
+      organizationName := "kaizen-solutions",
+      publish / skip   := true,
+      libraryDependencies ++=
+        Seq(
+          "io.janstenpickle"            %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats,
+          "com.softwaremill.sttp.tapir" %% "tapir-json-circe"                  % Versions.tapir,
+          "com.softwaremill.sttp.tapir" %% "tapir-http4s-server"               % Versions.tapir,
+          "org.http4s"                  %% "http4s-blaze-server"               % Versions.http4s
+        )
+    )
+    .dependsOn(tapir)
