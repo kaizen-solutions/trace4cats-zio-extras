@@ -1,8 +1,9 @@
 package io.kaizensolutions.virgil
 
 import com.datastax.oss.driver.api.core.{CqlSession, CqlSessionBuilder}
-import io.janstenpickle.trace4cats.model.{AttributeValue, SampleDecision, SpanKind}
+import io.janstenpickle.trace4cats.model.{AttributeValue, SampleDecision, SpanKind, SpanStatus}
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
+import io.kaizensolutions.virgil.codecs.DecoderException
 import io.kaizensolutions.virgil.configuration.PageState
 import io.kaizensolutions.virgil.internal.CqlStatementRenderer
 import io.kaizensolutions.virgil.internal.Proofs.*
@@ -35,8 +36,13 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
           else ZIO.unit
 
         ZStream.execute(enrichSpanWithBindMarkers).drain ++
-          underlying
-            .execute(in)
+          ZStream(
+            underlying
+              .execute(in)
+              .process // access the underlying process to get access to tapDefect
+              .tapDefect(cause => enrichSpanWithDefectInformation(span)(cause).toManaged_)
+          )
+            .tapError(enrichSpanWithErrorInformation(span))
             .ensuring(tracer.removeCurrentSpan)
       }
   }
@@ -48,7 +54,11 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
         if (isSampled) enrichSpan(in, span, dropMarkerFromSpan)
         else ZIO.unit
 
-      enrichSpanWithBindMarkers *> underlying.executeMutation(in)
+      enrichSpanWithBindMarkers *>
+        underlying
+          .executeMutation(in)
+          .tapError(enrichSpanWithErrorInformation(span))
+          .tapDefect(enrichSpanWithDefectInformation(span))
     }
 
   override def executePage[A](in: CQL[A], pageState: Option[PageState])(implicit
@@ -65,8 +75,52 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
 
       enrichSpanWithBindMarkers *>
         span.put("virgil.query-paged", AttributeValue.BooleanValue(true)) *>
-        underlying.executePage(in, pageState)
+        underlying
+          .executePage(in, pageState)
+          .tapError(enrichSpanWithErrorInformation(span))
+          .tapDefect(enrichSpanWithDefectInformation(span))
     }
+  }
+
+  private def enrichSpanWithDefectInformation[E](currentSpan: ZSpan)(cause: Cause[E]): UIO[Unit] = {
+    val addInfo = currentSpan.context.traceFlags.sampled.toBoolean
+    if (addInfo) currentSpan.setStatus(SpanStatus.Internal(cause.prettyPrint))
+    else ZIO.unit
+  }
+
+  private def enrichSpanWithErrorInformation(currentSpan: ZSpan)(error: Throwable): UIO[Unit] = {
+    val addInfo = currentSpan.context.traceFlags.sampled.toBoolean
+    val enrich = error match {
+      case e: DecoderException.PrimitiveReadFailure =>
+        currentSpan.putAll(
+          Map(
+            "virgil.error.message" -> AttributeValue.StringValue(e.message),
+            "virgil.error.cause"   -> AttributeValue.StringValue(e.cause.getMessage)
+          )
+        )
+
+      case e: DecoderException.StructureReadFailure =>
+        currentSpan.putAll(
+          Map(
+            "virgil.error.message"             -> AttributeValue.StringValue(e.message),
+            "virgil.error.cause"               -> AttributeValue.StringValue(e.cause.getMessage),
+            "virgil.error.actual-db-structure" -> AttributeValue.StringValue(e.debugStructure),
+            "virgil.error.field" -> AttributeValue
+              .StringValue(e.field.map(_.toString).getOrElse("field-not-available"))
+          )
+        )
+
+      case e =>
+        currentSpan.putAll(
+          Map(
+            "virgil.error.message" -> AttributeValue.StringValue(e.getMessage),
+            "virgil.error.cause"   -> AttributeValue.StringValue(e.getCause.getMessage)
+          )
+        )
+    }
+
+    if (addInfo) enrich
+    else ZIO.unit
   }
 
   private def extractQueryString[A](in: CQL[A]) = {
