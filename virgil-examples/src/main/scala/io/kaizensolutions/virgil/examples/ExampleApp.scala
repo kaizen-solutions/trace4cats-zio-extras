@@ -3,9 +3,9 @@ package io.kaizensolutions.virgil.examples
 import com.datastax.oss.driver.api.core.CqlSession
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.virgil.*
-import io.kaizensolutions.virgil.codecs.CqlRowDecoder
 import io.kaizensolutions.virgil.cql.CqlStringContext
 import io.kaizensolutions.virgil.dsl.InsertBuilder
+import io.kaizensolutions.virgil.trace4cats.zio.extras.TracedCQLExecutor
 import zio.*
 import zio.blocking.Blocking
 import zio.clock.Clock
@@ -72,10 +72,4 @@ object ExampleApp extends App {
       .exitCode
       .provideCustomLayer(dependencies)
   }
-}
-
-final case class Person(id: Int, age: Int, name: String)
-object Person {
-  implicit val cqlRowDecoderForPerson: CqlRowDecoder.Object[Person] =
-    CqlRowDecoder.derive[Person]
 }

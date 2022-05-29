@@ -3,6 +3,7 @@ package io.kaizensolutions.trace4cats.zio.extras
 import io.janstenpickle.trace4cats.model.{AttributeValue, SpanContext, SpanKind, TraceHeaders}
 import io.janstenpickle.trace4cats.{ErrorHandler, ToHeaders}
 import zio.*
+import zio.stream.ZStream
 
 /**
  * ZTracer is a ZIO wrapper around the Trace4Cats Span. The abstraction utilizes
@@ -56,7 +57,7 @@ final case class ZTracer private (
     name: String = "root",
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(fn: ZSpan => ZIO[R, E, A]): ZIO[R, E, A] =
-    fromHeadersManaged(headers, kind, name, errorHandler)
+    fromHeadersManaged(headers, name, kind, errorHandler)
       .use(child => current.locally(Some(child))(fn(child)))
 
   /**
@@ -79,8 +80,8 @@ final case class ZTracer private (
    */
   def fromHeadersManaged(
     headers: TraceHeaders,
-    kind: SpanKind = SpanKind.Internal,
     name: String = "root",
+    kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   ): UManaged[ZSpan] =
     entryPoint.fromHeadersOtherwiseRoot(headers, kind, name, errorHandler)
@@ -138,6 +139,66 @@ final case class ZTracer private (
       case None       => entryPoint.rootSpan(name, kind, errorHandler)
     }
 
+  /**
+   * This operator is used to trace each element in a ZStream. Each element
+   * needs to provide enough context so we can extract tracer headers and turn
+   * them into spans which the ZTracer mechanism can use. For example, Kafka
+   * messages can place this Trace Header information in the Kafka message
+   * headers and we can hold onto it and use it to continue the trace across
+   * boundaries
+   *
+   * @param extractHeaders
+   *   is a function that extracts the trace headers from the element
+   * @param name
+   *   is the name of the span
+   * @param kind
+   *   is the kind of span
+   * @param errorHandler
+   *   is the error handler for the span
+   * @param stream
+   *   is the stream's elements that will be traced
+   * @tparam R
+   *   is the environment type
+   * @tparam E
+   *   is the error type
+   * @tparam O
+   *   is the output element type
+   * @return
+   */
+  def traceEachElement[R, E, O](
+    extractHeaders: O => TraceHeaders,
+    name: String,
+    kind: SpanKind = SpanKind.Internal,
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  )(stream: ZStream[R, E, O]): ZStream[R, E, Spanned[O]] =
+    stream
+      .mapChunks(Chunk.single)
+      .flatMap(inputs =>
+        ZStream.managed(
+          ZManaged.foreach(inputs)(input =>
+            fromHeadersManaged(extractHeaders(input), name, kind, errorHandler)
+              .map(Spanned(_, input))
+          )
+        )
+      )
+      .mapChunks(_.flatten)
+
+  /**
+   * End tracing each element of the Stream
+   *
+   * @param stream
+   * @param headers
+   * @tparam R
+   * @tparam E
+   * @tparam O
+   * @return
+   */
+  def endTracingEachElement[R, E, O](
+    stream: ZStream[R, E, Spanned[O]],
+    headers: ToHeaders = ToHeaders.standard
+  ): ZStream[R, E, (O, TraceHeaders)] =
+    stream.mapChunks(_.map(s => (s.value, headers.fromContext(s.span.context))))
+
   val removeCurrentSpan: UIO[Unit] =
     current.set(None)
 
@@ -161,6 +222,19 @@ object ZTracer {
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(zio: ZIO[R, E, A]): ZIO[R & Has[ZTracer], E, A] =
     ZIO.service[ZTracer].flatMap(_.span(name, kind, errorHandler)(zio))
+
+  def spanManaged(
+    name: String,
+    kind: SpanKind = SpanKind.Internal,
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  ): URManaged[Has[ZTracer], ZSpan] =
+    ZManaged.serviceWithManaged[ZTracer](_.spanManaged(name, kind, errorHandler))
+
+  def updateCurrentSpan(span: ZSpan): URIO[Has[ZTracer], Unit] =
+    ZIO.serviceWith[ZTracer](_.updateCurrentSpan(span))
+
+  val removeCurrentSpan: URIO[Has[ZTracer], Unit] =
+    ZIO.serviceWith[ZTracer](_.removeCurrentSpan)
 
   def withSpan[R <: Has[?], E, A](
     name: String,

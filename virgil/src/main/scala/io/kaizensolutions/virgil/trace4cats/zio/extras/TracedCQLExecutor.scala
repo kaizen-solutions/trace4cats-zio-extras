@@ -1,4 +1,4 @@
-package io.kaizensolutions.virgil
+package io.kaizensolutions.virgil.trace4cats.zio.extras
 
 import com.datastax.oss.driver.api.core.{CqlSession, CqlSessionBuilder}
 import io.janstenpickle.trace4cats.model.{AttributeValue, SampleDecision, SpanKind, SpanStatus}
@@ -7,6 +7,7 @@ import io.kaizensolutions.virgil.codecs.DecoderException
 import io.kaizensolutions.virgil.configuration.PageState
 import io.kaizensolutions.virgil.internal.CqlStatementRenderer
 import io.kaizensolutions.virgil.internal.Proofs.*
+import io.kaizensolutions.virgil.*
 import zio.*
 import zio.stream.*
 

@@ -61,6 +61,7 @@ lazy val root =
     .settings(publish / skip := true)
     .aggregate(
       core,
+      coreExample,
       http4s,
       http4sExample,
       zioHttp,
@@ -93,12 +94,28 @@ lazy val core = project
         trace4cats %% "trace4cats-inject" % Versions.trace4Cats,
         typelevel  %% "cats-effect"       % Versions.catsEffect,
         zio        %% "zio"               % Versions.zio,
+        zio        %% "zio-streams"       % Versions.zio,
         zio        %% "zio-interop-cats"  % Versions.zioInteropCats,
         zio        %% "zio-test"          % Versions.zio % Test,
         zio        %% "zio-test-sbt"      % Versions.zio % Test
       )
     }
   )
+
+lazy val coreExample = project
+  .in(file("core-examples"))
+  .settings(kindProjectorSettings: _*)
+  .settings(
+    name             := "trace4cats-zio-extras-core-examples",
+    organization     := "io.kaizen-solutions",
+    organizationName := "kaizen-solutions",
+    publish / skip   := true,
+    libraryDependencies ++= {
+      val trace4cats = "io.janstenpickle"
+      Seq(trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats)
+    }
+  )
+  .dependsOn(core)
 
 lazy val http4s = project
   .in(file("http4s"))
@@ -249,9 +266,13 @@ lazy val virgilExample =
     .settings(releaseSettings: _*)
     .settings(
       resolvers += "jitpack".at("https://jitpack.io"),
-      name                                      := "trace4cats-zio-extras-virgil",
-      organization                              := "io.kaizen-solutions",
-      organizationName                          := "kaizen-solutions",
-      libraryDependencies += "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats
+      name             := "trace4cats-zio-extras-virgil",
+      organization     := "io.kaizen-solutions",
+      organizationName := "kaizen-solutions",
+      libraryDependencies ++=
+        Seq(
+          "io.janstenpickle"                   %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats,
+          "com.github.kaizen-solutions.virgil" %% "virgil"                            % Versions.virgil
+        )
     )
-    .dependsOn(virgil)
+    .dependsOn(core, virgil)
