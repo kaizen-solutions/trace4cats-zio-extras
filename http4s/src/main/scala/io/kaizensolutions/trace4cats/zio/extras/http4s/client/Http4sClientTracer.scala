@@ -36,8 +36,6 @@ object Http4sClientTracer {
               Http4sStatusMapping.toSpanStatus(status)
             }
           )
-          .tapM(tracer.updateCurrentSpan)
-          .onExit(_ => tracer.removeCurrentSpan)
 
       // workaround for variance not automatically inferring
       val spanResource: Resource[ZIO[R, E, *], ZSpan] = spanManaged.toResourceZIO

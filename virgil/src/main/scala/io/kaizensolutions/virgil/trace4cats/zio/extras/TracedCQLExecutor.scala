@@ -26,27 +26,22 @@ import scala.collection.mutable
  */
 class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFromSpan: String => Boolean)
     extends CQLExecutor {
-  override def execute[A](in: CQL[A]): Stream[Throwable, A] = {
-    val span = tracer.spanManaged(extractQueryString(in), SpanKind.Internal)
-    ZStream
-      .managed(span.tapM(tracer.updateCurrentSpan))
-      .flatMap { span =>
-        val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
-        val enrichSpanWithBindMarkers =
-          if (isSampled) enrichSpan(in, span, dropMarkerFromSpan)
-          else ZIO.unit
+  override def execute[A](in: CQL[A]): Stream[Throwable, A] =
+    ZStream.managed(tracer.spanManaged(extractQueryString(in), SpanKind.Internal)).flatMap { span =>
+      val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
+      val enrichSpanWithBindMarkers =
+        if (isSampled) enrichSpan(in, span, dropMarkerFromSpan)
+        else ZIO.unit
 
-        ZStream.execute(enrichSpanWithBindMarkers).drain ++
-          ZStream(
-            underlying
-              .execute(in)
-              .process // access the underlying process to get access to tapDefect
-              .tapDefect(cause => enrichSpanWithDefectInformation(span)(cause).toManaged_)
-          )
-            .tapError(enrichSpanWithErrorInformation(span))
-            .ensuring(tracer.removeCurrentSpan)
-      }
-  }
+      ZStream.execute(enrichSpanWithBindMarkers).drain ++
+        ZStream(
+          underlying
+            .execute(in)
+            .process // access the underlying process to get access to tapDefect
+            .tapDefect(cause => enrichSpanWithDefectInformation(span)(cause).toManaged_)
+        )
+          .tapError(enrichSpanWithErrorInformation(span))
+    }
 
   override def executeMutation(in: CQL[MutationResult]): Task[MutationResult] =
     tracer.withSpan(extractQueryString(in), SpanKind.Internal) { span =>

@@ -111,15 +111,22 @@ final case class ZTracer private (
     spanManaged(name, kind, errorHandler).use(span => current.locally(Some(span))(zio))
 
   /**
-   * This is a low level operator and you are responsible for manipulating the
-   * current span (updateCurrentSpan and removeCurrentSpan). For example, we
-   * would recommend doing the following:
+   * This is a low level operator and leaves you, the user, to manipulate the
+   * current span using `updateCurrentSpan` and `removeCurrentSpan`. We
+   * recommend using `spanManaged` instead.
+   *
+   * For example:
    *
    * {{{
    * spanManaged("mySpan")                // produces a ZSpan
    *   .tapM(updateCurrentSpan)           // sets the current span to the span we just produced
    *   .onExit(_ => removeCurrentSpan)    // removes the current span when the resource finalization takes place
    * }}}
+   *
+   * WARNING: Please note that the above is just an example, rather than
+   * removing the current span (i.e. setting the FiberRef to None, you should be
+   * restoring it to what was there previously before you called span). You
+   * should use spanManagedLocally
    *
    * @param name
    *   is the name of the span
@@ -129,7 +136,7 @@ final case class ZTracer private (
    *   is the error handler for the span
    * @return
    */
-  def spanManaged(
+  def spanManagedManual(
     name: String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
@@ -138,6 +145,26 @@ final case class ZTracer private (
       case Some(span) => span.child(name, kind, errorHandler)
       case None       => entryPoint.rootSpan(name, kind, errorHandler)
     }
+
+  /**
+   * Works like withSpan but in the context of a ZManaged and handles updating
+   * of the underlying Span context automatically for you.
+   * @param name
+   * @param kind
+   * @param errorHandler
+   * @return
+   */
+  def spanManaged(
+    name: String,
+    kind: SpanKind = SpanKind.Internal,
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  ): UManaged[ZSpan] =
+    retrieveCurrentSpan.toManaged_
+      .flatMap(current =>
+        spanManagedManual(name, kind, errorHandler)
+          .tapM(updateCurrentSpan)
+          .ensuring(restore(current))
+      )
 
   /**
    * This operator is used to trace each element in a ZStream. Each element
@@ -187,10 +214,16 @@ final case class ZTracer private (
    * End tracing each element of the Stream
    *
    * @param stream
+   *   is the stream whose elements are of type `Spanned[A]` which we wish to
+   *   stop spanning
    * @param headers
+   *   is the headers to extract from each span
    * @tparam R
+   *   is the environment
    * @tparam E
+   *   is the error type
    * @tparam O
+   *   is the output element type that was originally spanned
    * @return
    */
   def endTracingEachElement[R, E, O](
@@ -199,11 +232,29 @@ final case class ZTracer private (
   ): ZStream[R, E, (O, TraceHeaders)] =
     stream.mapChunks(_.map(s => (s.value, headers.fromContext(s.span.context))))
 
+  /**
+   * This is a low level operator that can potentially be used with spanManaged
+   * but using `retrieveCurrentSpan` and a finalizer calling `updateCurrentSpan`
+   * is a safer alternative to preserve the span already present rather than a
+   * complete wipe
+   */
   val removeCurrentSpan: UIO[Unit] =
     current.set(None)
 
+  /**
+   * This is a low level operator meant to be used with spanManaged
+   */
+  val retrieveCurrentSpan: UIO[Option[ZSpan]] =
+    current.get
+
   def updateCurrentSpan(in: ZSpan): UIO[Unit] =
     current.set(Some(in))
+
+  def restore(in: Option[ZSpan]): UIO[Unit] =
+    current.set(in)
+
+  def locally[R, E, A](span: ZSpan)(zio: ZIO[R, E, A]): ZIO[R, E, A] =
+    current.locally(Some(span))(zio)
 
   def withSpan[R, E, A](
     name: String,
@@ -223,6 +274,13 @@ object ZTracer {
   )(zio: ZIO[R, E, A]): ZIO[R & Has[ZTracer], E, A] =
     ZIO.service[ZTracer].flatMap(_.span(name, kind, errorHandler)(zio))
 
+  def spanManagedManual(
+    name: String,
+    kind: SpanKind = SpanKind.Internal,
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  ): URManaged[Has[ZTracer], ZSpan] =
+    ZManaged.serviceWithManaged[ZTracer](_.spanManagedManual(name, kind, errorHandler))
+
   def spanManaged(
     name: String,
     kind: SpanKind = SpanKind.Internal,
@@ -232,6 +290,15 @@ object ZTracer {
 
   def updateCurrentSpan(span: ZSpan): URIO[Has[ZTracer], Unit] =
     ZIO.serviceWith[ZTracer](_.updateCurrentSpan(span))
+
+  def restore(span: Option[ZSpan]): URIO[Has[ZTracer], Unit] =
+    ZIO.serviceWith[ZTracer](_.restore(span))
+
+  def locally[R <: Has[?], E, A](span: ZSpan)(zio: ZIO[R, E, A]): ZIO[R & Has[ZTracer], E, A] =
+    ZIO.service[ZTracer].flatMap(_.locally(span)(zio))
+
+  val getCurrentSpan: URIO[Has[ZTracer], Option[ZSpan]] =
+    ZIO.serviceWith[ZTracer](_.retrieveCurrentSpan)
 
   val removeCurrentSpan: URIO[Has[ZTracer], Unit] =
     ZIO.serviceWith[ZTracer](_.removeCurrentSpan)
@@ -251,7 +318,10 @@ object ZTracer {
   val live: URLayer[Has[ZEntryPoint], Has[ZTracer]] =
     ZLayer.fromServiceM[ZEntryPoint, Any, Nothing, ZTracer](ep =>
       FiberRef
-        .make[Option[ZSpan]](None)
+        .make[Option[ZSpan]](
+          initial = None,
+          join = (parent, _) => parent // the FiberRef will keep the parent's span when a child fiber joined
+        )
         .map(spanRef => ZTracer.make(spanRef, ep))
     )
 }
