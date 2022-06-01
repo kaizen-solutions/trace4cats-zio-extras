@@ -112,8 +112,8 @@ final case class ZTracer private (
 
   /**
    * This is a low level operator and leaves you, the user, to manipulate the
-   * current span using `updateCurrentSpan` and `removeCurrentSpan`. We
-   * recommend using `spanManaged` instead.
+   * current span using [[updateCurrentSpan]] and [[removeCurrentSpan]] or
+   * [[restore]]. We recommend using [[spanManaged]] instead.
    *
    * For example:
    *
@@ -126,7 +126,7 @@ final case class ZTracer private (
    * WARNING: Please note that the above is just an example, rather than
    * removing the current span (i.e. setting the FiberRef to None, you should be
    * restoring it to what was there previously before you called span). You
-   * should use spanManagedLocally
+   * should use [[spanManaged]] instead.
    *
    * @param name
    *   is the name of the span
@@ -147,11 +147,14 @@ final case class ZTracer private (
     }
 
   /**
-   * Works like withSpan but in the context of a ZManaged and handles updating
-   * of the underlying Span context automatically for you.
+   * Works like [[withSpan]] but in the context of a ZManaged and handles
+   * updating of the underlying Span context automatically for you.
    * @param name
+   *   is the name of the span
    * @param kind
+   *   is the kind of the span
    * @param errorHandler
+   *   is the error handler to use in case the span fails
    * @return
    */
   def spanManaged(
@@ -315,13 +318,13 @@ object ZTracer {
   )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R & Has[ZTracer], E, A] =
     ZIO.service[ZTracer].flatMap(_.spanSource(kind)(zio)(fileName, line))
 
-  val live: URLayer[Has[ZEntryPoint], Has[ZTracer]] =
-    ZLayer.fromServiceM[ZEntryPoint, Any, Nothing, ZTracer](ep =>
-      FiberRef
-        .make[Option[ZSpan]](
-          initial = None,
-          join = (parent, _) => parent // the FiberRef will keep the parent's span when a child fiber joined
-        )
-        .map(spanRef => ZTracer.make(spanRef, ep))
+  val layer: URLayer[Has[ZEntryPoint], Has[ZTracer]] =
+    ZLayer.fromEffect(
+      for {
+        ep <- ZIO.service[ZEntryPoint]
+        // the FiberRef will keep the parent's span when a child fiber joined
+        spanRef <- FiberRef.make[Option[ZSpan]](initial = None, join = (parent, _) => parent)
+        tracer   = ZTracer.make(spanRef, ep)
+      } yield tracer
     )
 }

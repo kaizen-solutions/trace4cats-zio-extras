@@ -16,7 +16,7 @@ import zio.duration.durationInt
 object ExampleClientApp extends App {
   val dependencies: URLayer[Clock & Blocking, ChannelFactory & EventLoopGroup & Has[ZTracer]] =
     ChannelFactory.auto ++ EventLoopGroup.auto() ++
-      (JaegarEntrypoint.entryPoint(TraceProcess("zio-http-client-example")).orDie.toLayer >>> ZTracer.live)
+      (JaegarEntrypoint.entryPoint(TraceProcess("zio-http-client-example")).orDie.toLayer >>> ZTracer.layer)
 
   override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = {
     val reqPlainText =

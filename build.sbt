@@ -197,7 +197,7 @@ lazy val sttp =
       name                                                   := "trace4cats-zio-extras-sttp",
       organization                                           := "io.kaizen-solutions",
       organizationName                                       := "kaizen-solutions",
-      libraryDependencies += "com.softwaremill.sttp.client3" %% "httpclient-backend-zio1" % Versions.sttp
+      libraryDependencies += "com.softwaremill.sttp.client3" %% "zio1" % Versions.sttp
     )
     .dependsOn(core)
 

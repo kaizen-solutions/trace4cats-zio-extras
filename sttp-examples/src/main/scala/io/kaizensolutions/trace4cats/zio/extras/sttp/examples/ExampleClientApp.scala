@@ -22,7 +22,7 @@ object ExampleClientApp extends App {
     } yield SttpBackendTracer(tracer, backend)).orDie
 
   val dependencies: URLayer[Clock & Blocking, Has[ZTracer] & Has[SttpClient]] = {
-    val tracerLayer: URLayer[Clock & Blocking, Has[ZTracer]]     = JaegarEntrypoint.live >>> ZTracer.live
+    val tracerLayer: URLayer[Clock & Blocking, Has[ZTracer]]     = JaegarEntrypoint.live >>> ZTracer.layer
     val sttpBackendLayer: URLayer[Has[ZTracer], Has[SttpClient]] = tracedBackendManaged.toLayer
 
     tracerLayer >+> sttpBackendLayer

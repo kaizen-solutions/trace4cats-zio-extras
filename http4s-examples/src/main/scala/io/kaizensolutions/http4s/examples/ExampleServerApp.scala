@@ -48,6 +48,6 @@ object ExampleServerApp extends App {
       .useForever
       .exitCode
       .provideCustomLayer(
-        (JaegarEntrypoint.live >>> ZTracer.live) ++ Db.live
+        (JaegarEntrypoint.live >>> ZTracer.layer) ++ Db.live
       )
 }

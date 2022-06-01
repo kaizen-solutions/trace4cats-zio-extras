@@ -61,6 +61,6 @@ object ExampleClientApp extends App {
       }
     }.exitCode
       .provideCustomLayer(
-        JaegarEntrypoint.entryPoint(TraceProcess("http4s-client-example")).orDie.toLayer >>> ZTracer.live
+        JaegarEntrypoint.entryPoint(TraceProcess("http4s-client-example")).orDie.toLayer >>> ZTracer.layer
       )
 }

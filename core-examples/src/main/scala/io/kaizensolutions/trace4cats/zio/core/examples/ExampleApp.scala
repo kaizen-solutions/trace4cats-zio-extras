@@ -65,5 +65,5 @@ object ExampleApp extends App {
           .runDrain
           .exitCode
       }
-      .provideCustomLayer(JaegarEntrypoint.live >>> ZTracer.live)
+      .provideCustomLayer(JaegarEntrypoint.live >>> ZTracer.layer)
 }

@@ -61,8 +61,6 @@ very closely to the Trace4Cats HTTP4s integration and is intended to function as
 Here's an example:
 
 ```scala
-
-```scala
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.http4s.server.Http4sServerTracer
 import org.http4s.blaze.server.BlazeServerBuilder
@@ -110,7 +108,7 @@ ZManaged
   .useForever
   .exitCode
   .provideCustomLayer(
-    (NewRelicEntrypoint.live >>> ZTracer.live) ++ Db.live
+    (NewRelicEntrypoint.live >>> ZTracer.layer) ++ Db.live
   )
 ```
 
@@ -168,7 +166,7 @@ object ExampleApp extends App {
       }
       .exitCode
       .provideCustomLayer(
-        (NewRelicEntrypoint.live >>> ZTracer.live) ++ Db.live
+        (NewRelicEntrypoint.live >>> ZTracer.layer) ++ Db.live
       )
 }
 ```
@@ -201,7 +199,7 @@ val tracedBackendManaged: URManaged[Has[ZTracer], SttpClient] =
   } yield SttpBackendTracer(tracer, backend)).orDie
 
 val dependencies: URLayer[Clock & Blocking, Has[ZTracer] & Has[SttpClient]] = {
-  val tracerLayer: URLayer[Clock & Blocking, Has[ZTracer]]     = NewRelicEntrypoint.live >>> ZTracer.live
+  val tracerLayer: URLayer[Clock & Blocking, Has[ZTracer]]     = NewRelicEntrypoint.live >>> ZTracer.layer
   val sttpBackendLayer: URLayer[Has[ZTracer], Has[SttpClient]] = tracedBackendManaged.toLayer
   tracerLayer >+> sttpBackendLayer
 }
@@ -305,7 +303,7 @@ Here is a small example:
 ```scala
   val dependencies: URLayer[Clock & Blocking, Has[CQLExecutor] & Has[ZTracer]] =
     ZLayer.succeed(CqlSession.builder().withKeyspace("virgil")) ++ JaegarEntrypoint.live >>>
-      CQLExecutor.live.orDie ++ ZTracer.live >+> TracedCQLExecutor.layer
+      CQLExecutor.live.orDie ++ ZTracer.layer >+> TracedCQLExecutor.layer
 
   val queryProgram: ZIO[Console & Has[CQLExecutor] & Has[ZTracer], Throwable, Unit] = 
     ZTracer.span("all-persons") {

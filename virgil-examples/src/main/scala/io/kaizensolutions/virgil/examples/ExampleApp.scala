@@ -30,7 +30,7 @@ object ExampleApp extends App {
 
   val dependencies: URLayer[Clock & Blocking, Has[CQLExecutor] & Has[ZTracer]] =
     ZLayer.succeed(CqlSession.builder().withKeyspace("virgil")) ++ JaegarEntrypoint.live >>>
-      CQLExecutor.live.orDie ++ ZTracer.live >+> TracedCQLExecutor.layer
+      CQLExecutor.live.orDie ++ ZTracer.layer >+> TracedCQLExecutor.layer
 
   override def run(args: List[String]): URIO[ZEnv, ExitCode] = {
     val queryProgram: ZIO[Console & Has[CQLExecutor] & Has[ZTracer], Throwable, Unit] =
