@@ -135,7 +135,7 @@ lazy val http4s = project
       )
     }
   )
-  .dependsOn(core)
+  .dependsOn(core % "compile->compile;test->test")
 
 lazy val http4sExample =
   project
