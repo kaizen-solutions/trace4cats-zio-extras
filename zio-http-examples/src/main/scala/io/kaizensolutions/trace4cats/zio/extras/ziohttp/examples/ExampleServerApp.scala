@@ -1,8 +1,9 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziohttp.examples
 
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
-import io.kaizensolutions.trace4cats.zio.extras.ziohttp.server.ZioHttpServerTracer
+import io.kaizensolutions.trace4cats.zio.extras.ziohttp.server.ZioHttpServerTracer.trace
 import zhttp.http.*
+import zhttp.http.Middleware.debug
 import zhttp.service.Server
 import zio.*
 import zio.clock.Clock
@@ -33,12 +34,8 @@ object ExampleServerApp extends App {
     }
 
   override def run(args: List[String]): URIO[ZEnv, ExitCode] =
-    ZIO
-      .service[ZTracer]
-      .flatMap { tracer =>
-        val tracedApp = ZioHttpServerTracer.traceApp(tracer, app)
-        Server.start(8080, tracedApp)
-      }
+    Server
+      .start(8080, app @@ debug @@ trace)
       .exitCode
       .provideCustomLayer(
         (JaegarEntrypoint.live >>> ZTracer.layer) ++ Db.live

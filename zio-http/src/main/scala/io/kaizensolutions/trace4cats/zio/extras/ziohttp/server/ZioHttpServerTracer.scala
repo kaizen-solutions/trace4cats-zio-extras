@@ -7,10 +7,40 @@ import io.janstenpickle.trace4cats.model.{AttributeValue, SpanKind, SpanStatus}
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.{extractTraceHeaders, toSpanStatus}
 import zhttp.http.*
-import zio.{Chunk, Exit}
+import zhttp.http.middleware.HttpMiddleware
+import zio.{Chunk, Exit, Has, ZIO}
 
 object ZioHttpServerTracer {
   type SpanNamer = Request => String
+
+  val trace: HttpMiddleware[Has[ZTracer], Nothing] = traceWithEnv()
+
+  def traceWith(
+    tracer: ZTracer,
+    dropHeadersWhen: String => Boolean = SensitiveHeaders.contains,
+    spanNamer: SpanNamer = req => s"${req.method.toString()} ${req.url.path.toString()}",
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  ): HttpMiddleware[Any, Nothing] =
+    new Middleware[Any, Nothing, Request, Response, Request, Response] {
+      override def apply[R1 <: Any, E1 >: Nothing](
+        http: Http[R1, E1, Request, Response]
+      ): Http[R1, E1, Request, Response] =
+        traceApp(tracer, http, dropHeadersWhen, spanNamer, errorHandler)
+    }
+
+  def traceWithEnv(
+    dropHeadersWhen: String => Boolean = SensitiveHeaders.contains,
+    spanNamer: SpanNamer = req => s"${req.method.toString()} ${req.url.path.toString()}",
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  ): HttpMiddleware[Has[ZTracer], Nothing] =
+    new Middleware[Has[ZTracer], Nothing, Request, Response, Request, Response] {
+      override def apply[R1 <: Has[ZTracer], E1 >: Nothing](
+        http: Http[R1, E1, Request, Response]
+      ): Http[R1, E1, Request, Response] =
+        Http
+          .fromZIO(ZIO.service[ZTracer])
+          .flatMap(traceApp(_, http, dropHeadersWhen, spanNamer, errorHandler))
+    }
 
   def traceApp[R, E](
     tracer: ZTracer,
@@ -30,11 +60,11 @@ object ZioHttpServerTracer {
         name = nameOfSpan,
         errorHandler = errorHandler
       ) { span =>
-        span.putAll(reqFields *) *>
+        span.putAll(reqFields*) *>
           httpApp(request).onExit {
             case Exit.Success(response) =>
               span.setStatus(toSpanStatus(response.status)) *>
-                span.putAll(responseFields(response, dropHeadersWhen) *)
+                span.putAll(responseFields(response, dropHeadersWhen)*)
 
             case Exit.Failure(cause) =>
               span.setStatus(SpanStatus.Internal(cause.prettyPrint))

@@ -12,7 +12,7 @@ import zhttp.service.client.ClientSSLHandler.ClientSSLOptions
 import zhttp.service.{ChannelFactory, Client, EventLoopGroup}
 import zio.{Has, ZIO}
 
-object TracedClient {
+object ZioHttpClientTracer {
   def makeRequest(
     tracer: ZTracer,
     request: Request,
