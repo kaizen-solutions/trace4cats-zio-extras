@@ -266,7 +266,7 @@ lazy val virgilExample =
     .settings(releaseSettings: _*)
     .settings(
       resolvers += "jitpack".at("https://jitpack.io"),
-      name             := "trace4cats-zio-extras-virgil",
+      name             := "trace4cats-zio-extras-virgil-examples",
       organization     := "io.kaizen-solutions",
       organizationName := "kaizen-solutions",
       libraryDependencies ++=
