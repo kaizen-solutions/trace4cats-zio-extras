@@ -63,7 +63,7 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
     val query  = extractQueryString(in)
     val pageNr = pageState.map(_.toString()).getOrElse("begin")
 
-    tracer.withSpan(s"$query-page-$pageNr", SpanKind.Internal) { span =>
+    tracer.withSpan(s"page-$pageNr: $query", SpanKind.Internal) { span =>
       val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
       val enrichSpanWithBindMarkers =
         if (isSampled) enrichSpan(in, span, dropMarkerFromSpan)
@@ -145,27 +145,27 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
   private def enrichSpan[A](in: CQL[A], span: ZSpan, dropMarkerFromSpan: String => Boolean) =
     in.cqlType match {
       case q @ CQLType.Query(_, _, pullMode) =>
-        val attrMap       = mutable.Map.empty[String, AttributeValue]
-        val (qs, markers) = CqlStatementRenderer.render(q)
-        attrMap += ("virgil.query"            -> AttributeValue.StringValue(qs))
+        val attrMap      = mutable.Map.empty[String, AttributeValue]
+        val (_, markers) = CqlStatementRenderer.render(q)
+
         attrMap += ("virgil.query-type"       -> AttributeValue.StringValue("query"))
         attrMap += ("virgil.elements-to-pull" -> AttributeValue.StringValue(pullMode.toString))
         markers.underlying.foreach { m =>
           val (name, marker) = m
           if (dropMarkerFromSpan(name.name)) ()
-          else attrMap += (s"virgil.query.$name" -> AttributeValue.StringValue(marker.value.toString))
+          else attrMap += (s"virgil.bind-markers.$name" -> AttributeValue.StringValue(marker.value.toString))
         }
         span.putAll(attrMap.toMap)
 
       case mutation: CQLType.Mutation =>
-        val attrMap       = mutable.Map.empty[String, AttributeValue]
-        val (qs, markers) = CqlStatementRenderer.render(mutation)
-        attrMap += ("virgil.query"      -> AttributeValue.StringValue(qs))
+        val attrMap      = mutable.Map.empty[String, AttributeValue]
+        val (_, markers) = CqlStatementRenderer.render(mutation)
+
         attrMap += ("virgil.query-type" -> AttributeValue.StringValue("mutation"))
         markers.underlying.foreach { m =>
           val (name, marker) = m
           if (dropMarkerFromSpan(name.name)) ()
-          else attrMap += (s"virgil.query.$name" -> AttributeValue.StringValue(marker.value.toString))
+          else attrMap += (s"virgil.bind-markers.$name" -> AttributeValue.StringValue(marker.value.toString))
         }
         span.putAll(attrMap.toMap)
 
@@ -181,7 +181,10 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
           markers.underlying.foreach { m =>
             val (name, marker) = m
             if (dropMarkerFromSpan(name.name)) ()
-            else attrMap += (s"virgil.query.$queryCounter.$name" -> AttributeValue.StringValue(marker.value.toString))
+            else
+              attrMap += (s"virgil.bind-markers.$queryCounter.$name" -> AttributeValue.StringValue(
+                marker.value.toString
+              ))
           }
           queryCounter += 1
         }
@@ -190,6 +193,12 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
 }
 
 object TracedCQLExecutor {
+  def apply(
+    underlying: CQLExecutor,
+    tracer: ZTracer,
+    dropMarkerFromSpan: String => Boolean
+  ): TracedCQLExecutor = new TracedCQLExecutor(underlying, tracer, dropMarkerFromSpan)
+
   def apply(
     builder: CqlSessionBuilder,
     tracer: ZTracer,

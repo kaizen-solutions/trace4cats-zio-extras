@@ -257,7 +257,7 @@ lazy val virgil =
       organizationName                                            := "kaizen-solutions",
       libraryDependencies += "com.github.kaizen-solutions.virgil" %% "virgil" % Versions.virgil
     )
-    .dependsOn(core)
+    .dependsOn(core % "compile->compile;test->test")
 
 lazy val virgilExample =
   project
