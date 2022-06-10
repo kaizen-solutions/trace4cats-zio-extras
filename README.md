@@ -17,7 +17,9 @@ libraryDependencies ++= {
     org %% "trace4cats-zio-extras-core"     % "<See Latest Release on JitPack>",  // core only
     org %% "trace4cats-zio-extras-zio-http" % "<See Latest Release on JitPack>",  // core + zio http server + client integration
     org %% "trace4cats-zio-extras-http4s"   % "<See Latest Release on JitPack>",  // core + http4s server + client integration
-    org %% "trace4cats-zio-extras-sttp"     % "<See Latest Release on JitPack>"   // core + sttp client integration
+    org %% "trace4cats-zio-extras-sttp"     % "<See Latest Release on JitPack>",  // core + sttp client integration
+    org %% "trace4cats-zio-extras-tapir"    % "<See Latest Release on JitPack>",  // core + tapir integration
+    org %% "trace4cats-zio-extras-virgil"   % "<See Latest Release on JitPack>"   // core + virgil integration
   )
 }
 ```
