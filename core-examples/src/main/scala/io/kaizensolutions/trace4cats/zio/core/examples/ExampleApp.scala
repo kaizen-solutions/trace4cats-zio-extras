@@ -35,14 +35,14 @@ object ExampleApp extends App {
   // The approach below is a lot more heavy-handed but works properly in the face of parallelism
   override def run(args: List[String]): URIO[ZEnv, ExitCode] =
     ZTracer
-      .span("streaming-app") {
+      .span("streaming-app-new-fiberref-grouped") {
         ZStream
           .range(1, 100)
           .mapM(i => ZTracer.withSpan(s"name-$i")(span => ZIO.succeed((i, span.extractHeaders(ToHeaders.standard)))))
           .traceEachElement("in-begin") { case (_, headers) =>
             headers
           }
-          .mapThrough(_._1)
+          .map(_._1)
           .mapMTraced(e =>
             ZTracer.span(s"plus 1 for $e")(putStrLn(s"Adding ${e} + 1 = ${e + 1}") *> ZIO.succeed(e + 1))
           )
@@ -61,9 +61,12 @@ object ExampleApp extends App {
               ) *> ZIO.succeed(e + 2)
             )
           )
+          .groupedWithin(10, 1.second)
+          .mapM(chunk => ZTracer.span("grouped")(ZIO.succeed(chunk)))
+          .mapMParTraced(3)(e => ZTracer.span(s"after grouped for $e")(ZIO.succeed(e)))
           .endTracingEachElement
           .runDrain
           .exitCode
       }
-      .provideCustomLayer(JaegarEntrypoint.live >>> ZTracer.layer)
+      .provideCustomLayer(JaegarEntrypoint.live >>> ZTracer.layer ++ StreamElementTracer.layer)
 }

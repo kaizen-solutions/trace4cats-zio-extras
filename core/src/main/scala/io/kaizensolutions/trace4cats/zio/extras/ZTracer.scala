@@ -200,14 +200,15 @@ final case class ZTracer private (
     name: String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
-  )(stream: ZStream[R, E, O]): ZStream[R, E, Spanned[O]] =
+  )(stream: ZStream[R, E, O]): ZStream[R & Has[StreamElementTracer], E, O] =
     stream
       .mapChunks(Chunk.single)
       .flatMap(inputs =>
         ZStream.managed(
           ZManaged.foreach(inputs)(input =>
             fromHeadersManaged(extractHeaders(input), name, kind, errorHandler)
-              .map(Spanned(_, input))
+              .tapM(StreamElementTracer.set)
+              .as(input)
           )
         )
       )
@@ -229,11 +230,14 @@ final case class ZTracer private (
    *   is the output element type that was originally spanned
    * @return
    */
-  def endTracingEachElement[R, E, O](
-    stream: ZStream[R, E, Spanned[O]],
+  def endTracingEachElement[R <: Has[StreamElementTracer], E, O](
+    stream: ZStream[R, E, O],
     headers: ToHeaders = ToHeaders.standard
   ): ZStream[R, E, (O, TraceHeaders)] =
-    stream.mapChunks(_.map(s => (s.value, headers.fromContext(s.span.context))))
+    stream.mapM(o =>
+      StreamElementTracer.get
+        .map(span => (o, headers.fromContext(span.context)))
+    )
 
   /**
    * This is a low level operator that can potentially be used with spanManaged
