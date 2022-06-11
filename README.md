@@ -17,7 +17,10 @@ libraryDependencies ++= {
     org %% "trace4cats-zio-extras-core"     % "<See Latest Release on JitPack>",  // core only
     org %% "trace4cats-zio-extras-zio-http" % "<See Latest Release on JitPack>",  // core + zio http server + client integration
     org %% "trace4cats-zio-extras-http4s"   % "<See Latest Release on JitPack>",  // core + http4s server + client integration
-    org %% "trace4cats-zio-extras-sttp"     % "<See Latest Release on JitPack>"   // core + sttp client integration
+    org %% "trace4cats-zio-extras-sttp"     % "<See Latest Release on JitPack>",  // core + sttp client integration
+    org %% "trace4cats-zio-extras-tapir"    % "<See Latest Release on JitPack>",  // core + tapir integration
+    org %% "trace4cats-zio-extras-virgil"   % "<See Latest Release on JitPack>",  // core + virgil integration
+    org %% "trace4cats-zio-extras-fs2"      % "<See Latest Release on JitPack>"   // core + fs2-streams integration
   )
 }
 ```
@@ -48,7 +51,27 @@ val nestedTrace: URIO[Has[ZTracer], Unit] = {
 ```
 
 Notice that using the `ZTracer` abstraction cannot fail; meaning if you mis-configure the tracing configuration, your 
-application will continue to function but traces will not be reported.
+application will continue to function but traces will not be reported. 
+
+`ZTracer` can also be used to trace `ZStream`s in tandem with the `Spanned` datatype where each element of the `ZStream`
+has an associated span (i.e. Kafka messages). We have an 
+[example](core-examples/src/main/scala/io/kaizensolutions/trace4cats/zio/core/examples/ExampleApp.scala) that will get 
+you started.
+
+**Note:** There are some exceptions to this rule like when sending very large traces to Jaeger for example where the 
+span size can be larger than what the collector accepts. To work around this, you will have to adjust the batch size 
+when configuring a `SpanCompleter` and ensure that you perform local testing and ensuring your application continues to 
+function to avoid these edge cases. 
+
+## FS2 integration
+
+In addition to supporting `ZStream` where each element of the stream has its own span, we also support `fs2.Stream` in 
+the same way. There are a few requirements on the type of ZIO effect that can be used with `fs2.Stream` since we need to 
+materialize the `Async` and `Concurrent` typeclasses from `cats-effect` and as a result we require the ZIO environment 
+contain `Clock`, `Blocking` and `ZTracer` in order to perform spans. In addition, the error type must be fixed to 
+`Throwable` otherwise these typeclasses cannot be derived (from the `interop-cats` library). We have an 
+[example](fs2-examples/src/main/scala/io/kaizensolutions/trace4cats/zio/extras/fs2/ExampleApp.scala) to help you get 
+started, and it's almost the same as the `ZStream` example.
 
 ## HTTP4S integration
 
@@ -56,7 +79,7 @@ Whilst Trace4Cats does provide a 1st party integration for ZIO, you have to avoi
 because of the way the `Provide` typeclass works with ZIO. We work around this by directly implementing an HTTP4S 
 middleware which allows you to wrap either any `HttpRoutes[ZIO[R, E, *]]` or any `HttpApp[ZIO[R, E, *]]`  
 (provided zio-interop-cats will give you typeclass instances for your selected effect type). The integration follows 
-very closely to the Trace4Cats HTTP4s integration and is intended to function as a drop-in replacement.
+very closely to the Trace4Cats HTTP4S integration and is intended to function as a drop-in replacement.
 
 Here's an example:
 
@@ -79,7 +102,6 @@ def routes: HttpRoutes[Effect] = {
   import dsl.*
 
   HttpRoutes.of {
-
     case GET -> Root / "hello" / id =>
       val myId = Try(id.toInt).getOrElse(1)
       ZTracer
@@ -119,14 +141,16 @@ We provide integrations for both the server and client.
 
 ## ZIO-HTTP integration
 
-We provide an integration for zio-http's `HttpApp` datatype with similar semantics to the http4s integration with some
+We provide an integration for zio-http's `HttpApp` datatype with similar semantics to the HTTP4S integration with some
 slight differences with the amount of information available in the trace due zio-http having a different API. 
 
-Here is an example:
+The easiest way to trace a ZIO HTTP application is to use the `trace` middleware. Here is an example:
 
 ```scala
+package io.kaizensolutions.trace4cats.zio.extras.ziohttp.examples
+
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
-import io.kaizensolutions.trace4cats.zio.extras.ziohttp.ZioHttpServerTracer
+import io.kaizensolutions.trace4cats.zio.extras.ziohttp.server.ZioHttpServerTracer.trace
 import zhttp.http.*
 import zhttp.service.Server
 import zio.*
@@ -134,7 +158,7 @@ import zio.clock.Clock
 import zio.duration.*
 import zio.random.Random
 
-object ExampleApp extends App {
+object ExampleServerApp extends App {
   val app: Http[Clock & Random & Has[Db] & Has[ZTracer], Throwable, Request, Response] =
     Http.collectZIO[Request] {
 
@@ -158,17 +182,14 @@ object ExampleApp extends App {
     }
 
   override def run(args: List[String]): URIO[ZEnv, ExitCode] =
-    ZIO
-      .service[ZTracer]
-      .flatMap { tracer =>
-        val tracedApp = ZioHttpServerTracer.traceApp(tracer, app)
-        Server.start(8080, tracedApp)
-      }
+    Server
+      .start(8080, app @@ trace)  // tracing is implemented as a middleware for ZIO HTTP
       .exitCode
       .provideCustomLayer(
-        (NewRelicEntrypoint.live >>> ZTracer.layer) ++ Db.live
+        (JaegarEntrypoint.live >>> ZTracer.layer) ++ Db.live
       )
 }
+
 ```
 
 The example generates the following trace in New Relic when `/plaintext` is queried:

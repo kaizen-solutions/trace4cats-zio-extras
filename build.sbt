@@ -62,6 +62,8 @@ lazy val root =
     .aggregate(
       core,
       coreExample,
+      fs2,
+      fs2Example,
       http4s,
       http4sExample,
       zioHttp,
@@ -116,6 +118,32 @@ lazy val coreExample = project
     }
   )
   .dependsOn(core)
+
+lazy val fs2 = project
+  .in(file("fs2"))
+  .settings(kindProjectorSettings: _*)
+  .settings(releaseSettings: _*)
+  .settings(
+    name                            := "trace4cats-zio-extras-fs2",
+    organization                    := "io.kaizen-solutions",
+    libraryDependencies += "co.fs2" %% "fs2-core" % Versions.fs2
+  )
+  .dependsOn(core % "compile->compile;test->test")
+
+lazy val fs2Example = project
+  .in(file("fs2-examples"))
+  .settings(kindProjectorSettings: _*)
+  .settings(
+    name             := "trace4cats-zio-extras-fs2-examples",
+    organization     := "io.kaizen-solutions",
+    organizationName := "kaizen-solutions",
+    publish / skip   := true,
+    libraryDependencies ++= {
+      val trace4cats = "io.janstenpickle"
+      Seq(trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats)
+    }
+  )
+  .dependsOn(fs2)
 
 lazy val http4s = project
   .in(file("http4s"))
