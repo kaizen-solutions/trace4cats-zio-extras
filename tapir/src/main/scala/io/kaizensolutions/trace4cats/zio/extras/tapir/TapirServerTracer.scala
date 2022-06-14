@@ -82,7 +82,7 @@ object TapirServerTracer {
     )
 
   def methodWithPathTemplateSpanNamer[I]: (Endpoint[?, I, ?, ?, ?], I) => String =
-    (endpoint, _) => endpoint.input.method.fold("ANY")(_.method) + " " + endpoint.renderPathTemplate()
+    (endpoint, _) => endpoint.input.method.fold("ANY")(_.method) + " " + endpoint.showPathTemplate()
 
   private def requestFields(
     hs: Headers,

@@ -30,6 +30,7 @@ object ExampleServerApp extends App {
 
   val countCharactersEndpoint: Endpoint[Unit, Request, NoCharacters, Int, Any] =
     endpoint.post
+      .in("count" / "characters")
       .in(stringBody(Charset.defaultCharset()))
       .in(headers)
       .mapIn(raw => Request(raw._1, Headers(raw._2)))(r => (r.input, r.headers.headers.toList))
