@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import io.janstenpickle.trace4cats.model.*
 import io.janstenpickle.trace4cats.{ErrorHandler, Span, ToHeaders}
 import zio.interop.catz.*
-import zio.{NonEmptyChunk, Task, UIO, UManaged}
+import zio.{NonEmptyChunk, Scope, Task, UIO, URIO}
 
 /**
  * Newtype on the underlying Trace4Cats Span but with a less powerful API. This
@@ -32,21 +32,21 @@ final class ZSpan(private val underlying: Span[Task]) extends AnyVal {
   def extractHeaders(headerTypes: ToHeaders): TraceHeaders =
     headerTypes.fromContext(underlying.context)
 
-  private[extras] def child(implicit fileName: sourcecode.FileName, line: sourcecode.Line): UManaged[ZSpan] =
+  private[extras] def child(implicit fileName: sourcecode.FileName, line: sourcecode.Line): URIO[Scope, ZSpan] =
     child(s"${fileName.value}:${line.value}", SpanKind.Internal)
 
   private[extras] def child(
     kind: SpanKind
-  )(implicit fileName: sourcecode.FileName, line: sourcecode.Line): UManaged[ZSpan] =
+  )(implicit fileName: sourcecode.FileName, line: sourcecode.Line): URIO[Scope, ZSpan] =
     child(s"${fileName.value}:${line.value}", kind)
 
-  private[extras] def child(name: String, kind: SpanKind): UManaged[ZSpan] =
-    underlying.child(name, kind).map(new ZSpan(_)).toManagedZIO.orDie
+  private[extras] def child(name: String, kind: SpanKind): URIO[Scope, ZSpan] =
+    underlying.child(name, kind).map(new ZSpan(_)).toScopedZIO.orDie
 
-  private[extras] def child(name: String, kind: SpanKind, errorHandler: ErrorHandler): UManaged[ZSpan] =
-    underlying.child(name, kind, errorHandler).map(new ZSpan(_)).toManagedZIO.orDie
+  private[extras] def child(name: String, kind: SpanKind, errorHandler: ErrorHandler): URIO[Scope, ZSpan] =
+    underlying.child(name, kind, errorHandler).map(new ZSpan(_)).toScopedZIO.orDie
 }
 object ZSpan {
   def make(underlying: Span[Task]): ZSpan = new ZSpan(underlying)
-  def noop: UManaged[ZSpan]               = Span.noop[Task].toManagedZIO.map(make).orDie
+  def noop: URIO[Scope, ZSpan]            = Span.noop[Task].toScopedZIO.map(make).orDie
 }

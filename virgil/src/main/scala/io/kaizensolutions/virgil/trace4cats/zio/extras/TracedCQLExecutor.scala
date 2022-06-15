@@ -27,7 +27,7 @@ import scala.collection.mutable
 class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFromSpan: String => Boolean)
     extends CQLExecutor {
   override def execute[A](in: CQL[A]): Stream[Throwable, A] =
-    ZStream.managed(tracer.spanManaged(extractQueryString(in), SpanKind.Internal)).flatMap { span =>
+    ZStream.managed(tracer.spanScoped(extractQueryString(in), SpanKind.Internal)).flatMap { span =>
       val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
       val enrichSpanWithBindMarkers =
         if (isSampled) enrichSpan(in, span, dropMarkerFromSpan)

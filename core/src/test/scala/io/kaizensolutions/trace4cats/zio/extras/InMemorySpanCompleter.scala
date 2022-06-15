@@ -4,33 +4,28 @@ import io.janstenpickle.trace4cats.ToHeaders
 import io.janstenpickle.trace4cats.inject.EntryPoint
 import io.janstenpickle.trace4cats.kernel.{SpanCompleter, SpanSampler}
 import io.janstenpickle.trace4cats.model.{CompletedSpan, TraceProcess}
-import zio.blocking.Blocking
-import zio.clock.Clock
 import zio.interop.catz.*
-import zio.{FiberRef, Queue, Task, UIO, ZIO}
+import zio.{Chunk, FiberRef, Queue, Scope, Task, UIO, URIO}
 
 class InMemorySpanCompleter(private val process: TraceProcess, private val state: Queue[CompletedSpan])
     extends SpanCompleter[Task] {
   override def complete(span: CompletedSpan.Builder): Task[Unit] =
     state.offer(span.build(process)).unit
 
-  def retrieveCollected: UIO[List[CompletedSpan]] =
+  def retrieveCollected: UIO[Chunk[CompletedSpan]] =
     state.takeAll
 }
 object InMemorySpanCompleter {
   def entryPoint(
     process: TraceProcess,
     headers: ToHeaders = ToHeaders.standard
-  ): ZIO[Clock & Blocking, Nothing, (InMemorySpanCompleter, EntryPoint[Task])] = {
-    ZIO.runtime[Clock & Blocking].flatMap { implicit rts =>
-      Queue
-        .unbounded[CompletedSpan]
-        .map(new InMemorySpanCompleter(process, _))
-        .map(completer => (completer, EntryPoint[Task](SpanSampler.always[Task], completer, headers)))
-    }
-  }
+  ): UIO[(InMemorySpanCompleter, EntryPoint[Task])] =
+    Queue
+      .unbounded[CompletedSpan]
+      .map(new InMemorySpanCompleter(process, _))
+      .map(completer => (completer, EntryPoint[Task](SpanSampler.always[Task], completer, headers)))
 
-  def toZTracer(in: EntryPoint[Task]): UIO[ZTracer] = {
+  def toZTracer(in: EntryPoint[Task]): URIO[Scope, ZTracer] = {
     val zep = new ZEntryPoint(in)
     FiberRef
       .make(None: Option[ZSpan])

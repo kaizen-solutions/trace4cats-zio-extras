@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
-import zio.{Has, ZIO}
+import zio.ZIO
 
 /**
  * Attaches a span to an element. This is used to trace each element in a
@@ -19,6 +19,6 @@ final case class Spanned[+A](span: ZSpan, value: A) {
   def mapZIO[R, E, B](f: A => ZIO[R, E, B]): ZIO[R, E, Spanned[B]] =
     f(value).map(b => copy(value = b))
 
-  def mapZIOTraced[R, E, B](f: A => ZIO[R, E, B]): ZIO[R & Has[ZTracer], E, Spanned[B]] =
+  def mapZIOTraced[R, E, B](f: A => ZIO[R, E, B]): ZIO[R & ZTracer, E, Spanned[B]] =
     ZTracer.locally(span)(f(value).map(b => copy(value = b)))
 }

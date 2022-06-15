@@ -1,15 +1,14 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
 import io.janstenpickle.trace4cats.model.TraceProcess
-import zio.test.environment.TestEnvironment
-import zio.test.{assertTrue, DefaultRunnableSpec, ZSpec}
-import zio.{Has, UIO, URIO, ZIO}
+import zio.test.{assertTrue, Spec, TestEnvironment, ZIOSpecDefault}
+import zio.{Scope, URIO, ZEnvironment, ZIO}
 
-object ZTracerSpec extends DefaultRunnableSpec {
-  override def spec: ZSpec[TestEnvironment, Any] =
+object ZTracerSpec extends ZIOSpecDefault {
+  override def spec: Spec[TestEnvironment & Scope, Any] =
     suite("ZTracer specification") {
-      testM("nested traces are captured") {
-        val nestedTrace: URIO[Has[ZTracer], Unit] = {
+      test("nested traces are captured") {
+        val nestedTrace: URIO[ZTracer, Unit] = {
           
            // format: off
            //      parent
@@ -20,8 +19,8 @@ object ZTracerSpec extends DefaultRunnableSpec {
            // format: on
           ZTracer.span("parent") {
             ZTracer
-              .span("child1")(ZTracer.span("grandchild")(UIO.unit))
-              .zipParLeft(ZTracer.span("child2")(UIO.unit))
+              .span("child1")(ZTracer.span("grandchild")(ZIO.unit))
+              .zipParLeft(ZTracer.span("child2")(ZIO.unit))
           }
         }
 
@@ -29,7 +28,7 @@ object ZTracerSpec extends DefaultRunnableSpec {
           result  <- InMemorySpanCompleter.entryPoint(TraceProcess("nested-trace-test"))
           (sc, ep) = result
           tracer  <- InMemorySpanCompleter.toZTracer(ep)
-          _       <- nestedTrace.provide(Has(tracer))
+          _       <- nestedTrace.provideEnvironment(ZEnvironment(tracer))
           spans   <- sc.retrieveCollected
           gc      <- ZIO.fromOption(spans.find(_.name == "grandchild"))
           c1      <- ZIO.fromOption(spans.find(_.name == "child1"))
@@ -52,18 +51,18 @@ object ZTracerSpec extends DefaultRunnableSpec {
           // GC is a child of C1
           assertTrue(gc.context.parent.map(_.spanId).get == c1.context.spanId)
       } +
-        testM("spans belonging to different traces are isolated") {
-          val trace1: URIO[Has[ZTracer], Unit] =
-            ZTracer.span("a")(ZTracer.span("b")(UIO.unit))
+        test("spans belonging to different traces are isolated") {
+          val trace1: URIO[ZTracer, Unit] =
+            ZTracer.span("a")(ZTracer.span("b")(ZIO.unit))
 
-          val trace2: URIO[Has[ZTracer], Unit] =
-            ZTracer.span("x")(ZTracer.span("y")(ZTracer.span("z")(UIO.unit)))
+          val trace2: URIO[ZTracer, Unit] =
+            ZTracer.span("x")(ZTracer.span("y")(ZTracer.span("z")(ZIO.unit)))
 
           for {
             result        <- InMemorySpanCompleter.entryPoint(TraceProcess("nested-trace-test"))
             (sc, ep)       = result
             tracer        <- InMemorySpanCompleter.toZTracer(ep)
-            _             <- trace1.zipPar(trace2).provide(Has(tracer))
+            _             <- trace1.zipPar(trace2).provideEnvironment(ZEnvironment(tracer))
             spans         <- sc.retrieveCollected
             uniqueTraceIds = spans.map(_.context.traceId).toSet
           } yield assertTrue(uniqueTraceIds.size == 2)

@@ -57,8 +57,10 @@ final case class ZTracer private (
     name: String = "root",
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(fn: ZSpan => ZIO[R, E, A]): ZIO[R, E, A] =
-    fromHeadersManaged(headers, name, kind, errorHandler)
-      .use(child => current.locally(Some(child))(fn(child)))
+    ZIO.scoped[R](
+      fromHeadersScoped(headers, name, kind, errorHandler)
+        .flatMap(child => current.locally(Some(child))(fn(child)))
+    )
 
   /**
    * Allows you to obtain a ZSpan from trace headers This is a low level
@@ -67,9 +69,9 @@ final case class ZTracer private (
    * doing the following:
    *
    * {{{
-   * fromHeadersManaged(yourHeaders)      // produces a ZSpan
-   *   .tapM(updateCurrentSpan)           // sets the current span to the span we just produced
-   *   .onExit(_ => removeCurrentSpan)    // removes the current span when the resource finaliztion takes place
+   * fromHeadersScoped(yourHeaders)         // produces a ZSpan
+   *   .tap(updateCurrentSpan)          // sets the current span to the span we just produced
+   *   .onExit(_ => removeCurrentSpan)      // removes the current span when the finalization takes place
    * }}}
    *
    * @param headers
@@ -78,47 +80,53 @@ final case class ZTracer private (
    * @param errorHandler
    * @return
    */
-  def fromHeadersManaged(
+  def fromHeadersScoped(
     headers: TraceHeaders,
     name: String = "root",
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): UManaged[ZSpan] =
+  ): URIO[Scope, ZSpan] =
     entryPoint.fromHeadersOtherwiseRoot(headers, kind, name, errorHandler)
 
   def put(key: String, value: AttributeValue): UIO[Unit] =
     current.get.flatMap {
-      case None       => UIO.unit
+      case None       => ZIO.unit
       case Some(span) => span.put(key, value)
     }
 
   def putAll(fields: (String, AttributeValue)*): UIO[Unit] =
     current.get.flatMap {
-      case None       => UIO.unit
+      case None       => ZIO.unit
       case Some(span) => span.putAll(fields*)
     }
 
   def spanSource[R, E, A](
     kind: SpanKind = SpanKind.Internal
-  )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R, E, A] =
-    spanManaged(s"${fileName.value}:${line.value}", kind).use(span => current.locally(Some(span))(zio))
+  )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R, E, A] = {
+    ZIO.scoped[R] {
+      spanScoped(s"${fileName.value}:${line.value}", kind)
+        .flatMap(span => current.locally(Some(span))(zio))
+    }
+  }
 
   def span[R, E, A](
     name: String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(zio: ZIO[R, E, A]): ZIO[R, E, A] =
-    spanManaged(name, kind, errorHandler).use(span => current.locally(Some(span))(zio))
+    ZIO.scoped[R] {
+      spanScoped(name, kind, errorHandler).flatMap(span => current.locally(Some(span))(zio))
+    }
 
   /**
    * This is a low level operator and leaves you, the user, to manipulate the
    * current span using [[updateCurrentSpan]] and [[removeCurrentSpan]] or
-   * [[restore]]. We recommend using [[spanManaged]] instead.
+   * [[restore]]. We recommend using [[spanScoped]] instead.
    *
    * For example:
    *
    * {{{
-   * spanManaged("mySpan")                // produces a ZSpan
+   * spanScopedManual("mySpan")           // produces a ZSpan
    *   .tapM(updateCurrentSpan)           // sets the current span to the span we just produced
    *   .onExit(_ => removeCurrentSpan)    // removes the current span when the resource finalization takes place
    * }}}
@@ -126,7 +134,7 @@ final case class ZTracer private (
    * WARNING: Please note that the above is just an example, rather than
    * removing the current span (i.e. setting the FiberRef to None, you should be
    * restoring it to what was there previously before you called span). You
-   * should use [[spanManaged]] instead.
+   * should use [[spanScoped]] instead.
    *
    * @param name
    *   is the name of the span
@@ -136,18 +144,18 @@ final case class ZTracer private (
    *   is the error handler for the span
    * @return
    */
-  def spanManagedManual(
+  def spanScopedManual(
     name: String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): UManaged[ZSpan] =
-    current.get.toManaged_.flatMap {
+  ): URIO[Scope, ZSpan] =
+    current.get.flatMap {
       case Some(span) => span.child(name, kind, errorHandler)
       case None       => entryPoint.rootSpan(name, kind, errorHandler)
     }
 
   /**
-   * Works like [[withSpan]] but in the context of a ZManaged and handles
+   * Works like [[withSpan]] but in the context of a [[zio.Scope]] and handles
    * updating of the underlying Span context automatically for you.
    * @param name
    *   is the name of the span
@@ -157,15 +165,15 @@ final case class ZTracer private (
    *   is the error handler to use in case the span fails
    * @return
    */
-  def spanManaged(
+  def spanScoped(
     name: String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): UManaged[ZSpan] =
-    retrieveCurrentSpan.toManaged_
+  ): URIO[Scope, ZSpan] =
+    retrieveCurrentSpan
       .flatMap(current =>
-        spanManagedManual(name, kind, errorHandler)
-          .tapM(updateCurrentSpan)
+        spanScopedManual(name, kind, errorHandler)
+          .tap(updateCurrentSpan)
           .ensuring(restore(current))
       )
 
@@ -202,16 +210,14 @@ final case class ZTracer private (
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(stream: ZStream[R, E, O]): ZStream[R, E, Spanned[O]] =
     stream
-      .mapChunks(Chunk.single)
-      .flatMap(inputs =>
-        ZStream.managed(
-          ZManaged.foreach(inputs)(input =>
-            fromHeadersManaged(extractHeaders(input), name, kind, errorHandler)
+      .mapChunksZIO(inputs =>
+        ZIO.scoped[R](
+          ZIO.foreach(inputs)(input =>
+            fromHeadersScoped(extractHeaders(input), name, kind, errorHandler)
               .map(Spanned(_, input))
           )
         )
       )
-      .mapChunks(_.flatten)
 
   /**
    * End tracing each element of the Stream
@@ -236,16 +242,16 @@ final case class ZTracer private (
     stream.mapChunks(_.map(s => (s.value, headers.fromContext(s.span.context))))
 
   /**
-   * This is a low level operator that can potentially be used with spanManaged
-   * but using `retrieveCurrentSpan` and a finalizer calling `updateCurrentSpan`
-   * is a safer alternative to preserve the span already present rather than a
-   * complete wipe
+   * This is a low level operator that can potentially be used with
+   * [[spanScopedManual]] but using `retrieveCurrentSpan` and a finalizer
+   * calling `updateCurrentSpan` is a safer alternative to preserve the span
+   * already present rather than a complete wipe
    */
   val removeCurrentSpan: UIO[Unit] =
     current.set(None)
 
   /**
-   * This is a low level operator meant to be used with spanManaged
+   * This is a low level operator meant to be used with [[spanScopedManual]]
    */
   val retrieveCurrentSpan: UIO[Option[ZSpan]] =
     current.get
@@ -264,62 +270,68 @@ final case class ZTracer private (
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(fn: ZSpan => ZIO[R, E, A]): ZIO[R, E, A] =
-    spanManaged(name, kind, errorHandler).use(span => current.locally(Some(span))(fn(span)))
+    ZIO.scoped[R] {
+      spanScoped(name, kind, errorHandler).flatMap(span => current.locally(Some(span))(fn(span)))
+    }
 }
 object ZTracer {
   def make(current: FiberRef[Option[ZSpan]], entryPoint: ZEntryPoint): ZTracer =
     new ZTracer(current, entryPoint)
 
-  def span[R <: Has[?], E, A](
+  def span[R, E, A](
     name: String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
-  )(zio: ZIO[R, E, A]): ZIO[R & Has[ZTracer], E, A] =
+  )(zio: ZIO[R, E, A]): ZIO[R & ZTracer, E, A] =
     ZIO.service[ZTracer].flatMap(_.span(name, kind, errorHandler)(zio))
 
-  def spanManagedManual(
+  def spanScopedManual(
     name: String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): URManaged[Has[ZTracer], ZSpan] =
-    ZManaged.serviceWithManaged[ZTracer](_.spanManagedManual(name, kind, errorHandler))
+  ): URIO[ZTracer & Scope, ZSpan] =
+    ZIO.serviceWithZIO[ZTracer](_.spanScopedManual(name, kind, errorHandler))
 
-  def spanManaged(
+  def spanScoped(
     name: String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): URManaged[Has[ZTracer], ZSpan] =
-    ZManaged.serviceWithManaged[ZTracer](_.spanManaged(name, kind, errorHandler))
+  ): URIO[ZTracer & Scope, ZSpan] =
+    ZIO.serviceWithZIO[ZTracer](_.spanScoped(name, kind, errorHandler))
 
-  def updateCurrentSpan(span: ZSpan): URIO[Has[ZTracer], Unit] =
-    ZIO.serviceWith[ZTracer](_.updateCurrentSpan(span))
+  def updateCurrentSpan(span: ZSpan): URIO[ZTracer, Unit] =
+    ZIO.serviceWithZIO[ZTracer](_.updateCurrentSpan(span))
 
-  def restore(span: Option[ZSpan]): URIO[Has[ZTracer], Unit] =
-    ZIO.serviceWith[ZTracer](_.restore(span))
+  def restore(span: Option[ZSpan]): URIO[ZTracer, Unit] =
+    ZIO.serviceWithZIO[ZTracer](_.restore(span))
 
-  def locally[R <: Has[?], E, A](span: ZSpan)(zio: ZIO[R, E, A]): ZIO[R & Has[ZTracer], E, A] =
+  def locally[R, E, A](span: ZSpan)(zio: ZIO[R, E, A]): ZIO[R & ZTracer, E, A] =
     ZIO.service[ZTracer].flatMap(_.locally(span)(zio))
 
-  val getCurrentSpan: URIO[Has[ZTracer], Option[ZSpan]] =
-    ZIO.serviceWith[ZTracer](_.retrieveCurrentSpan)
+  val getCurrentSpan: URIO[ZTracer, Option[ZSpan]] =
+    ZIO.serviceWithZIO[ZTracer](_.retrieveCurrentSpan)
 
-  val removeCurrentSpan: URIO[Has[ZTracer], Unit] =
-    ZIO.serviceWith[ZTracer](_.removeCurrentSpan)
+  val removeCurrentSpan: URIO[ZTracer, Unit] =
+    ZIO.serviceWithZIO[ZTracer](_.removeCurrentSpan)
 
-  def withSpan[R <: Has[?], E, A](
+  def withSpan[R, E, A](
     name: String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
-  )(fn: ZSpan => ZIO[R, E, A]): ZIO[R & Has[ZTracer], E, A] =
-    ZIO.service[ZTracer].flatMap(_.withSpan(name, kind, errorHandler)(fn))
+  )(fn: ZSpan => ZIO[R, E, A]): ZIO[R & ZTracer, E, A] =
+    ZIO
+      .service[ZTracer]
+      .flatMap(_.withSpan(name, kind, errorHandler)(fn))
 
-  def spanSource[R <: Has[?], E, A](
+  def spanSource[R, E, A](
     kind: SpanKind = SpanKind.Internal
-  )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R & Has[ZTracer], E, A] =
-    ZIO.service[ZTracer].flatMap(_.spanSource(kind)(zio)(fileName, line))
+  )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R & ZTracer, E, A] =
+    ZIO
+      .service[ZTracer]
+      .flatMap(_.spanSource(kind)(zio)(fileName, line))
 
-  val layer: URLayer[Has[ZEntryPoint], Has[ZTracer]] =
-    ZLayer.fromEffect(
+  val layer: URLayer[ZEntryPoint, ZTracer] =
+    ZLayer.scoped(
       for {
         ep <- ZIO.service[ZEntryPoint]
         // the FiberRef will keep the parent's span when a child fiber joined

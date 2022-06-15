@@ -4,7 +4,7 @@ import io.janstenpickle.trace4cats.ErrorHandler
 import io.janstenpickle.trace4cats.inject.EntryPoint
 import io.janstenpickle.trace4cats.model.{SpanKind, TraceHeaders}
 import zio.interop.catz.*
-import zio.{Task, UManaged}
+import zio.{Scope, Task, URIO}
 
 /**
  * Entrypoint provides a way to obtain a root span or a span from headers. All
@@ -16,10 +16,10 @@ final class ZEntryPoint(private val underlying: EntryPoint[Task]) extends AnyVal
     name: String,
     kind: SpanKind,
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): UManaged[ZSpan] =
+  ): URIO[Scope, ZSpan] =
     underlying
       .root(name, kind, errorHandler)
-      .toManagedZIO
+      .toScopedZIO
       .orDie
       .map(ZSpan.make)
 
@@ -28,10 +28,10 @@ final class ZEntryPoint(private val underlying: EntryPoint[Task]) extends AnyVal
     kind: SpanKind = SpanKind.Internal,
     name: String = "root",
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): UManaged[ZSpan] =
+  ): URIO[Scope, ZSpan] =
     underlying
       .continueOrElseRoot(name, kind, headers, errorHandler)
-      .toManagedZIO
+      .toScopedZIO
       .orDie
       .map(ZSpan.make)
 }
