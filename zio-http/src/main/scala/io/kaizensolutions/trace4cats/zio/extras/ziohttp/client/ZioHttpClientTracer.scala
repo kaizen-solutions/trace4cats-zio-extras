@@ -10,7 +10,7 @@ import zhttp.http.*
 import zhttp.service.Client.Config
 import zhttp.service.client.ClientSSLHandler.ClientSSLOptions
 import zhttp.service.{ChannelFactory, Client, EventLoopGroup}
-import zio.{Has, ZIO}
+import zio.*
 
 object ZioHttpClientTracer {
   def makeRequest(
@@ -46,7 +46,7 @@ object ZioHttpClientTracer {
     toHeaders: ToHeaders = ToHeaders.standard,
     spanNamer: Request => String = methodWithPathSpanNamer,
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): ZIO[EventLoopGroup & ChannelFactory & Has[ZTracer], Throwable, Response] =
+  ): ZIO[EventLoopGroup & ChannelFactory & ZTracer, Throwable, Response] =
     ZIO
       .service[ZTracer]
       .flatMap(tracer =>
@@ -93,7 +93,7 @@ object ZioHttpClientTracer {
     toHeaders: ToHeaders = ToHeaders.standard,
     spanNamer: Request => String = methodWithPathSpanNamer,
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): ZIO[EventLoopGroup & ChannelFactory & Has[ZTracer], Throwable, Response] =
+  ): ZIO[EventLoopGroup & ChannelFactory & ZTracer, Throwable, Response] =
     ZIO
       .service[ZTracer]
       .flatMap(tracer =>

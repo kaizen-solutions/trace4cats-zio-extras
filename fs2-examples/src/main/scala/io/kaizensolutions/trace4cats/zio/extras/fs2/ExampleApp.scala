@@ -4,15 +4,12 @@ import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import _root_.fs2.*
 import io.janstenpickle.trace4cats.ToHeaders
 import zio.*
-import zio.blocking.Blocking
-import zio.clock.Clock
-import zio.duration.*
 import zio.interop.catz.*
 
-object ExampleApp extends App {
-  type Effect[A] = RIO[Clock & Blocking & Has[ZTracer], A]
+object ExampleApp extends ZIOAppDefault {
+  type Effect[A] = RIO[ZTracer, A]
 
-  override def run(args: List[String]): URIO[ZEnv, ExitCode] =
+  override val run: ZIO[ZIOAppArgs & Scope, Any, Any] =
     ZTracer
       .span("streaming-app")(
         Stream
@@ -46,5 +43,5 @@ object ExampleApp extends App {
           .drain
       )
       .exitCode
-      .provideCustomLayer(JaegarEntrypoint.live >>> ZTracer.layer)
+      .provide(JaegarEntrypoint.live, ZTracer.layer)
 }

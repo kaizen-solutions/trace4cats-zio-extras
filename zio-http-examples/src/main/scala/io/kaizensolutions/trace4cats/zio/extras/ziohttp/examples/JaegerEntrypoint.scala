@@ -1,4 +1,4 @@
-package io.kaizensolutions.trace4cats.zio.extras.fs2
+package io.kaizensolutions.trace4cats.zio.extras.ziohttp.examples
 
 import io.janstenpickle.trace4cats.inject.EntryPoint
 import io.janstenpickle.trace4cats.jaeger.JaegerSpanCompleter
@@ -8,13 +8,12 @@ import io.kaizensolutions.trace4cats.zio.extras.*
 import zio.interop.catz.*
 import zio.{RIO, Scope, Task, ULayer, ZLayer}
 
-object JaegarEntrypoint {
+object JaegerEntrypoint {
   val live: ULayer[ZEntryPoint] =
-    ZLayer.scoped[Any](entryPoint(TraceProcess("fs2-example-app"))).orDie
+    ZLayer.scoped[Any](entryPoint(TraceProcess("zio-http-example-app"))).orDie
 
   def entryPoint(process: TraceProcess): RIO[Scope, ZEntryPoint] =
     JaegerSpanCompleter[Task](process, "localhost")
       .map(completer => EntryPoint[Task](SpanSampler.always[Task], completer))
       .scoped
-
 }

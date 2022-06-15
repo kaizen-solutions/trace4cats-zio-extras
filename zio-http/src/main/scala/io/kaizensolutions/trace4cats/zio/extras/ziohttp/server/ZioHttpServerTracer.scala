@@ -8,12 +8,12 @@ import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.{extractTraceHeaders, toSpanStatus}
 import zhttp.http.*
 import zhttp.http.middleware.HttpMiddleware
-import zio.{Chunk, Exit, Has, ZIO}
+import zio.*
 
 object ZioHttpServerTracer {
   type SpanNamer = Request => String
 
-  val trace: HttpMiddleware[Has[ZTracer], Nothing] = traceWithEnv()
+  val trace: HttpMiddleware[ZTracer, Nothing] = traceWithEnv()
 
   def traceWith(
     tracer: ZTracer,
@@ -32,9 +32,9 @@ object ZioHttpServerTracer {
     dropHeadersWhen: String => Boolean = SensitiveHeaders.contains,
     spanNamer: SpanNamer = req => s"${req.method.toString()} ${req.url.path.toString()}",
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): HttpMiddleware[Has[ZTracer], Nothing] =
-    new Middleware[Has[ZTracer], Nothing, Request, Response, Request, Response] {
-      override def apply[R1 <: Has[ZTracer], E1 >: Nothing](
+  ): HttpMiddleware[ZTracer, Nothing] =
+    new Middleware[ZTracer, Nothing, Request, Response, Request, Response] {
+      override def apply[R1 <: ZTracer, E1 >: Nothing](
         http: Http[R1, E1, Request, Response]
       ): Http[R1, E1, Request, Response] =
         Http

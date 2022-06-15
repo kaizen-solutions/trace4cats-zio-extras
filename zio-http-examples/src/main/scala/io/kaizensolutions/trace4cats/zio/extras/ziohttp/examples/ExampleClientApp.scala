@@ -5,39 +5,32 @@ import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.client.ZioHttpClientTracer
 import zhttp.service.{ChannelFactory, EventLoopGroup}
 import zio.*
-import zio.blocking.Blocking
-import zio.clock.Clock
-import zio.console.putStrLn
-import zio.duration.durationInt
+import zio.Console.printLine
 
 /**
  * Fire up [[ExampleServerApp]] and then run this example client.
  */
-object ExampleClientApp extends App {
-  val dependencies: URLayer[Clock & Blocking, ChannelFactory & EventLoopGroup & Has[ZTracer]] =
-    ChannelFactory.auto ++ EventLoopGroup.auto() ++
-      (JaegarEntrypoint.entryPoint(TraceProcess("zio-http-client-example")).orDie.toLayer >>> ZTracer.layer)
-
-  override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] = {
+object ExampleClientApp extends ZIOAppDefault {
+  override val run: ZIO[ZIOAppArgs & Scope, Any, Any] = {
     val reqPlainText =
       ZioHttpClientTracer
         .tracedRequest("http://localhost:8080/plaintext")
-        .tap(response => ZTracer.spanSource()(response.bodyAsString.flatMap(putStrLn(_))))
+        .tap(response => ZTracer.spanSource()(response.bodyAsString.flatMap(printLine(_))))
 
     val reqFail =
       ZioHttpClientTracer
         .tracedRequest("http://localhost:8080/fail")
-        .tap(response => response.bodyAsString.flatMap(putStrLn(_)))
+        .tap(response => response.bodyAsString.flatMap(printLine(_)))
 
     val reqBadGateway =
       ZioHttpClientTracer
         .tracedRequest("http://localhost:8080/bad_gateway")
-        .tap(response => response.bodyAsString.flatMap(putStrLn(_)))
+        .tap(response => response.bodyAsString.flatMap(printLine(_)))
 
     ZTracer
       .span("client-request") {
         ZIO
-          .collectAllPar_(
+          .collectAllParDiscard(
             List(
               reqPlainText,
               reqFail,
@@ -47,6 +40,11 @@ object ExampleClientApp extends App {
       }
       .repeat(Schedule.recurs(10) *> Schedule.spaced(1.second))
       .exitCode
-      .provideCustomLayer(dependencies)
+      .provide(
+        ChannelFactory.auto,
+        EventLoopGroup.auto(),
+        ZLayer.scoped(JaegerEntrypoint.entryPoint(TraceProcess("zio-http-client-example")).orDie),
+        ZTracer.layer
+      )
   }
 }

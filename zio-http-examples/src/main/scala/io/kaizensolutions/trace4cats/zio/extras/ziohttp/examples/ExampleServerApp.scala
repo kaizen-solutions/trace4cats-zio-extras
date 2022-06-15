@@ -6,18 +6,15 @@ import zhttp.http.*
 import zhttp.http.Middleware.debug
 import zhttp.service.Server
 import zio.*
-import zio.clock.Clock
-import zio.duration.*
-import zio.random.Random
 
-object ExampleServerApp extends App {
-  val app: Http[Clock & Random & Has[Db] & Has[ZTracer], Throwable, Request, Response] =
+object ExampleServerApp extends ZIOAppDefault {
+  val app: Http[Clock & Random & Db & ZTracer, Throwable, Request, Response] =
     Http.collectZIO[Request] {
 
       case Method.GET -> !! / "plaintext" =>
         ZTracer.withSpan("plaintext-fetch-db") { span =>
           for {
-            sleep <- random.nextIntBetween(1, 3)
+            sleep <- Random.nextIntBetween(1, 3)
             _     <- span.put("sleep-duration.seconds", sleep)
             _     <- ZTracer.spanSource()(ZIO.sleep(sleep.seconds) *> Db.get(sleep))
           } yield Response
@@ -33,11 +30,15 @@ object ExampleServerApp extends App {
         ZIO.succeed(Response.status(Status.BadGateway))
     }
 
-  override def run(args: List[String]): URIO[ZEnv, ExitCode] =
+  override val run: ZIO[ZIOAppArgs & Scope, Any, Any] =
     Server
       .start(8080, app @@ debug @@ trace)
-      .exitCode
-      .provideCustomLayer(
-        (JaegarEntrypoint.live >>> ZTracer.layer) ++ Db.live
+      .provide(
+        JaegerEntrypoint.live,
+        ZTracer.layer,
+        Db.live,
+        Clock.live,
+        Random.live,
+        Console.live
       )
 }
