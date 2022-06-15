@@ -10,8 +10,8 @@ import io.janstenpickle.trace4cats.http4s.common.{
   Request_,
   Response_
 }
-import io.janstenpickle.trace4cats.model.AttributeValue.{LongValue, StringValue}
 import io.janstenpickle.trace4cats.model.*
+import io.janstenpickle.trace4cats.model.AttributeValue.{LongValue, StringValue}
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import org.http4s.client.{Client, UnexpectedStatus}
 import org.http4s.{Headers, Uri}
@@ -27,7 +27,7 @@ object Http4sClientTracer {
   ): Client[ZIO[R, E, *]] = {
     Client[ZIO[R, E, *]] { request =>
       val nameOfRequest = spanNamer(request: Request_)
-      val spanManaged: ZManaged[R, E, ZSpan] =
+      val spanScoped: URIO[Scope, ZSpan] =
         tracer
           .spanScoped(
             name = nameOfRequest,
@@ -38,7 +38,7 @@ object Http4sClientTracer {
           )
 
       // workaround for variance not automatically inferring
-      val spanResource: Resource[ZIO[R, E, *], ZSpan] = spanManaged.toResourceZIO
+      val spanResource: Resource[ZIO[R, E, *], ZSpan] = Resource.scopedZIO[R, E, ZSpan](spanScoped)
 
       spanResource.flatMap { span =>
         val traceHeaders: TraceHeaders  = span.extractHeaders(toHeaders)

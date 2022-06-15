@@ -6,14 +6,11 @@ import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{HttpApp, HttpRoutes}
 import zio.*
-import zio.blocking.Blocking
-import zio.clock.Clock
-import zio.duration.durationInt
 import zio.interop.catz.*
 
 import scala.util.Try
 
-object ExampleServerApp extends App {
+object ExampleServerApp extends ZIOAppDefault {
   def routes: HttpRoutes[Effect] = {
     object dsl extends Http4sDsl[Effect]
     import dsl.*
@@ -30,24 +27,25 @@ object ExampleServerApp extends App {
     }
   }
 
-  override def run(args: List[String]): URIO[zio.ZEnv, ExitCode] =
-    ZManaged
-      .runtime[Clock & Blocking]
-      .flatMap { implicit rts =>
-        val _ = rts
-        ZManaged.service[ZTracer].flatMap { tracer =>
-          val httpApp: HttpApp[Effect] = Http4sServerTracer.traceRoutes(tracer, routes).orNotFound
+  val run: ZIO[ZIOAppArgs & Scope, Any, Any] =
+    ZIO
+      .service[ZTracer]
+      .flatMap { tracer =>
+        val httpApp: HttpApp[Effect] = Http4sServerTracer.traceRoutes(tracer, routes).orNotFound
 
+        val server =
           BlazeServerBuilder[Effect]
             .bindHttp(8080, "localhost")
             .withHttpApp(httpApp)
             .resource
-            .toManagedZIO
-        }
+            .toScopedZIO
+
+        server <* ZIO.never
       }
-      .useForever
-      .exitCode
-      .provideCustomLayer(
-        (JaegarEntrypoint.live >>> ZTracer.layer) ++ Db.live
+      .provide(
+        ZLayer.fromZIO(Scope.make),
+        JaegerEntrypoint.live,
+        ZTracer.layer,
+        Db.live
       )
 }

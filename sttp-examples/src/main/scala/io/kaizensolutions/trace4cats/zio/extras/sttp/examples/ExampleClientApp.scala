@@ -1,34 +1,26 @@
 package io.kaizensolutions.trace4cats.zio.extras.sttp.examples
 
-import io.kaizensolutions.trace4cats.zio.extras.ZTracer
+import io.kaizensolutions.trace4cats.zio.extras.{ZEntryPoint, ZTracer}
 import io.kaizensolutions.trace4cats.zio.extras.sttp.SttpBackendTracer
 import sttp.capabilities
 import sttp.capabilities.zio.ZioStreams
 import sttp.client3.*
 import sttp.client3.httpclient.zio.HttpClientZioBackend
 import zio.*
-import zio.blocking.Blocking
-import zio.clock.Clock
-import zio.duration.durationInt
 
 // Spin up the HTTP4S Server Example and then this one
-object ExampleClientApp extends App {
+object ExampleClientApp extends ZIOAppDefault {
   type SttpClient = SttpBackend[Task, ZioStreams & capabilities.WebSockets]
 
-  val tracedBackendManaged: URManaged[Has[ZTracer], SttpClient] =
+  val tracedBackend: URIO[Scope & ZTracer, SttpClient] =
     (for {
-      tracer  <- ZManaged.service[ZTracer]
-      backend <- HttpClientZioBackend.managed()
+      tracer  <- ZIO.service[ZTracer]
+      backend <- HttpClientZioBackend.scoped()
     } yield SttpBackendTracer(tracer, backend)).orDie
 
-  val dependencies: URLayer[Clock & Blocking, Has[ZTracer] & Has[SttpClient]] = {
-    val tracerLayer: URLayer[Clock & Blocking, Has[ZTracer]]     = JaegarEntrypoint.live >>> ZTracer.layer
-    val sttpBackendLayer: URLayer[Has[ZTracer], Has[SttpClient]] = tracedBackendManaged.toLayer
+  val tracerLayer: URLayer[ZEntryPoint, ZTracer] = JaegarEntrypoint.live >>> ZTracer.layer
 
-    tracerLayer >+> sttpBackendLayer
-  }
-
-  override def run(args: List[String]): URIO[ZEnv, ExitCode] =
+  val run: ZIO[ZIOAppArgs & Scope, Any, Any] =
     ZIO
       .service[SttpClient]
       .flatMap { client =>
@@ -53,6 +45,9 @@ object ExampleClientApp extends App {
               .repeat(Schedule.recurs(10) *> Schedule.spaced(1.second))
           }
       }
-      .exitCode
-      .provideCustomLayer(dependencies)
+      .provide(
+        JaegarEntrypoint.live,
+        tracerLayer,
+        ZLayer.scoped[ZTracer](tracedBackend)
+      )
 }

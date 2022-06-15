@@ -30,7 +30,7 @@ object SttpBackendTracer {
       ) { span =>
         val requestWithTraceHeaders = {
           val traceHeaders = convertTraceHeaders(span.extractHeaders(toHeaders))
-          request.headers(traceHeaders.headers *)
+          request.headers(traceHeaders.headers*)
         }
         val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
 
@@ -40,15 +40,19 @@ object SttpBackendTracer {
           if (isSampled) toAttributes(request)
           else Map.empty
 
-        for {
-          _                   <- span.putAll((reqHeaderAttributes ++ reqExtraAttrs) *)
-          response            <- underlying.send(requestWithTraceHeaders)
-          _                   <- span.setStatus(toSpanStatus(response.statusText, response.code))
-          respHeaderAttributes = responseFields(Headers(response.headers), dropHeadersWhen)
-          // extractResponseAttributes has the potential to be expensive, so only call if the span is sampled
-          respExtraAttributes = if (isSampled) extractResponseAttributes(response) else Map.empty
-          _                  <- span.putAll((respHeaderAttributes ++ respExtraAttributes) *)
-        } yield response
+        val tracedRequest =
+          for {
+            _                   <- span.putAll((reqHeaderAttributes ++ reqExtraAttrs)*)
+            response            <- underlying.send(requestWithTraceHeaders)
+            _                   <- span.setStatus(toSpanStatus(response.statusText, response.code))
+            respHeaderAttributes = responseFields(Headers(response.headers), dropHeadersWhen)
+            // extractResponseAttributes has the potential to be expensive, so only call if the span is sampled
+            respExtraAttributes = if (isSampled) extractResponseAttributes(response) else Map.empty
+            _                  <- span.putAll((respHeaderAttributes ++ respExtraAttributes)*)
+          } yield response
+
+        tracedRequest
+          .tapDefect(cause => span.setStatus(SpanStatus.Internal(cause.prettyPrint)))
       }
     }
 
