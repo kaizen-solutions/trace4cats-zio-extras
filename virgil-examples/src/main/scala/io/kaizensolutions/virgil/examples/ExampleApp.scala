@@ -7,13 +7,9 @@ import io.kaizensolutions.virgil.cql.CqlStringContext
 import io.kaizensolutions.virgil.dsl.InsertBuilder
 import io.kaizensolutions.virgil.trace4cats.zio.extras.TracedCQLExecutor
 import zio.*
-import zio.blocking.Blocking
-import zio.clock.Clock
-import zio.console.*
-import zio.duration.*
-import zio.random.Random
+import zio.Console.printLine
 
-object ExampleApp extends App {
+object ExampleApp extends ZIOAppDefault {
   /*
     CREATE KEYSPACE IF NOT EXISTS virgil WITH REPLICATION = {
       'class': 'SimpleStrategy',
@@ -28,48 +24,48 @@ object ExampleApp extends App {
     );
    */
 
-  val dependencies: URLayer[Clock & Blocking, Has[CQLExecutor] & Has[ZTracer]] =
-    ZLayer.succeed(CqlSession.builder().withKeyspace("virgil")) ++ JaegarEntrypoint.live >>>
-      CQLExecutor.live.orDie ++ ZTracer.layer >+> TracedCQLExecutor.layer
-
-  override def run(args: List[String]): URIO[ZEnv, ExitCode] = {
-    val queryProgram: ZIO[Console & Has[CQLExecutor] & Has[ZTracer], Throwable, Unit] =
+  val run = {
+    val queryProgram: ZIO[CQLExecutor & ZTracer, Throwable, Unit] =
       ZTracer
         .span("all-persons") {
           cql"SELECT * FROM persons"
             .query[Person]
             .pageSize(10)
             .execute
-            .tap(p => putStrLn(p.toString))
+            .tap(p => printLine(p.toString))
             .runDrain
         }
 
-    val insertProgram: RIO[Has[CQLExecutor] & Random, Unit] =
-      ZIO.collectAllParN_(2)(
-        ZIO.replicate(10)(
-          for {
-            id   <- random.nextInt
-            age  <- random.nextInt
-            name <- random.nextUUID
-            _ <- InsertBuilder("persons")
-                   .values(
-                     "id"   -> id,
-                     "name" -> name.toString,
-                     "age"  -> age
-                   )
-                   .build
-                   .executeMutation
-          } yield ()
+    val insertProgram: RIO[CQLExecutor, Unit] = {
+      ZIO.withParallelism(2) {
+        ZIO.collectAllParDiscard(
+          ZIO.replicate(10)(
+            for {
+              id   <- Random.nextInt
+              age  <- Random.nextInt
+              name <- Random.nextUUID
+              _ <- InsertBuilder("persons")
+                     .values(
+                       "id"   -> id,
+                       "name" -> name.toString,
+                       "age"  -> age
+                     )
+                     .build
+                     .executeMutation
+            } yield ()
+          )
         )
-      )
+      }
+    }
 
     ZTracer
-      .span("virgil-program")(
-        insertProgram
-          .zipPar(queryProgram)
-      )
+      .span("virgil-program")(insertProgram.zipPar(queryProgram))
       .repeat(Schedule.spaced(5.seconds))
-      .exitCode
-      .provideCustomLayer(dependencies)
+      .provide(
+        ZLayer.succeed(CqlSession.builder().withKeyspace("virgil")),
+        JaegerEntrypoint.live,
+        ZTracer.layer,
+        CQLExecutor.live.orDie ++ ZLayer.service[ZTracer] >>> TracedCQLExecutor.layer
+      )
   }
 }

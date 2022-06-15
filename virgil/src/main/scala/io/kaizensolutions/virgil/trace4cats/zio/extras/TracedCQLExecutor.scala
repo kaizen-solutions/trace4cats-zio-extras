@@ -26,24 +26,27 @@ import scala.collection.mutable
  */
 class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFromSpan: String => Boolean)
     extends CQLExecutor {
-  override def execute[A](in: CQL[A]): Stream[Throwable, A] =
-    ZStream.managed(tracer.spanScoped(extractQueryString(in), SpanKind.Internal)).flatMap { span =>
+  override def execute[A](in: CQL[A])(implicit trace: Trace): Stream[Throwable, A] =
+    ZStream.scoped(tracer.spanScoped(extractQueryString(in), SpanKind.Internal)).flatMap { span =>
       val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
       val enrichSpanWithBindMarkers =
         if (isSampled) enrichSpan(in, span, dropMarkerFromSpan)
         else ZIO.unit
 
       ZStream.execute(enrichSpanWithBindMarkers).drain ++
-        ZStream(
-          underlying
-            .execute(in)
-            .process // access the underlying process to get access to tapDefect
-            .tapDefect(cause => enrichSpanWithDefectInformation(span)(cause).toManaged_)
-        )
+        underlying
+          .execute(in)
           .tapError(enrichSpanWithErrorInformation(span))
+          .channel
+          .ensuringWith {
+            case Exit.Success(_)                    => ZIO.unit
+            case Exit.Failure(cause) if cause.isDie => span.setStatus(SpanStatus.Internal(cause.prettyPrint))
+            case Exit.Failure(_)                    => ZIO.unit
+          }
+          .toStream
     }
 
-  override def executeMutation(in: CQL[MutationResult]): Task[MutationResult] =
+  override def executeMutation(in: CQL[MutationResult])(implicit trace: Trace): Task[MutationResult] =
     tracer.withSpan(extractQueryString(in), SpanKind.Internal) { span =>
       val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
       val enrichSpanWithBindMarkers =
@@ -58,7 +61,8 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
     }
 
   override def executePage[A](in: CQL[A], pageState: Option[PageState])(implicit
-    ev: A =:!= MutationResult
+    ev: A =:!= MutationResult,
+    trace: Trace
   ): Task[Paged[A]] = {
     val query  = extractQueryString(in)
     val pageNr = pageState.map(_.toString()).getOrElse("begin")
@@ -203,7 +207,7 @@ object TracedCQLExecutor {
     builder: CqlSessionBuilder,
     tracer: ZTracer,
     dropMarkerFromSpan: String => Boolean = _ => false
-  ): TaskManaged[CQLExecutor] =
+  ): RIO[Scope, CQLExecutor] =
     CQLExecutor(builder)
       .map(new TracedCQLExecutor(_, tracer, dropMarkerFromSpan))
 
@@ -214,8 +218,8 @@ object TracedCQLExecutor {
   ): CQLExecutor =
     new TracedCQLExecutor(CQLExecutor.fromCqlSession(session), tracer, dropMarkerFromSpan)
 
-  val layer: URLayer[Has[CQLExecutor] & Has[ZTracer], Has[CQLExecutor]] =
-    ZLayer.fromEffect(
+  val layer: URLayer[CQLExecutor & ZTracer, CQLExecutor] =
+    ZLayer.fromZIO(
       for {
         tracer <- ZIO.service[ZTracer]
         cql    <- ZIO.service[CQLExecutor]
