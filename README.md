@@ -25,6 +25,8 @@ libraryDependencies ++= {
 }
 ```
 
+This project is cross-built for ZIO 1.x and 2.x (look for the `zio2` prefix) as well as Scala 2.12.x, 2.13.x, and 3.1.x.
+
 Take a look at the example projects in this repository in order to get started.
 
 ## ZTracer
