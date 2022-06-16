@@ -71,7 +71,7 @@ object TapirServerTracer {
                     .as(right)
               }
               .onExit {
-                case Exit.Failure(cause) if cause.died =>
+                case Exit.Failure(cause) if cause.isDie =>
                   span.setStatus(SpanStatus.Internal(cause.prettyPrint))
 
                 case _ =>

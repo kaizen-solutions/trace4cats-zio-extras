@@ -37,13 +37,10 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
         underlying
           .execute(in)
           .tapError(enrichSpanWithErrorInformation(span))
-          .channel
-          .ensuringWith {
-            case Exit.Success(_)                    => ZIO.unit
-            case Exit.Failure(cause) if cause.isDie => span.setStatus(SpanStatus.Internal(cause.prettyPrint))
-            case Exit.Failure(_)                    => ZIO.unit
-          }
-          .toStream
+          .tapErrorCause(cause =>
+            if (cause.isDie) span.setStatus(SpanStatus.Internal(cause.prettyPrint))
+            else ZIO.unit
+          )
     }
 
   override def executeMutation(in: CQL[MutationResult])(implicit trace: Trace): Task[MutationResult] =

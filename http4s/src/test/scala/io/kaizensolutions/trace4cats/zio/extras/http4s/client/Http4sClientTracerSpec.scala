@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras.http4s.client
 
-import cats.effect.kernel.Resource
+import cats.effect.Resource
 import io.janstenpickle.trace4cats.model.TraceProcess
 import io.kaizensolutions.trace4cats.zio.extras.InMemorySpanCompleter
 import io.kaizensolutions.trace4cats.zio.extras.http4s.server.Http4sServerTracerSpec.dsl.Ok
@@ -8,29 +8,28 @@ import org.http4s.client.Client
 import org.http4s.syntax.all.*
 import org.http4s.{Header, Headers, Method, Request, Response}
 import org.typelevel.ci.CIString
-import zio.ZIO
-import zio.blocking.Blocking
-import zio.clock.Clock
 import zio.interop.catz.*
 import zio.test.*
-import zio.test.environment.TestEnvironment
+import zio.{Scope, Task, ZIO}
 
-object Http4sClientTracerSpec extends DefaultRunnableSpec {
-  override def spec: ZSpec[TestEnvironment, Any] =
+object Http4sClientTracerSpec extends ZIOSpecDefault {
+  override def spec: Spec[TestEnvironment & Scope, Any] =
     suite("HTTP4S Client Tracer")(
-      testM("Client requests are traced") {
+      test("Client requests are traced") {
         for {
           result      <- InMemorySpanCompleter.entryPoint(TraceProcess("http4s-server-tracer-spec"))
           (sc, ep)     = result
           tracer      <- InMemorySpanCompleter.toZTracer(ep)
-          client       = Client[Effect](_ => Resource.pure(Response[Effect](status = Ok)))
+          client       = Client[Task](_ => Resource.pure(Response[Task](status = Ok)))
           tracedClient = Http4sClientTracer.traceClient(tracer, client)
-          request = Request[Effect](
+          request = Request[Task](
                       method = Method.GET,
                       uri = uri"/hello",
                       headers = Headers(Header.Raw(CIString("hello"), "world"))
                     )
-          response <- tracedClient.run(request).toManagedZIO.useNow
+          // NOTE: define a scope here otherwise the results won't show up as it uses this Scope which is held open for
+          // the entire duration of this test
+          response <- ZIO.scoped(tracedClient.run(request).toScopedZIO)
           spans    <- sc.retrieveCollected
         } yield assertTrue(response.status == Ok, spans.length == 1) && {
           val span = spans.head
@@ -42,6 +41,4 @@ object Http4sClientTracerSpec extends DefaultRunnableSpec {
         }
       }
     )
-
-  type Effect[A] = ZIO[Clock & Blocking, Throwable, A]
 }

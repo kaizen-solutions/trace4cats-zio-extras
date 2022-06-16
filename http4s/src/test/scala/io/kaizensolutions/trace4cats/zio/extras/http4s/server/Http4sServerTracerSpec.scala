@@ -4,22 +4,19 @@ import io.janstenpickle.trace4cats.model.{AttributeValue, TraceProcess}
 import io.kaizensolutions.trace4cats.zio.extras.InMemorySpanCompleter
 import org.http4s.dsl.Http4sDsl
 import org.http4s.syntax.all.*
-import org.http4s.{HttpApp, HttpRoutes, Method, Request, Status}
-import zio.{URIO, ZIO}
-import zio.blocking.Blocking
-import zio.clock.Clock
+import org.http4s.*
 import zio.interop.catz.*
 import zio.test.*
-import zio.test.environment.TestEnvironment
+import zio.{RIO, Scope, Task, ZIO}
 
-object Http4sServerTracerSpec extends DefaultRunnableSpec {
-  override def spec: ZSpec[TestEnvironment, Any] =
+object Http4sServerTracerSpec extends ZIOSpecDefault {
+  override def spec: Spec[TestEnvironment & Scope, Any] =
     suite("HTTP4S Server Tracer specification")(
-      testM("traces successful server requests") {
+      test("traces successful server requests") {
         for {
           result         <- setup
           (sc, tracedApp) = result
-          req             = Request[Effect](method = Method.GET, uri = uri"/hello/42")
+          req             = Request[Task](method = Method.GET, uri = uri"/hello/42")
           resp           <- tracedApp.run(req)
           spans          <- sc.retrieveCollected
         } yield assertTrue(
@@ -37,11 +34,11 @@ object Http4sServerTracerSpec extends DefaultRunnableSpec {
           )
         }
       } +
-        testM("traces failed server requests") {
+        test("traces failed server requests") {
           for {
             result         <- setup
             (sc, tracedApp) = result
-            req             = Request[Effect](method = Method.POST, uri = uri"/error")
+            req             = Request[Task](method = Method.POST, uri = uri"/error")
             resp           <- tracedApp.run(req)
             spans          <- sc.retrieveCollected
           } yield assertTrue(
@@ -59,15 +56,15 @@ object Http4sServerTracerSpec extends DefaultRunnableSpec {
             )
           }
         } +
-        testM("traces defective server requests") {
+        test("traces defective server requests") {
           for {
             result         <- setup
             (sc, tracedApp) = result
-            req             = Request[Effect](method = Method.DELETE, uri = uri"/boom")
-            resp           <- tracedApp.run(req).run
+            req             = Request[Task](method = Method.DELETE, uri = uri"/boom")
+            resp           <- tracedApp.run(req).exit
             spans          <- sc.retrieveCollected
           } yield assertTrue(
-            !resp.succeeded,
+            !resp.isSuccess,
             spans.length == 1
           ) && {
             val span        = spans.head
@@ -82,13 +79,12 @@ object Http4sServerTracerSpec extends DefaultRunnableSpec {
         }
     )
 
-  type Effect[A] = ZIO[Clock & Blocking, Throwable, A]
-  object dsl extends Http4sDsl[Effect]
+  object dsl extends Http4sDsl[Task]
   import dsl.*
 
-  val app: HttpApp[Effect] =
+  val app: HttpApp[Task] =
     HttpRoutes
-      .of[Effect] {
+      .of[Task] {
         case GET -> Root / "hello" / id =>
           Ok(s"Hello, $id!")
 
@@ -100,12 +96,12 @@ object Http4sServerTracerSpec extends DefaultRunnableSpec {
       }
       .orNotFound
 
-  val setup: URIO[Clock & Blocking, (InMemorySpanCompleter, HttpApp[Effect])] =
+  val setup: RIO[Scope, (InMemorySpanCompleter, HttpApp[Task])] =
     for {
       result   <- InMemorySpanCompleter.entryPoint(TraceProcess("http4s-server-tracer-spec"))
       (sc, ep)  = result
       tracer   <- InMemorySpanCompleter.toZTracer(ep)
-      tracedApp = Http4sServerTracer.traceApp[Clock & Blocking, Throwable](tracer, app)
+      tracedApp = Http4sServerTracer.traceApp[Any, Throwable](tracer, app)
     } yield (sc, tracedApp)
 
   def cleanupAttributes(in: Map[String, AttributeValue]): Map[String, Any] =

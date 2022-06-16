@@ -11,13 +11,11 @@ import sttp.tapir.json.circe.*
 import sttp.tapir.server.ServerEndpoint
 import sttp.tapir.server.http4s.Http4sServerInterpreter
 import zio.*
-import zio.blocking.Blocking
-import zio.clock.Clock
 import zio.interop.catz.*
 
 import java.nio.charset.Charset
 
-object ExampleServerApp extends App {
+object ExampleServerApp extends ZIOAppDefault {
   def countCharacters(tracer: ZTracer)(in: Request): UIO[Either[NoCharacters, Int]] = {
     val l = in.input.length
     val out = tracer.spanSource() {
@@ -49,24 +47,24 @@ object ExampleServerApp extends App {
         extractResponseHeaders = _ => Headers(Nil)
       )
 
-  override def run(args: List[String]): URIO[ZEnv, ExitCode] = {
+  override val run: ZIO[ZIOAppArgs & Scope, Any, Any] = {
     val program =
-      ZIO.runtime[Clock & Blocking].flatMap { implicit rts =>
-        val server =
-          for {
-            tracer  <- ZIO.service[ZTracer]
-            endpoint = tracedServerEndpoint(tracer)
-            httpApp  = Http4sServerInterpreter[Task]().toRoutes(endpoint).orNotFound
-            server = BlazeServerBuilder[Task]
-                       .bindHttp(8080, "localhost")
-                       .withHttpApp(httpApp)
-          } yield server
+      for {
+        tracer  <- ZIO.service[ZTracer]
+        endpoint = tracedServerEndpoint(tracer)
+        httpApp  = Http4sServerInterpreter[Task]().toRoutes(endpoint).orNotFound
+        server <- BlazeServerBuilder[Task]
+                    .bindHttp(8080, "localhost")
+                    .withHttpApp(httpApp)
+                    .resource
+                    .toScopedZIO <* ZIO.never
+      } yield server
 
-        server.flatMap(_.resource.toManagedZIO.useForever)
-      }
-
-    program.exitCode
-      .provideCustomLayer(JaegarEntrypoint.live >>> ZTracer.layer)
+    program.provide(
+      ZLayer.fromZIO(Scope.make),
+      JaegarEntrypoint.live,
+      ZTracer.layer
+    )
   }
 }
 

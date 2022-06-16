@@ -8,18 +8,15 @@ import io.kaizensolutions.virgil.cql.CqlStringContext
 import io.kaizensolutions.virgil.dsl.*
 import io.kaizensolutions.virgil.internal.Proofs.=:!=
 import zio.*
-import zio.blocking.Blocking
-import zio.clock.Clock
 import zio.stream.*
 import zio.test.*
-import zio.test.environment.TestEnvironment
 
 import java.util.UUID
 
-object TracedCQLExecutorSpec extends DefaultRunnableSpec {
-  override def spec: ZSpec[TestEnvironment, Any] =
+object TracedCQLExecutorSpec extends ZIOSpecDefault {
+  override def spec: Spec[TestEnvironment & Scope, Any] =
     suite("Traced CQL Executor Specification")(
-      testM("traces streaming queries")(
+      test("traces streaming queries")(
         for {
           result   <- setup
           (cql, sc) = result
@@ -43,17 +40,17 @@ object TracedCQLExecutorSpec extends DefaultRunnableSpec {
           )
         }
       ) +
-        testM("traces batched mutations")(
+        test("traces batched mutations")(
           for {
             result   <- setup
             (cql, sc) = result
-            id1      <- ZIO(UUID.randomUUID())
+            id1      <- ZIO.succeed(UUID.randomUUID())
             pop1      = 1
             u1        = cql"UPDATE cycling.popular_count SET popularity = popularity + $pop1 WHERE id = $id1".mutation
-            id2      <- ZIO(UUID.randomUUID())
+            id2      <- ZIO.succeed(UUID.randomUUID())
             pop2      = 125
             u2        = cql"UPDATE cycling.popular_count SET popularity = popularity + $pop2 WHERE id = $id2".mutation
-            id3      <- ZIO(UUID.randomUUID())
+            id3      <- ZIO.succeed(UUID.randomUUID())
             pop3      = 64
             u3        = cql"UPDATE cycling.popular_count SET popularity = popularity - $pop3 WHERE id = $id3".mutation
             _        <- cql.executeMutation(u1 + u2 + u3)
@@ -84,7 +81,7 @@ object TracedCQLExecutorSpec extends DefaultRunnableSpec {
             )
           }
         ) +
-        testM("traces paged queries") {
+        test("traces paged queries") {
           for {
             result   <- setup
             (cql, sc) = result
@@ -111,27 +108,28 @@ object TracedCQLExecutorSpec extends DefaultRunnableSpec {
 
   val testCqlExecutor: CQLExecutor =
     new CQLExecutor {
-      override def execute[A](in: CQL[A]): Stream[Throwable, A] =
+      override def execute[A](in: CQL[A])(implicit trace: Trace): Stream[Throwable, A] =
         in.cqlType match {
           case _: CQLType.Mutation =>
-            Stream.succeed(MutationResult.make(true).asInstanceOf[A])
+            ZStream.succeed(MutationResult.make(true).asInstanceOf[A])
 
           case CQLType.Batch(_, _) =>
-            Stream.succeed(MutationResult.make(true).asInstanceOf[A])
+            ZStream.succeed(MutationResult.make(true).asInstanceOf[A])
 
           case CQLType.Query(_, _, _) =>
-            Stream.empty
+            ZStream.empty
         }
 
-      override def executeMutation(in: CQL[MutationResult]): Task[MutationResult] =
-        Task(MutationResult.make(true))
+      override def executeMutation(in: CQL[MutationResult])(implicit trace: Trace): Task[MutationResult] =
+        ZIO.attempt(MutationResult.make(true))
 
       override def executePage[A](in: CQL[A], pageState: Option[PageState])(implicit
-        ev: A =:!= MutationResult
-      ): Task[Paged[A]] = Task(Paged(Chunk.empty, None))
+        ev: A =:!= MutationResult,
+        trace: Trace
+      ): Task[Paged[A]] = ZIO.attempt(Paged(Chunk.empty, None))
     }
 
-  val setup: ZIO[Clock & Blocking, Nothing, (TracedCQLExecutor, InMemorySpanCompleter)] =
+  val setup: URIO[Scope, (TracedCQLExecutor, InMemorySpanCompleter)] =
     for {
       result  <- InMemorySpanCompleter.entryPoint(TraceProcess("virgil-streaming-query"))
       (sc, ep) = result

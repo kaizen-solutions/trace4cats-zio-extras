@@ -155,7 +155,7 @@ final case class ZTracer private (
     }
 
   /**
-   * Works like [[withSpan]] but in the context of a [[zio.Scope]] and handles
+   * Works like [[withSpan]] but in the context of a `zio.Scope` and handles
    * updating of the underlying Span context automatically for you.
    * @param name
    *   is the name of the span
