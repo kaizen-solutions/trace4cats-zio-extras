@@ -225,7 +225,9 @@ lazy val sttp =
       name                                                   := "trace4cats-zio-extras-sttp",
       organization                                           := "io.kaizen-solutions",
       organizationName                                       := "kaizen-solutions",
-      libraryDependencies += "com.softwaremill.sttp.client3" %% "zio" % Versions.sttp
+      libraryDependencies += "com.softwaremill.sttp.client3" %% "zio" % Versions.sttp,
+      // Prevents org.scala-lang.modules:scala-collection-compat _3, _2.13 conflicting cross-version suffixes
+      excludeDependencies += "org.scala-lang.modules" % "scala-collection-compat_2.13"
     )
     .dependsOn(core)
 
@@ -238,7 +240,9 @@ lazy val sttpExample =
       organization     := "io.kaizen-solutions",
       organizationName := "kaizen-solutions",
       publish / skip   := true,
-      libraryDependencies ++= Seq("io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats)
+      libraryDependencies ++= Seq("io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats),
+      // Prevents org.scala-lang.modules:scala-collection-compat _3, _2.13 conflicting cross-version suffixes
+      excludeDependencies += "org.scala-lang.modules" % "scala-collection-compat_2.13"
     )
     .dependsOn(sttp)
 
