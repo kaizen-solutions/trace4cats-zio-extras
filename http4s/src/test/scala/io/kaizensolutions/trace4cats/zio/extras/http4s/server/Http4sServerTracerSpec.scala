@@ -1,10 +1,10 @@
 package io.kaizensolutions.trace4cats.zio.extras.http4s.server
 
-import io.janstenpickle.trace4cats.model.{AttributeValue, SpanStatus, TraceProcess}
+import io.janstenpickle.trace4cats.model.{AttributeValue, TraceProcess}
 import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, ZTracer}
+import org.http4s.*
 import org.http4s.dsl.Http4sDsl
 import org.http4s.syntax.all.*
-import org.http4s.*
 import zio.interop.catz.*
 import zio.test.*
 import zio.{RIO, Scope, Task, ZIO}
@@ -75,8 +75,7 @@ object Http4sServerTracerSpec extends ZIOSpecDefault {
               spanAttribs("http.url") == "/boom", {
                 val cause = spanAttribs("error.cause").toString
                 cause.contains("Boom!") && cause.contains("Bang!")
-              },
-              span.status.toString.contains("Boom!") || span.status == SpanStatus.Cancelled
+              }
             )
           }
         } +
@@ -118,9 +117,16 @@ object Http4sServerTracerSpec extends ZIOSpecDefault {
           InternalServerError("Oh noes!")
 
         case DELETE -> Root / "boom" =>
-          ZIO
-            .die(new IllegalArgumentException("Boom!"))
-            .zipParRight(ZIO.die(new RuntimeException("Bang!")))
+          for {
+            fiber <- ZIO.forkAll(
+                       List(
+                         ZIO.die(new IllegalArgumentException("Boom!")),
+                         ZIO.die(new IllegalStateException("Bang!"))
+                       )
+                     )
+            _      <- fiber.join
+            result <- NotImplemented()
+          } yield result
       }
 
   val setupApp: RIO[Scope, (InMemorySpanCompleter, HttpApp[Task])] =
