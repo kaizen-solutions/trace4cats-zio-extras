@@ -9,8 +9,8 @@ import io.janstenpickle.trace4cats.http4s.common.{
   Request_,
   Response_
 }
-import io.janstenpickle.trace4cats.model.{SpanKind, SpanStatus}
-import io.kaizensolutions.trace4cats.zio.extras.ZTracer
+import io.janstenpickle.trace4cats.model.{AttributeValue, SampleDecision, SpanKind, SpanStatus}
+import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import org.http4s.{Headers, HttpApp, HttpRoutes, Request, Response}
 import org.typelevel.ci.CIString
 import zio.*
@@ -51,7 +51,6 @@ object Http4sServerTracer {
       Request[ZIO[R, E, *]],
       Response[ZIO[R, E, *]]
     ] { request =>
-      val reqFields    = Http4sHeaders.requestFields(request: Request_, dropHeadersWhen)
       val traceHeaders = Http4sHeaders.converter.from(request.headers)
       val nameOfSpan   = spanNamer(request)
 
@@ -62,17 +61,11 @@ object Http4sServerTracer {
           name = nameOfSpan,
           errorHandler = errorHandler
         ) { span =>
-          span.putAll(reqFields *) *>
+          enrichRequest(request, dropHeadersWhen, span) *>
             routes.run(request).value.onExit {
-              case Exit.Success(Some(response)) =>
-                span.setStatus(Http4sStatusMapping.toSpanStatus(response.status)) *>
-                  span.putAll(Http4sHeaders.responseFields(response: Response_, dropHeadersWhen) *)
-
-              case Exit.Success(None) =>
-                span.setStatus(SpanStatus.NotFound)
-
-              case Exit.Failure(cause) =>
-                span.setStatus(SpanStatus.Internal(cause.prettyPrint))
+              case Exit.Success(Some(response)) => enrichResponse(response, dropHeadersWhen, span)
+              case Exit.Success(None)           => span.setStatus(SpanStatus.NotFound)
+              case Exit.Failure(cause)          => enrichCause(cause, span)
             }
         }
       OptionT(tracedResponse)
@@ -112,7 +105,6 @@ object Http4sServerTracer {
       Request[ZIO[R, E, *]],
       Response[ZIO[R, E, *]]
     ] { request =>
-      val reqFields    = Http4sHeaders.requestFields(request: Request_, dropHeadersWhen)
       val traceHeaders = Http4sHeaders.converter.from(request.headers)
       val nameOfSpan   = spanNamer(request)
 
@@ -122,15 +114,53 @@ object Http4sServerTracer {
         name = nameOfSpan,
         errorHandler = errorHandler
       ) { span =>
-        span.putAll(reqFields *) *>
+        enrichRequest(request, dropHeadersWhen, span) *>
           app.run(request).onExit {
-            case Exit.Success(response) =>
-              span.setStatus(Http4sStatusMapping.toSpanStatus(response.status)) *>
-                span.putAll(Http4sHeaders.responseFields(response: Response_, dropHeadersWhen) *)
-
-            case Exit.Failure(cause) =>
-              span.setStatus(SpanStatus.Internal(cause.prettyPrint))
+            case Exit.Success(response) => enrichResponse(response, dropHeadersWhen, span)
+            case Exit.Failure(cause)    => enrichCause(cause, span)
           }
       }
     }
+
+  private def enrichRequest[R, E](
+    request: Request[ZIO[R, E, *]],
+    dropHeadersWhen: CIString => Boolean,
+    span: ZSpan
+  ): UIO[Unit] = {
+    val spanSampled = span.context.traceFlags.sampled == SampleDecision.Include
+    val reqFields   = Http4sHeaders.requestFields(request: Request_, dropHeadersWhen)
+
+    if (spanSampled) span.putAll(reqFields*)
+    else ZIO.unit
+  }
+
+  private def enrichResponse[R, E](
+    response: Response[ZIO[R, E, *]],
+    dropHeadersWhen: CIString => Boolean,
+    span: ZSpan
+  ): UIO[Unit] = {
+    val spanSampled = span.context.traceFlags.sampled == SampleDecision.Include
+    val enrichRespAttribs =
+      if (spanSampled) span.putAll(Http4sHeaders.responseFields(response: Response_, dropHeadersWhen)*)
+      else ZIO.unit
+
+    enrichRespAttribs *> span.setStatus(Http4sStatusMapping.toSpanStatus(response.status))
+  }
+
+  private def enrichCause[E](cause: Cause[E], span: ZSpan): UIO[Unit] = {
+    val spanSampled = span.context.traceFlags.sampled == SampleDecision.Include
+    if (spanSampled) {
+      if (cause.isDie) span.put("error.cause", AttributeValue.StringValue(cause.prettyPrint))
+      else if (cause.isFailure) {
+        val failure = cause.failureOption.get
+        span.put(
+          "error.message",
+          failure match {
+            case t: Throwable => AttributeValue.StringValue(t.getLocalizedMessage)
+            case other        => AttributeValue.StringValue(other.toString)
+          }
+        )
+      } else ZIO.unit
+    } else ZIO.unit
+  }
 }
