@@ -1,7 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras.http4s.client
 
 import cats.effect.{MonadCancelThrow, Resource}
-import cats.syntax.apply.*
 import io.janstenpickle.trace4cats.ToHeaders
 import io.janstenpickle.trace4cats.http4s.common.{
   Http4sHeaders,
@@ -14,17 +13,17 @@ import io.janstenpickle.trace4cats.model.*
 import io.janstenpickle.trace4cats.model.AttributeValue.{LongValue, StringValue}
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import org.http4s.client.{Client, UnexpectedStatus}
-import org.http4s.{Headers, Uri}
+import org.http4s.{Headers, Response, Uri}
 import zio.*
 import zio.interop.catz.*
 
 object Http4sClientTracer {
-  def traceClient[R, E](
+  def traceClient[R, E <: Throwable](
     tracer: ZTracer,
     client: Client[ZIO[R, E, *]],
     toHeaders: ToHeaders = ToHeaders.standard,
     spanNamer: Http4sSpanNamer = Http4sSpanNamer.methodWithPath
-  ): Client[ZIO[R, E, *]] = {
+  ): Client[ZIO[R, E, *]] =
     Client[ZIO[R, E, *]] { request =>
       val nameOfRequest = spanNamer(request: Request_)
       val spanScoped: URIO[Scope, ZSpan] =
@@ -37,29 +36,38 @@ object Http4sClientTracer {
             }
           )
 
-      // workaround for variance not automatically inferring
-      val spanResource: Resource[ZIO[R, E, *], ZSpan] = Resource.scopedZIO[R, E, ZSpan](spanScoped)
+      val responseScoped: ZIO[R & Scope, E, Response[ZIO[R, E, *]]] =
+        spanScoped.flatMap { span =>
+          val traceHeaders: TraceHeaders  = span.extractHeaders(toHeaders)
+          val http4sTraceHeaders: Headers = Http4sHeaders.converter.to(traceHeaders)
+          val requestWithHeaders          = request.transformHeaders(_ ++ http4sTraceHeaders)
+          val spanSampled                 = span.context.traceFlags.sampled == SampleDecision.Include
 
-      spanResource.flatMap { span =>
-        val traceHeaders: TraceHeaders  = span.extractHeaders(toHeaders)
-        val http4sTraceHeaders: Headers = Http4sHeaders.converter.to(traceHeaders)
-        val requestWithHeaders          = request.transformHeaders(_ ++ http4sTraceHeaders)
+          // NOTE: We must respect the sampled flag
+          val enrichWithAttributes: ZIO[R, E, Unit] =
+            if (spanSampled) span.putAll(toAttributes(request))
+            else ZIO.unit
 
-        // NOTE: We must respect the sampled flag
-        val enrichWithAttributes: ZIO[R, E, Unit] =
-          if (span.context.traceFlags.sampled == SampleDecision.Include) span.putAll(toAttributes(request))
-          else ZIO.unit
-
-        Resource.eval[ZIO[R, E, *], Unit](enrichWithAttributes) *>
-          client.run(requestWithHeaders).evalMap { response =>
-            val spanStatus     = Http4sStatusMapping.toSpanStatus(response.status)
-            val respAttributes = toAttributes(response)
-
-            span.setStatus(spanStatus) *> span.putAll(respAttributes).as(response)
-          }
-      }
+          enrichWithAttributes *>
+            client
+              .run(requestWithHeaders)
+              .toScopedZIO
+              .tap { response =>
+                val spanStatus     = Http4sStatusMapping.toSpanStatus(response.status)
+                val respAttributes = toAttributes(response)
+                span.putAll(respAttributes) *> span.setStatus(spanStatus).as(response)
+              }
+              .tapError(e =>
+                if (spanSampled) span.put("error.message", AttributeValue.StringValue(e.getLocalizedMessage))
+                else ZIO.unit
+              )
+              .tapDefect(cause =>
+                if (cause.isDie && spanSampled) span.put("error.cause", AttributeValue.StringValue(cause.prettyPrint))
+                else ZIO.unit
+              )
+        }
+      Resource.scopedZIO[R, E, Response[ZIO[R, E, *]]](responseScoped)
     }(concurrentInstance[R, E].asInstanceOf[MonadCancelThrow[ZIO[R, E, *]]]) // workaround as E is fixed to Throwable
-  }
 
   private def toAttributes(req: Request_): Map[String, AttributeValue] =
     Map[String, AttributeValue](
