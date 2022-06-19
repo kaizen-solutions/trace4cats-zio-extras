@@ -117,16 +117,9 @@ object Http4sServerTracerSpec extends ZIOSpecDefault {
           InternalServerError("Oh noes!")
 
         case DELETE -> Root / "boom" =>
-          for {
-            fiber <- ZIO.forkAll(
-                       List(
-                         ZIO.die(new IllegalArgumentException("Boom!")),
-                         ZIO.die(new IllegalStateException("Bang!"))
-                       )
-                     )
-            _      <- fiber.join
-            result <- NotImplemented()
-          } yield result
+          ZIO
+            .die(new IllegalArgumentException("Boom!"))
+            .race(ZIO.die(new IllegalStateException("Bang!"))) *> NotImplemented()
       }
 
   val setupApp: RIO[Scope, (InMemorySpanCompleter, HttpApp[Task])] =
