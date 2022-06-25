@@ -64,7 +64,7 @@ object Http4sServerTracerSpec extends ZIOSpecDefault {
             resp           <- tracedApp.run(req).exit
             spans          <- sc.retrieveCollected
           } yield assertTrue(
-            !resp.isSuccess,
+            resp.isFailure: Boolean,
             spans.length == 1
           ) && {
             val span        = spans.head

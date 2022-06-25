@@ -3,12 +3,11 @@ package io.kaizensolutions.trace4cats.zio.extras.ziohttp.examples
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.server.ZioHttpServerTracer.trace
 import zhttp.http.*
-import zhttp.http.Middleware.debug
 import zhttp.service.Server
 import zio.*
 
 object ExampleServerApp extends ZIOAppDefault {
-  val app: Http[Clock & Random & Db & ZTracer, Throwable, Request, Response] =
+  val app: Http[Db & ZTracer, Throwable, Request, Response] =
     Http.collectZIO[Request] {
 
       case Method.GET -> !! / "plaintext" =>
@@ -32,13 +31,10 @@ object ExampleServerApp extends ZIOAppDefault {
 
   override val run: ZIO[ZIOAppArgs & Scope, Any, Any] =
     Server
-      .start(8080, app @@ debug @@ trace)
+      .start(8080, app @@ trace)
       .provide(
         JaegerEntrypoint.live,
         ZTracer.layer,
-        Db.live,
-        Clock.live,
-        Random.live,
-        Console.live
+        Db.live
       )
 }
