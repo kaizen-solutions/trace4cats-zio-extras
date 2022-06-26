@@ -9,7 +9,7 @@ import sttp.client3.impl.zio.RIOMonadAsyncError
 import sttp.client3.{HttpError, Request, Response, SttpBackend}
 import sttp.model.{Header, HeaderNames, Headers, StatusCode}
 import sttp.monad.MonadError
-import zio.Task
+import zio.{Task, ZIO}
 
 // Lifted from io.janstenpickle.trace4cats.sttp.client3 to remain semantically the same
 object SttpBackendTracer {
@@ -52,7 +52,14 @@ object SttpBackendTracer {
           } yield response
 
         tracedRequest
-          .tapDefect(cause => span.setStatus(SpanStatus.Internal(cause.prettyPrint)))
+          .tapError(e =>
+            if (isSampled) span.put("error.message", AttributeValue.StringValue(e.getLocalizedMessage))
+            else ZIO.unit
+          )
+          .tapDefect(cause =>
+            if (cause.isDie && isSampled) span.put("error.cause", AttributeValue.StringValue(cause.prettyPrint))
+            else ZIO.unit
+          )
       }
     }
 
