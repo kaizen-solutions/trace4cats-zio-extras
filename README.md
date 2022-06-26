@@ -3,9 +3,8 @@
 ![Build Status](https://github.com/kaizen-solutions/trace4cats-zio-extras/actions/workflows/ci.yml/badge.svg)
 [![Jitpack](https://jitpack.io/v/kaizen-solutions/trace4cats-zio-extras.svg)](https://jitpack.io/#kaizen-solutions/trace4cats-zio-extras)
 
-Provides a variety of ZIO tracing integrations (with http4s and zio-http) and abstractions (`ZTracer`) for use with 
-Trace4Cats without making use of the typeclasses inside trace4cats (eg. `Provide`, etc.) and instead uses the ZIO 
-environment (`R`) and `FiberRef`s directly to call the underlying Trace4Cats APIs in order to provide a better ZIO API 
+
+This project provides [distributed tracing](https://newrelic.com/resources/ebooks/quick-introduction-distributed-tracing) to the ZIO ecosystem. It provides a variety of ZIO tracing integrations (with http4s and zio-http) and abstractions (`ZTracer`) for use with Trace4Cats without making use of the typeclasses inside trace4cats (eg. `Provide`, etc.) and instead uses the ZIO environment (`R`) and `FiberRef`s directly to call the underlying Trace4Cats APIs in order to provide a better ZIO API 
 experience for the user.
 
 ## Getting started
