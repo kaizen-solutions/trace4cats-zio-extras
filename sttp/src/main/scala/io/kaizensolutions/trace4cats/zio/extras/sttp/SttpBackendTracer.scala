@@ -1,15 +1,15 @@
 package io.kaizensolutions.trace4cats.zio.extras.sttp
 
 import io.janstenpickle.trace4cats.ToHeaders
-import io.janstenpickle.trace4cats.model.AttributeValue.{LongValue, StringValue}
 import io.janstenpickle.trace4cats.model.*
+import io.janstenpickle.trace4cats.model.AttributeValue.{LongValue, StringValue}
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import sttp.capabilities.Effect
 import sttp.client3.impl.zio.RIOMonadAsyncError
 import sttp.client3.{HttpError, Request, Response, SttpBackend}
 import sttp.model.{Header, HeaderNames, Headers, StatusCode}
 import sttp.monad.MonadError
-import zio.Task
+import zio.{Task, ZIO}
 
 // Lifted from io.janstenpickle.trace4cats.sttp.client3 to remain semantically the same
 object SttpBackendTracer {
@@ -30,7 +30,7 @@ object SttpBackendTracer {
       ) { span =>
         val requestWithTraceHeaders = {
           val traceHeaders = convertTraceHeaders(span.extractHeaders(toHeaders))
-          request.headers(traceHeaders.headers *)
+          request.headers(traceHeaders.headers*)
         }
         val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
 
@@ -40,15 +40,26 @@ object SttpBackendTracer {
           if (isSampled) toAttributes(request)
           else Map.empty
 
-        for {
-          _                   <- span.putAll((reqHeaderAttributes ++ reqExtraAttrs) *)
-          response            <- underlying.send(requestWithTraceHeaders)
-          _                   <- span.setStatus(toSpanStatus(response.statusText, response.code))
-          respHeaderAttributes = responseFields(Headers(response.headers), dropHeadersWhen)
-          // extractResponseAttributes has the potential to be expensive, so only call if the span is sampled
-          respExtraAttributes = if (isSampled) extractResponseAttributes(response) else Map.empty
-          _                  <- span.putAll((respHeaderAttributes ++ respExtraAttributes) *)
-        } yield response
+        val execute =
+          for {
+            _                   <- span.putAll((reqHeaderAttributes ++ reqExtraAttrs)*)
+            response            <- underlying.send(requestWithTraceHeaders)
+            _                   <- span.setStatus(toSpanStatus(response.statusText, response.code))
+            respHeaderAttributes = responseFields(Headers(response.headers), dropHeadersWhen)
+            // extractResponseAttributes has the potential to be expensive, so only call if the span is sampled
+            respExtraAttributes = if (isSampled) extractResponseAttributes(response) else Map.empty
+            _                  <- span.putAll((respHeaderAttributes ++ respExtraAttributes)*)
+          } yield response
+
+        execute
+          .tapError(e =>
+            if (isSampled) span.put("error.message", AttributeValue.StringValue(e.getLocalizedMessage))
+            else ZIO.unit
+          )
+          .tapCause(c =>
+            if (isSampled && c.died) span.put("error.cause", AttributeValue.StringValue(c.prettyPrint))
+            else ZIO.unit
+          )
       }
     }
 
