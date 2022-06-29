@@ -19,6 +19,13 @@ package object fs2 {
       kind: SpanKind = SpanKind.Internal,
       errorHandler: ErrorHandler = ErrorHandler.empty
     )(extractHeaders: O => TraceHeaders): TracedStream[R1, O] =
+      traceEachElement[R1]((_: O) => name, kind, errorHandler)(extractHeaders)
+
+    def traceEachElement[R1 <: R](
+      extractName: O => String,
+      kind: SpanKind,
+      errorHandler: ErrorHandler
+    )(extractHeaders: O => TraceHeaders): TracedStream[R1, O] =
       stream.chunks
         .flatMap(chunk =>
           Stream.resource(
@@ -26,7 +33,7 @@ package object fs2 {
               .service[ZTracer]
               .flatMap(tracer =>
                 chunk.traverse[RManaged[R1, *], Spanned[O]](o =>
-                  tracer.fromHeadersManaged(extractHeaders(o), name, kind, errorHandler).map(Spanned(_, o))
+                  tracer.fromHeadersManaged(extractHeaders(o), extractName(o), kind, errorHandler).map(Spanned(_, o))
                 )
               )
               .toResourceZIO
