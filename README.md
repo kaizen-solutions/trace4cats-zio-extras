@@ -20,7 +20,7 @@ libraryDependencies ++= {
     org %% "trace4cats-zio-extras-tapir"        % "<See Latest Release on JitPack>",  // core + tapir integration
     org %% "trace4cats-zio-extras-virgil"       % "<See Latest Release on JitPack>",  // core + virgil integration
     org %% "trace4cats-zio-extras-fs2"          % "<See Latest Release on JitPack>"   // core + fs2-streams integration
-      org %% "trace4cats-zio-extras-fs2-kafka"  % "<See Latest Release on JitPack>"   // core + fs2-kafka + fs2-streams integration
+    org %% "trace4cats-zio-extras-fs2-kafka"  % "<See Latest Release on JitPack>"   // core + fs2-kafka + fs2-streams integration
   )
 }
 ```
