@@ -1,5 +1,6 @@
 package io.kaizensolutions.virgil.trace4cats.zio.extras
 
+import com.datastax.oss.driver.api.core.metrics.Metrics
 import com.datastax.oss.driver.api.core.{CqlSession, CqlSessionBuilder}
 import io.janstenpickle.trace4cats.model.{AttributeValue, SampleDecision, SpanKind, SpanStatus}
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
@@ -78,6 +79,9 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
     }
   }
 
+  override def metrics: UIO[Option[Metrics]] =
+    tracer.span("metrics")(underlying.metrics)
+
   private def enrichSpanWithDefectInformation[E](currentSpan: ZSpan)(cause: Cause[E]): UIO[Unit] = {
     val addInfo = currentSpan.context.traceFlags.sampled.toBoolean
     if (addInfo) currentSpan.setStatus(SpanStatus.Internal(cause.prettyPrint))
@@ -119,7 +123,7 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
     else ZIO.unit
   }
 
-  private def extractQueryString[A](in: CQL[A]) = {
+  private def extractQueryString[A](in: CQL[A]): String = {
     in.cqlType match {
       case mutation: CQLType.Mutation =>
         val (queryStr, _) = CqlStatementRenderer.render(mutation)
@@ -142,7 +146,7 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
     }
   }
 
-  private def enrichSpan[A](in: CQL[A], span: ZSpan, dropMarkerFromSpan: String => Boolean) =
+  private def enrichSpan[A](in: CQL[A], span: ZSpan, dropMarkerFromSpan: String => Boolean): UIO[Unit] =
     in.cqlType match {
       case q @ CQLType.Query(_, _, pullMode) =>
         val attrMap      = mutable.Map.empty[String, AttributeValue]

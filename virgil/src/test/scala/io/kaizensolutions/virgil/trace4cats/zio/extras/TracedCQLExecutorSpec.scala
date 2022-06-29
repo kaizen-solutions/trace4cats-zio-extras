@@ -1,5 +1,6 @@
 package io.kaizensolutions.virgil.trace4cats.zio.extras
 
+import com.datastax.oss.driver.api.core.metrics.Metrics
 import io.janstenpickle.trace4cats.model.TraceProcess
 import io.kaizensolutions.trace4cats.zio.extras.InMemorySpanCompleter
 import io.kaizensolutions.virgil.*
@@ -129,6 +130,8 @@ object TracedCQLExecutorSpec extends DefaultRunnableSpec {
       override def executePage[A](in: CQL[A], pageState: Option[PageState])(implicit
         ev: A =:!= MutationResult
       ): Task[Paged[A]] = Task(Paged(Chunk.empty, None))
+
+      override def metrics: UIO[Option[Metrics]] = UIO.none
     }
 
   val setup: ZIO[Clock & Blocking, Nothing, (TracedCQLExecutor, InMemorySpanCompleter)] =
