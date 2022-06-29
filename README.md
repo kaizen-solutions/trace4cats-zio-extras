@@ -13,13 +13,14 @@ resolvers += "jitpack" at "https://jitpack.io"
 libraryDependencies ++= {
   val org = "com.github.kaizen-solutions.trace4cats-zio-extras"
   Seq(
-    org %% "trace4cats-zio-extras-core"     % "<See Latest Release on JitPack>",  // core only
-    org %% "trace4cats-zio-extras-zio-http" % "<See Latest Release on JitPack>",  // core + zio http server + client integration
-    org %% "trace4cats-zio-extras-http4s"   % "<See Latest Release on JitPack>",  // core + http4s server + client integration
-    org %% "trace4cats-zio-extras-sttp"     % "<See Latest Release on JitPack>",  // core + sttp client integration
-    org %% "trace4cats-zio-extras-tapir"    % "<See Latest Release on JitPack>",  // core + tapir integration
-    org %% "trace4cats-zio-extras-virgil"   % "<See Latest Release on JitPack>",  // core + virgil integration
-    org %% "trace4cats-zio-extras-fs2"      % "<See Latest Release on JitPack>"   // core + fs2-streams integration
+    org %% "trace4cats-zio-extras-core"         % "<See Latest Release on JitPack>",  // core only
+    org %% "trace4cats-zio-extras-zio-http"     % "<See Latest Release on JitPack>",  // core + zio http server + client integration
+    org %% "trace4cats-zio-extras-http4s"       % "<See Latest Release on JitPack>",  // core + http4s server + client integration
+    org %% "trace4cats-zio-extras-sttp"         % "<See Latest Release on JitPack>",  // core + sttp client integration
+    org %% "trace4cats-zio-extras-tapir"        % "<See Latest Release on JitPack>",  // core + tapir integration
+    org %% "trace4cats-zio-extras-virgil"       % "<See Latest Release on JitPack>",  // core + virgil integration
+    org %% "trace4cats-zio-extras-fs2"          % "<See Latest Release on JitPack>"   // core + fs2-streams integration
+      org %% "trace4cats-zio-extras-fs2-kafka"  % "<See Latest Release on JitPack>"   // core + fs2-kafka + fs2-streams integration
   )
 }
 ```
@@ -71,6 +72,12 @@ contain `Clock`, `Blocking` and `ZTracer` in order to perform spans. In addition
 `Throwable` otherwise these typeclasses cannot be derived (from the `interop-cats` library). We have an 
 [example](fs2-examples/src/main/scala/io/kaizensolutions/trace4cats/zio/extras/fs2/ExampleApp.scala) to help you get 
 started, and it's almost the same as the `ZStream` example.
+
+## FS2 Kafka integration
+
+We provide integrations to trace FS2 Kafka Producers and FS2 Kafka Consumer streams. Please see the 
+[examples](fs2-kafka-examples/src/main/scala/io/kaizensolutions/trace4cats/zio/extras/fs2/kafka/examples) in the package
+to get started.
 
 ## HTTP4S integration
 
