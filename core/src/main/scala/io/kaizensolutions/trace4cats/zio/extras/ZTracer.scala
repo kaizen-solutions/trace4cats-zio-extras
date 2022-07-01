@@ -333,9 +333,8 @@ object ZTracer {
   val layer: URLayer[ZEntryPoint, ZTracer] =
     ZLayer.scoped(
       for {
-        ep <- ZIO.service[ZEntryPoint]
-        // the FiberRef will keep the parent's span when a child fiber joined
-        spanRef <- FiberRef.make[Option[ZSpan]](initial = None, join = (parent, _) => parent)
+        ep      <- ZIO.service[ZEntryPoint]
+        spanRef <- FiberRef.make[Option[ZSpan]](initial = None)
         tracer   = ZTracer.make(spanRef, ep)
       } yield tracer
     )
