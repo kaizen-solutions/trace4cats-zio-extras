@@ -14,3 +14,18 @@ services:
       JVM_EXTRA_OPTS: -Dcassandra.skip_wait_for_gossip_to_settle=0 -Dcassandra.load_ring_state=false -Dcassandra.initial_token=1 -Dcassandra.num_tokens=nil -Dcassandra.allocate_tokens_for_local_replication_factor=nil
     ports:
       - "9042:9042"
+  kafka:
+    image: ubuntu/kafka
+    entrypoint: >
+      bash -c "export CLUSTER_ID=$$(/opt/kafka/bin/kafka-storage.sh random-uuid) &&
+      /opt/kafka/bin/kafka-storage.sh format --cluster-id $$CLUSTER_ID --config /etc/kafka/kraft/server.properties &&
+      /opt/kafka/bin/kafka-server-start.sh /etc/kafka/kraft/server.properties 
+        --override advertised.listeners=$$ADVERTISED_LISTENERS 
+        --override listener.security.protocol.map=$$PROTOCOL_MAP
+        --override listeners=$$LISTENERS"
+    ports:
+      - "9092:9092"
+    environment:
+      ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      LISTENERS: PLAINTEXT://:29092,PLAINTEXT_HOST://:9092,CONTROLLER://:9093
