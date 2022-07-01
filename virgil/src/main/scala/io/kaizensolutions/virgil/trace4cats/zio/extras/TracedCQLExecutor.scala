@@ -28,21 +28,20 @@ import scala.collection.mutable
 class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFromSpan: String => Boolean)
     extends CQLExecutor {
   override def execute[A](in: CQL[A]): Stream[Throwable, A] =
-    ZStream.managed(tracer.spanManaged(extractQueryString(in), SpanKind.Internal)).flatMap { span =>
-      val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
+    ZStream.unwrap(tracer.withSpan(extractQueryString(in), SpanKind.Internal) { span =>
       val enrichSpanWithBindMarkers =
-        if (isSampled) enrichSpan(in, span, dropMarkerFromSpan)
+        if (span.isSampled) enrichSpan(in, span, dropMarkerFromSpan)
         else ZIO.unit
 
-      ZStream.execute(enrichSpanWithBindMarkers).drain ++
-        ZStream(
-          underlying
-            .execute(in)
-            .process // access the underlying process to get access to tapDefect
-            .tapDefect(cause => enrichSpanWithDefectInformation(span)(cause).toManaged_)
-        )
-          .tapError(enrichSpanWithErrorInformation(span))
-    }
+      val spannedStream = ZStream(
+        underlying
+          .execute(in)
+          .process // access the underlying process to get access to tapDefect
+          .tapDefect(cause => enrichSpanWithDefectInformation(span)(cause).toManaged_)
+      ).tapError(enrichSpanWithErrorInformation(span))
+
+      enrichSpanWithBindMarkers *> ZIO.succeed(spannedStream)
+    })
 
   override def executeMutation(in: CQL[MutationResult]): Task[MutationResult] =
     tracer.withSpan(extractQueryString(in), SpanKind.Internal) { span =>
@@ -65,9 +64,8 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
     val pageNr = pageState.map(_.toString()).getOrElse("begin")
 
     tracer.withSpan(s"page-$pageNr: $query", SpanKind.Internal) { span =>
-      val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
       val enrichSpanWithBindMarkers =
-        if (isSampled) enrichSpan(in, span, dropMarkerFromSpan)
+        if (span.isSampled) enrichSpan(in, span, dropMarkerFromSpan)
         else ZIO.unit
 
       enrichSpanWithBindMarkers *>
