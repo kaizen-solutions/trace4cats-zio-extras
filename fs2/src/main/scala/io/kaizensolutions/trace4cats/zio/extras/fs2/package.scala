@@ -17,11 +17,18 @@ package object fs2 {
       kind: SpanKind = SpanKind.Internal,
       errorHandler: ErrorHandler = ErrorHandler.empty
     )(extractHeaders: O => TraceHeaders): TracedStream[R1, O] =
+      traceEachElement[R1]((_: O) => name, kind, errorHandler)(extractHeaders)
+
+    def traceEachElement[R1 <: R](
+      extractName: O => String,
+      kind: SpanKind,
+      errorHandler: ErrorHandler
+    )(extractHeaders: O => TraceHeaders): TracedStream[R1, O] =
       stream
         .evalMapChunk(o =>
           ZIO.scoped {
             ZIO
-              .serviceWithZIO[ZTracer](_.fromHeadersScoped(extractHeaders(o), name, kind, errorHandler))
+              .serviceWithZIO[ZTracer](_.fromHeadersScoped(extractHeaders(o), extractName(o), kind, errorHandler))
               .map(Spanned(_, o))
           }
         )

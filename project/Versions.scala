@@ -2,6 +2,7 @@ object Versions {
   val sourceCode     = "0.2.8"
   val catsEffect     = "3.3.13"
   val fs2            = "3.2.8"
+  val fs2Kafka       = "2.4.0"
   val trace4Cats     = "0.13.1"
   val zio            = "2.0.0"
   val zioInteropCats = "3.3.0"
