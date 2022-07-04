@@ -3,11 +3,11 @@ import sbtrelease.ReleaseStateTransformations._
 inThisBuild {
   val scala212 = "2.12.16"
   val scala213 = "2.13.8"
-  val scala312 = "3.1.2"
+  val scala313 = "3.1.3"
 
   Seq(
-    scalaVersion                        := scala312,
-    crossScalaVersions                  := Seq(scala212, scala213, scala312),
+    scalaVersion                        := scala313,
+    crossScalaVersions                  := Seq(scala212, scala213, scala313),
     githubWorkflowPublishTargetBranches := Seq.empty,
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     releaseTagName := s"${version.value}"
