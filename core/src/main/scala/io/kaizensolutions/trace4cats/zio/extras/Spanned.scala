@@ -21,4 +21,7 @@ final case class Spanned[+A](span: ZSpan, value: A) {
 
   def mapZIOTraced[R, E, B](f: A => ZIO[R, E, B]): ZIO[R & Has[ZTracer], E, Spanned[B]] =
     ZTracer.locally(span)(f(value).map(b => copy(value = b)))
+
+  def mapZIOTraced[R, E, B](tracer: ZTracer)(f: A => ZIO[R, E, B]): ZIO[R, E, Spanned[B]] =
+    tracer.locally(span)(f(value).map(b => copy(value = b)))
 }

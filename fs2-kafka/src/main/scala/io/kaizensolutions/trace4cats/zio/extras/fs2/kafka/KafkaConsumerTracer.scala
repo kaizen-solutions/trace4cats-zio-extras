@@ -7,25 +7,25 @@ import io.janstenpickle.trace4cats.ErrorHandler
 import io.janstenpickle.trace4cats.model.{AttributeValue, SpanKind, TraceHeaders}
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import io.kaizensolutions.trace4cats.zio.extras.fs2.*
-import zio.blocking.Blocking
-import zio.clock.Clock
-import zio.{Has, RIO, URIO, ZIO}
+import zio.{RIO, URIO, ZIO}
 import zio.interop.catz.*
 
 object KafkaConsumerTracer {
-  def traceConsumerStream[R <: Clock & Blocking & Has[ZTracer], K, V](
+  def traceConsumerStream[R, K, V](
+    tracer: ZTracer,
     consumerStream: Stream[
       RIO[R, *],
       CommittableConsumerRecord[RIO[R, *], K, V]
     ],
     spanNameForElement: CommittableConsumerRecord[RIO[R, *], K, V] => String =
       (_: CommittableConsumerRecord[RIO[R, *], K, V]) => s"kafka-receive"
-  ): TracedStream[R, CommittableConsumerRecord[RIO[R, *], K, V]] =
-    consumerStream
-      .traceEachElement(spanNameForElement, SpanKind.Consumer, ErrorHandler.empty)(comm =>
+  ): TracedStream[R, CommittableConsumerRecord[RIO[R, *], K, V]] = {
+
+    FS2Tracer
+      .traceEachElement(tracer, consumerStream, spanNameForElement, SpanKind.Consumer, ErrorHandler.empty)(comm =>
         extractTraceHeaders(comm.record.headers)
       )
-      .evalMapTraced { comm =>
+      .evalMapWithTracer(tracer) { comm =>
         val record    = comm.record
         val topic     = record.topic
         val partition = record.partition
@@ -34,7 +34,7 @@ object KafkaConsumerTracer {
         val timestamp = record.timestamp
 
         // Explicit typing to work around lack of contravariance
-        val currentSpan: URIO[R, Option[ZSpan]] = ZTracer.getCurrentSpan
+        val currentSpan: URIO[R, Option[ZSpan]] = tracer.retrieveCurrentSpan
 
         currentSpan.flatMap {
           case Some(span) =>
@@ -63,8 +63,8 @@ object KafkaConsumerTracer {
                     consumerGroupId = comm.offset.consumerGroupId,
                     commit = _ =>
                       // Ensure the same span is tied to the commit effect
-                      ZTracer.locally(span)(
-                        ZTracer.withSpan(s"${spanNameForElement(comm)}-commit")(span =>
+                      tracer.locally(span)(
+                        tracer.withSpan(s"${spanNameForElement(comm)}-commit")(span =>
                           span.putAll(coreAttributes) *> comm.offset.commit
                         )
                       )
@@ -76,6 +76,7 @@ object KafkaConsumerTracer {
             ZIO.succeed(comm)
         }
       }
+  }
 
   private def extractTraceHeaders(in: Headers): TraceHeaders =
     in.toChain.foldMap(header => TraceHeaders.of(header.key() -> header.as[String]))
