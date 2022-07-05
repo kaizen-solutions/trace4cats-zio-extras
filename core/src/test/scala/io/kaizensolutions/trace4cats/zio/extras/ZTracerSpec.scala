@@ -1,8 +1,9 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
 import io.janstenpickle.trace4cats.model.TraceProcess
+import zio.stream.ZStream
 import zio.test.{assertTrue, Spec, TestEnvironment, ZIOSpecDefault}
-import zio.{Scope, URIO, ZEnvironment, ZIO}
+import zio.{Chunk, Scope, URIO, ZEnvironment, ZIO}
 
 object ZTracerSpec extends ZIOSpecDefault {
   override def spec: Spec[TestEnvironment & Scope, Any] =
@@ -66,6 +67,19 @@ object ZTracerSpec extends ZIOSpecDefault {
             spans         <- sc.retrieveCollected
             uniqueTraceIds = spans.map(_.context.traceId).toSet
           } yield assertTrue(uniqueTraceIds.size == 2)
+        } +
+        test("streaming spans are captured") {
+          for {
+            result  <- InMemorySpanCompleter.entryPoint(TraceProcess("streaming-trace-test"))
+            (sc, ep) = result
+            tracer  <- InMemorySpanCompleter.toZTracer(ep)
+            // TODO: Wait for ZStreams to add @@ for aspects
+            executed <- ZTracer
+                          .traceEntireStream("streaming-trace")(ZStream(1, 2, 3))
+                          .runCollect
+                          .provideEnvironment(ZEnvironment(tracer))
+            spans <- sc.retrieveCollected
+          } yield assertTrue(executed == Chunk(1, 2, 3), spans.length == 1)
         }
     }
 }

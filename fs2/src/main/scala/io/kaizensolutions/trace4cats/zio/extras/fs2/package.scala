@@ -27,6 +27,15 @@ package object fs2 {
       Stream
         .eval(ZIO.service[ZTracer])
         .flatMap(tracer => FS2Tracer.traceEachElement(tracer, stream, extractName, kind, errorHandler)(extractHeaders))
+
+    def traceEntireStream[R1 <: R](
+      name: String,
+      kind: SpanKind = SpanKind.Internal,
+      errorHandler: ErrorHandler = ErrorHandler.empty
+    ): Stream[RIO[R1, *], O] =
+      Stream
+        .eval(ZIO.service[ZTracer])
+        .flatMap(tracer => FS2Tracer.traceEntireStream(tracer, stream, name, kind, errorHandler))
   }
 
   implicit class Fs2ZTracerSpannedOps[R <: ZTracer, +O](
