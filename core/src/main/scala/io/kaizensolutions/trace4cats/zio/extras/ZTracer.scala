@@ -214,6 +214,50 @@ final case class ZTracer private (
       .mapChunks(_.flatten)
 
   /**
+   * This operation traces the execution of a (finite) ZStream and the trace
+   * will be reported once the stream completes. Do not use this on an infinite
+   * stream as it will hold the span open indefinitely.
+   *
+   * @param name
+   *   is the name of the span
+   * @param kind
+   *   is the kind of the span
+   * @param errorHandler
+   *   is the error handler for the span
+   * @param stream
+   *   is the stream that will have its execution traced
+   * @tparam R
+   *   is the environment type
+   * @tparam E
+   *   is the error type
+   * @tparam O
+   *   is the output element type
+   * @return
+   */
+  def traceEntireStream[R, E, O](
+    name: String,
+    kind: SpanKind = SpanKind.Internal,
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  )(stream: ZStream[R, E, O]): ZStream[R, E, O] =
+    ZStream.unwrap(
+      self.withSpan[R, E, ZStream[R, E, O]](name, kind, errorHandler) { span =>
+        val enrichedStream: ZStream[R, E, O] =
+          ZStream(
+            stream.tapError {
+              case e: Throwable if span.isSampled => span.put("error.message", e.getLocalizedMessage)
+              case error if span.isSampled        => span.put("error.message", error.toString)
+              case _                              => ZIO.unit
+            }.process.tapCause {
+              case c if c.died && span.isSampled => span.put("error.cause", c.prettyPrint).toManaged_
+              case _                             => ZIO.unit.toManaged_
+            }
+          )
+
+        ZIO.succeed(enrichedStream)
+      }
+    )
+
+  /**
    * End tracing each element of the Stream
    *
    * @param stream
@@ -277,6 +321,20 @@ object ZTracer {
   )(zio: ZIO[R, E, A]): ZIO[R & Has[ZTracer], E, A] =
     ZIO.service[ZTracer].flatMap(_.span(name, kind, errorHandler)(zio))
 
+  def traceEachElement[R <: Has[?], E, O](
+    name: String,
+    kind: SpanKind = SpanKind.Internal,
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  )(stream: ZStream[R, E, O])(extractHeaders: O => TraceHeaders): ZStream[R & Has[ZTracer], E, Spanned[O]] =
+    ZStream.service[ZTracer].flatMap(_.traceEachElement(extractHeaders, name, kind, errorHandler)(stream))
+
+  def traceEntireStream[R <: Has[?], E, O](
+    name: String,
+    kind: SpanKind = SpanKind.Internal,
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  )(stream: ZStream[R, E, O]): ZStream[R & Has[ZTracer], E, O] =
+    ZStream.service[ZTracer].flatMap(_.traceEntireStream(name, kind, errorHandler)(stream))
+
   def spanManagedManual(
     name: String,
     kind: SpanKind = SpanKind.Internal,
@@ -300,7 +358,7 @@ object ZTracer {
   def locally[R <: Has[?], E, A](span: ZSpan)(zio: ZIO[R, E, A]): ZIO[R & Has[ZTracer], E, A] =
     ZIO.service[ZTracer].flatMap(_.locally(span)(zio))
 
-  val getCurrentSpan: URIO[Has[ZTracer], Option[ZSpan]] =
+  val retrieveCurrentSpan: URIO[Has[ZTracer], Option[ZSpan]] =
     ZIO.serviceWith[ZTracer](_.retrieveCurrentSpan)
 
   val removeCurrentSpan: URIO[Has[ZTracer], Unit] =
