@@ -70,6 +70,6 @@ package object fs2 {
       stream.parEvalMapUnordered[RIO[R, *], Spanned[O1]](n)(_.mapZIOTraced[R, Throwable, O1](tracer)(f))
 
     def endTracingEachElement(headers: ToHeaders = ToHeaders.standard): Stream[RIO[R, *], (O, TraceHeaders)] =
-      stream.mapChunks(_.map(s => (s.value, headers.fromContext(s.span.context))))
+      stream.evalMapChunk(s => s.closeSpan.as((s.value, headers.fromContext(s.span.context))))
   }
 }

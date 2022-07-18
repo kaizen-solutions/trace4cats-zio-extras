@@ -197,21 +197,24 @@ final case class ZTracer private (
    */
   def traceEachElement[R, E, O](
     extractHeaders: O => TraceHeaders,
-    name: String,
+    extractName: O => String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(stream: ZStream[R, E, O]): ZStream[R, E, Spanned[O]] =
     stream
-      .mapChunks(Chunk.single)
-      .flatMap(inputs =>
-        ZStream.managed(
-          ZManaged.foreach(inputs)(input =>
-            fromHeadersManaged(extractHeaders(input), name, kind, errorHandler)
-              .map(Spanned(_, input))
-          )
+      .mapChunksM(
+        _.mapM(element =>
+          for {
+            waitSpanPromise  <- Promise.make[Nothing, ZSpan]
+            closeSpanPromise <- Promise.make[Nothing, Unit]
+            closeSpan         = closeSpanPromise.succeed(())
+            _ <- fromHeaders(extractHeaders(element), kind, extractName(element), errorHandler)(span =>
+                   waitSpanPromise.succeed(span) *> closeSpanPromise.await
+                 ).ensuring(closeSpan).fork
+            span <- waitSpanPromise.await
+          } yield Spanned(span, closeSpan, element)
         )
       )
-      .mapChunks(_.flatten)
 
   /**
    * This operation traces the execution of a (finite) ZStream and the trace
@@ -277,7 +280,14 @@ final case class ZTracer private (
     stream: ZStream[R, E, Spanned[O]],
     headers: ToHeaders = ToHeaders.standard
   ): ZStream[R, E, (O, TraceHeaders)] =
-    stream.mapChunks(_.map(s => (s.value, headers.fromContext(s.span.context))))
+    stream.mapChunksM(
+      _.mapM(s =>
+        s.closeSpan
+          .as(
+            (s.value, headers.fromContext(s.span.context))
+          )
+      )
+    )
 
   /**
    * This is a low level operator that can potentially be used with spanManaged
@@ -322,11 +332,11 @@ object ZTracer {
     ZIO.service[ZTracer].flatMap(_.span(name, kind, errorHandler)(zio))
 
   def traceEachElement[R <: Has[?], E, O](
-    name: String,
+    extractName: O => String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(stream: ZStream[R, E, O])(extractHeaders: O => TraceHeaders): ZStream[R & Has[ZTracer], E, Spanned[O]] =
-    ZStream.service[ZTracer].flatMap(_.traceEachElement(extractHeaders, name, kind, errorHandler)(stream))
+    ZStream.service[ZTracer].flatMap(_.traceEachElement(extractHeaders, extractName, kind, errorHandler)(stream))
 
   def traceEntireStream[R <: Has[?], E, O](
     name: String,
