@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
-import io.janstenpickle.trace4cats.model.{AttributeValue, SpanContext, SpanKind, TraceHeaders}
+import io.janstenpickle.trace4cats.model.*
 import io.janstenpickle.trace4cats.{ErrorHandler, ToHeaders}
 import zio.*
 import zio.stream.ZStream
@@ -201,20 +201,27 @@ final case class ZTracer private (
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(stream: ZStream[R, E, O]): ZStream[R, E, Spanned[O]] =
-    stream
-      .mapChunksM(
-        _.mapM(element =>
-          for {
-            waitSpanPromise  <- Promise.make[Nothing, ZSpan]
-            closeSpanPromise <- Promise.make[Nothing, Unit]
-            closeSpan         = closeSpanPromise.succeed(())
-            _ <- fromHeaders(extractHeaders(element), kind, extractName(element), errorHandler)(span =>
-                   waitSpanPromise.succeed(span) *> closeSpanPromise.await
-                 ).ensuring(closeSpan).fork
-            span <- waitSpanPromise.await
-          } yield Spanned(span, closeSpan, element)
-        )
+    ZStream
+      .fromEffect(
+        ZScope
+          .make[Exit[Any, Any]]
+          .flatMap(ElementTracerMap.make(_))
       )
+      .flatMap { tracerMap =>
+        ZStream(
+          process = stream
+            .mapChunksM(
+              _.mapM(element =>
+                tracerMap.traceElement(
+                  element = element,
+                  callback = fromHeaders(extractHeaders(element), kind, extractName(element), errorHandler)
+                )
+              )
+            )
+            .process
+            .onExit(tracerMap.cleanup(_))
+        )
+      }
 
   /**
    * This operation traces the execution of a (finite) ZStream and the trace

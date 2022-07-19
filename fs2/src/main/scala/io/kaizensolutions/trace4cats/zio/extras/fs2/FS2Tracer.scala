@@ -4,9 +4,9 @@ import cats.effect.kernel.Resource.ExitCase
 import fs2.*
 import io.janstenpickle.trace4cats.ErrorHandler
 import io.janstenpickle.trace4cats.model.{SpanKind, TraceHeaders}
-import io.kaizensolutions.trace4cats.zio.extras.{Spanned, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{ElementTracerMap, ZTracer}
 import zio.interop.catz.*
-import zio.{RIO, RManaged, ZIO}
+import zio.{Exit, RIO, ZIO, ZScope}
 
 object FS2Tracer {
   def traceEachElement[R, O](
@@ -16,17 +16,22 @@ object FS2Tracer {
     kind: SpanKind,
     errorHandler: ErrorHandler
   )(extractHeaders: O => TraceHeaders): TracedStream[R, O] =
-    stream.chunks
-      .flatMap(chunk =>
-        Stream.resource(
-          chunk
-            .traverse[RManaged[R, *], Spanned[O]](o =>
-              tracer.fromHeadersManaged(extractHeaders(o), extractName(o), kind, errorHandler).map(Spanned(_, o))
-            )
-            .toResourceZIO
-        )(concurrentInstance[R, Throwable]) // Scala 3.1.x workaround
+    Stream
+      .eval(
+        ZScope
+          .make[Exit[Any, Any]]
+          .flatMap(ElementTracerMap.make(_))
       )
-      .unchunks
+      .flatMap(tracerMap =>
+        stream
+          .evalMapChunk(element =>
+            tracerMap.traceElement(
+              element,
+              tracer.fromHeaders(extractHeaders(element), kind, extractName(element), errorHandler)
+            )
+          )
+          .onFinalizeCase(_ => tracerMap.cleanup(Exit.unit).unit)
+      )
 
   def traceEntireStream[R, O](
     tracer: ZTracer,
