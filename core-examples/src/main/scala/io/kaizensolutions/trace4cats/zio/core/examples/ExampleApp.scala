@@ -10,22 +10,20 @@ object ExampleApp extends App {
 
   override def run(args: List[String]): URIO[ZEnv, ExitCode] =
     ZTracer
-      .span("streaming-app") {
+      .span("streaming-app-2") {
         ZStream
           .range(1, 100)
           .mapM(i => ZTracer.withSpan(s"name-$i")(span => ZIO.succeed((i, span.extractHeaders(ToHeaders.standard)))))
-          .traceEachElement("in-begin") { case (_, headers) =>
+          .traceEachElement(i => s"in-begin-$i") { case (_, headers) =>
             headers
           }
           .mapThrough(_._1)
-          .mapMTraced(e =>
-            ZTracer.span(s"plus 1 for $e")(putStrLn(s"Adding ${e} + 1 = ${e + 1}") *> ZIO.succeed(e + 1))
-          )
+          .mapMTraced(e => ZTracer.span(s"plus 1 for $e")(putStrLn(s"Adding ${e} + 1 = ${e + 1}") *> ZIO.succeed(e)))
           .mapMParTraced(8)(e =>
             ZTracer.span(s"plus 2 for $e")(
               putStrLn(s"Adding ${e} + 2 = ${e + 2}")
                 .delay(500.millis) *>
-                ZIO.succeed(e + 2)
+                ZIO.succeed(e)
             )
           )
           .mapMParTraced(3)(e =>
@@ -33,7 +31,7 @@ object ExampleApp extends App {
               ZTracer.spanSource()(
                 putStrLn(s"Adding ${e} + 4 = ${e + 4}")
                   .delay(1.second)
-              ) *> ZIO.succeed(e + 2)
+              ) *> ZIO.succeed(e)
             )
           )
           .endTracingEachElement

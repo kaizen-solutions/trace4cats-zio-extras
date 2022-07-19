@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
-import io.janstenpickle.trace4cats.model.{AttributeValue, SpanContext, SpanKind, TraceHeaders}
+import io.janstenpickle.trace4cats.model.*
 import io.janstenpickle.trace4cats.{ErrorHandler, ToHeaders}
 import zio.*
 import zio.stream.ZStream
@@ -197,21 +197,31 @@ final case class ZTracer private (
    */
   def traceEachElement[R, E, O](
     extractHeaders: O => TraceHeaders,
-    name: String,
+    extractName: O => String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(stream: ZStream[R, E, O]): ZStream[R, E, Spanned[O]] =
-    stream
-      .mapChunks(Chunk.single)
-      .flatMap(inputs =>
-        ZStream.managed(
-          ZManaged.foreach(inputs)(input =>
-            fromHeadersManaged(extractHeaders(input), name, kind, errorHandler)
-              .map(Spanned(_, input))
-          )
-        )
+    ZStream
+      .fromEffect(
+        ZScope
+          .make[Exit[Any, Any]]
+          .flatMap(ElementTracerMap.make(_))
       )
-      .mapChunks(_.flatten)
+      .flatMap { tracerMap =>
+        ZStream(
+          process = stream
+            .mapChunksM(
+              _.mapM(element =>
+                tracerMap.traceElement(
+                  element = element,
+                  callback = fromHeaders(extractHeaders(element), kind, extractName(element), errorHandler)
+                )
+              )
+            )
+            .process
+            .onExit(tracerMap.cleanup(_))
+        )
+      }
 
   /**
    * This operation traces the execution of a (finite) ZStream and the trace
@@ -277,7 +287,14 @@ final case class ZTracer private (
     stream: ZStream[R, E, Spanned[O]],
     headers: ToHeaders = ToHeaders.standard
   ): ZStream[R, E, (O, TraceHeaders)] =
-    stream.mapChunks(_.map(s => (s.value, headers.fromContext(s.span.context))))
+    stream.mapChunksM(
+      _.mapM(s =>
+        s.closeSpan
+          .as(
+            (s.value, headers.fromContext(s.span.context))
+          )
+      )
+    )
 
   /**
    * This is a low level operator that can potentially be used with spanManaged
@@ -322,11 +339,11 @@ object ZTracer {
     ZIO.service[ZTracer].flatMap(_.span(name, kind, errorHandler)(zio))
 
   def traceEachElement[R <: Has[?], E, O](
-    name: String,
+    extractName: O => String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(stream: ZStream[R, E, O])(extractHeaders: O => TraceHeaders): ZStream[R & Has[ZTracer], E, Spanned[O]] =
-    ZStream.service[ZTracer].flatMap(_.traceEachElement(extractHeaders, name, kind, errorHandler)(stream))
+    ZStream.service[ZTracer].flatMap(_.traceEachElement(extractHeaders, extractName, kind, errorHandler)(stream))
 
   def traceEntireStream[R <: Has[?], E, O](
     name: String,
