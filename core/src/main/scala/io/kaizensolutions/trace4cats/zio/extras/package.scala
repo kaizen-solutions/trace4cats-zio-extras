@@ -23,13 +23,13 @@ package object extras {
 
   implicit class ZTracerStreamOps[R, E, A](val s: ZStream[R, E, A]) extends AnyVal {
     def traceEachElement(
-      name: String,
+      extractName: A => String,
       kind: SpanKind = SpanKind.Internal,
       errorHandler: ErrorHandler = ErrorHandler.empty
     )(extractHeaders: A => TraceHeaders): ZStream[R & ZTracer, E, Spanned[A]] =
       ZStream
         .service[ZTracer]
-        .flatMap(_.traceEachElement(extractHeaders, name, kind, errorHandler)(s))
+        .flatMap(_.traceEachElement(extractHeaders, extractName, kind, errorHandler)(s))
   }
 
   implicit class ZTracerStreamSpannedOps[-R, +E, +A](val s: ZStream[R, E, Spanned[A]]) extends AnyVal {

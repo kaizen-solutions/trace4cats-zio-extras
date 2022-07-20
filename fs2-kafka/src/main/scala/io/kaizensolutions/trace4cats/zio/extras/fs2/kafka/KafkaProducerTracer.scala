@@ -3,20 +3,61 @@ package io.kaizensolutions.trace4cats.zio.extras.fs2.kafka
 import cats.data.NonEmptyList
 import fs2.kafka.*
 import io.janstenpickle.trace4cats.ToHeaders
-import io.janstenpickle.trace4cats.model.AttributeValue
+import io.janstenpickle.trace4cats.model.{AttributeValue, SpanKind}
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
-import zio.ZIO
+import zio.{Exit, Fiber, Promise, ZIO}
 
 object KafkaProducerTracer {
+
+  /**
+   * @param tracer
+   *   is the ZTracer
+   * @param underlying
+   * @param headers
+   * @param tracerAckFromBroker
+   *   set to true if you plan on acknowledging the inner effect otherwise
+   *   traces will be left open causing memory leaks
+   * @tparam R
+   *   is the ZIO environment type
+   * @tparam E
+   *   is the ZIO error type
+   * @tparam K
+   *   is the Kafka producer key
+   * @tparam V
+   *   is the Kafka producer value
+   * @return
+   */
   def trace[R, E <: Throwable, K, V](
     tracer: ZTracer,
     underlying: KafkaProducer[ZIO[R, E, *], K, V],
-    headers: ToHeaders = ToHeaders.all
+    headers: ToHeaders = ToHeaders.all,
+    tracerAckFromBroker: Boolean = true
   ): KafkaProducer[ZIO[R, E, *], K, V] =
     new KafkaProducer[ZIO[R, E, *], K, V] {
       override def produce[P](records: ProducerRecords[P, K, V]): ZIO[R, E, ZIO[R, E, ProducerResult[P, K, V]]] =
-        tracer.withSpan("kafka-producer-send-buffer") { span =>
-          tracer.extractHeaders(headers).flatMap { traceHeaders =>
+        for {
+          waitSpan  <- Promise.make[Nothing, ZSpan]
+          closeSpan <- Promise.make[E, Unit]
+          // NOTE: We take special care to hold the span open until the inner effect (representing the broker ack is acknowledged)
+          fiber <- tracer
+                     .withSpan("kafka-producer-send-buffer", kind = SpanKind.Producer) { span =>
+                       waitSpan.succeed(span) *> closeSpan.await
+                     }
+                     .fork
+          span   <- waitSpan.await
+          result <- tracedProduce(span, fiber, closeSpan, records, tracerAckFromBroker)
+        } yield result
+
+      private def tracedProduce[P](
+        span: ZSpan,
+        spanFiber: Fiber[E, Unit],
+        closeSpan: Promise[E, Unit],
+        records: ProducerRecords[P, K, V],
+        tracerAckFromBroker: Boolean
+      ): ZIO[R, E, ZIO[R, E, ProducerResult[P, K, V]]] =
+        tracer
+          .extractHeaders(headers)
+          .flatMap { traceHeaders =>
             val enrichSpanWithTopics =
               if (span.isSampled)
                 NonEmptyList
@@ -37,15 +78,29 @@ object KafkaProducerTracer {
               "error.cause-producer-buffer-send",
               span,
               sendToProducerBuffer
-            ).map(ack =>
+            ).map(ackFromBroker =>
               tracer.locally(span) {
+                // Ensure the outer span is closed once the inner ack effect is finished
                 tracer.span("kafka-producer-broker-ack") {
-                  enrichSpanWithError("error.message-broker-ack", "error.cause-broker-ack", span, ack)
+                  enrichSpanWithError(
+                    "error.message-broker-ack",
+                    "error.cause-broker-ack",
+                    span,
+                    ackFromBroker
+                  ).onExit {
+                    case Exit.Success(_)     => closeSpan.succeed(())
+                    case Exit.Failure(cause) => closeSpan.refailCause(cause)
+                  }
                 }
               }
-            )
+            ).onInterrupt(spanFiber.interrupt)
+              .onExit(_ =>
+                // close span immediately if we don't care about tracing the acknowledgement from the broker
+                // otherwise rely on the inner effect being run
+                if (!tracerAckFromBroker) closeSpan.succeed(())
+                else ZIO.unit
+              )
           }
-        }
     }
 
   private def enrichSpanWithError[R, E <: Throwable, A](

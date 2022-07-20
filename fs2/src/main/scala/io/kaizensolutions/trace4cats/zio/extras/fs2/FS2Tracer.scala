@@ -4,9 +4,9 @@ import cats.effect.kernel.Resource.ExitCase
 import fs2.*
 import io.janstenpickle.trace4cats.ErrorHandler
 import io.janstenpickle.trace4cats.model.{SpanKind, TraceHeaders}
-import io.kaizensolutions.trace4cats.zio.extras.{Spanned, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{ElementTracerMap, ZTracer}
 import zio.interop.catz.*
-import zio.{RIO, ZIO}
+import zio.{Exit, RIO, Scope, ZIO}
 
 object FS2Tracer {
   def traceEachElement[R, O](
@@ -16,13 +16,17 @@ object FS2Tracer {
     kind: SpanKind,
     errorHandler: ErrorHandler
   )(extractHeaders: O => TraceHeaders): TracedStream[R, O] =
-    stream
-      .evalMapChunk(o =>
-        ZIO.scoped[Any] {
-          tracer
-            .fromHeadersScoped(extractHeaders(o), extractName(o), kind, errorHandler)
-            .map(Spanned(_, o))
-        }
+    Stream
+      .eval(Scope.make.flatMap(ElementTracerMap.make(_)))
+      .flatMap(tracerMap =>
+        stream
+          .evalMapChunk(element =>
+            tracerMap.traceElement(
+              element,
+              tracer.fromHeaders(extractHeaders(element), kind, extractName(element), errorHandler)
+            )
+          )
+          .onFinalizeCase(_ => tracerMap.cleanup(Exit.unit).unit)
       )
 
   def traceEntireStream[R, O](
