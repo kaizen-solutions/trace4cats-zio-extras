@@ -104,7 +104,7 @@ final case class ZTracer private (
     kind: SpanKind = SpanKind.Internal
   )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R, E, A] = {
     ZIO.scoped[R] {
-      spanScoped(s"${fileName.value}:${line.value}", kind)
+      spanScopedManual(s"${fileName.value}:${line.value}", kind)
         .flatMap(span => current.locally(Some(span))(zio))
     }
   }
@@ -115,7 +115,7 @@ final case class ZTracer private (
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(zio: ZIO[R, E, A]): ZIO[R, E, A] =
     ZIO.scoped[R] {
-      spanScoped(name, kind, errorHandler).flatMap(span => current.locally(Some(span))(zio))
+      spanScopedManual(name, kind, errorHandler).flatMap(span => current.locally(Some(span))(zio))
     }
 
   /**
@@ -317,7 +317,7 @@ final case class ZTracer private (
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(fn: ZSpan => ZIO[R, E, A]): ZIO[R, E, A] =
     ZIO.scoped[R] {
-      spanScoped(name, kind, errorHandler).flatMap(span => current.locally(Some(span))(fn(span)))
+      spanScopedManual(name, kind, errorHandler).flatMap(span => current.locally(Some(span))(fn(span)))
     }
 }
 object ZTracer {
