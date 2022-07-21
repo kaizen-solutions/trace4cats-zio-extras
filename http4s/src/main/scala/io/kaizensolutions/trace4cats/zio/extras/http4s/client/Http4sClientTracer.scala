@@ -28,7 +28,7 @@ object Http4sClientTracer {
       val nameOfRequest = spanNamer(request: Request_)
       val spanManaged: ZManaged[R, E, ZSpan] =
         tracer
-          .spanManaged(
+          .spanManagedManual(
             name = nameOfRequest,
             kind = SpanKind.Client,
             errorHandler = { case UnexpectedStatus(status, _, _) =>

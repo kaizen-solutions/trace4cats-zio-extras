@@ -46,7 +46,7 @@ object KafkaProducerTracer {
     ReleaseMap.make
       .flatMap(rlsMap =>
         tracer
-          .spanManaged("kafka-producer-send-buffer", kind = SpanKind.Producer)
+          .spanManagedManual("kafka-producer-send-buffer", kind = SpanKind.Producer)
           .zio
           .provide(((), rlsMap))
       )
