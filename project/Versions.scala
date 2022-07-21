@@ -9,6 +9,6 @@ object Versions {
   val zhttp          = "1.0.0.0-RC29"
   val http4s         = "0.23.12"
   val tapir          = "1.0.2"
-  val sttp           = "3.6.2"
+  val sttp           = "3.7.1"
   val virgil         = "0.10.1"
 }
