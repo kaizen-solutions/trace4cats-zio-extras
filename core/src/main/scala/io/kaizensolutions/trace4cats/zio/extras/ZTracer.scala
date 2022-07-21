@@ -101,14 +101,14 @@ final case class ZTracer private (
   def spanSource[R, E, A](
     kind: SpanKind = SpanKind.Internal
   )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R, E, A] =
-    spanManaged(s"${fileName.value}:${line.value}", kind).use(span => current.locally(Some(span))(zio))
+    spanManagedManual(s"${fileName.value}:${line.value}", kind).use(span => current.locally(Some(span))(zio))
 
   def span[R, E, A](
     name: String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(zio: ZIO[R, E, A]): ZIO[R, E, A] =
-    spanManaged(name, kind, errorHandler).use(span => current.locally(Some(span))(zio))
+    spanManagedManual(name, kind, errorHandler).use(span => current.locally(Some(span))(zio))
 
   /**
    * This is a low level operator and leaves you, the user, to manipulate the
@@ -179,8 +179,8 @@ final case class ZTracer private (
    *
    * @param extractHeaders
    *   is a function that extracts the trace headers from the element
-   * @param name
-   *   is the name of the span
+   * @param extractName
+   *   is a function that extracts the name from the element
    * @param kind
    *   is the kind of span
    * @param errorHandler
@@ -325,7 +325,7 @@ final case class ZTracer private (
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(fn: ZSpan => ZIO[R, E, A]): ZIO[R, E, A] =
-    spanManaged(name, kind, errorHandler).use(span => current.locally(Some(span))(fn(span)))
+    spanManagedManual(name, kind, errorHandler).use(span => current.locally(Some(span))(fn(span)))
 }
 object ZTracer {
   def make(current: FiberRef[Option[ZSpan]], entryPoint: ZEntryPoint): ZTracer =
