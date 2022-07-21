@@ -1,5 +1,6 @@
 package io.kaizensolutions.virgil.trace4cats.zio.extras
 
+import com.datastax.oss.driver.api.core.metrics.Metrics
 import com.datastax.oss.driver.api.core.{CqlSession, CqlSessionBuilder}
 import io.janstenpickle.trace4cats.model.{AttributeValue, SampleDecision, SpanKind, SpanStatus}
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
@@ -27,13 +28,11 @@ import scala.collection.mutable
 class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFromSpan: String => Boolean)
     extends CQLExecutor {
   override def execute[A](in: CQL[A])(implicit trace: Trace): Stream[Throwable, A] =
-    ZStream.scoped(tracer.spanScoped(extractQueryString(in), SpanKind.Internal)).flatMap { span =>
-      val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
+    ZStream.unwrap(tracer.withSpan(extractQueryString(in), SpanKind.Internal) { span =>
       val enrichSpanWithBindMarkers =
-        if (isSampled) enrichSpan(in, span, dropMarkerFromSpan)
+        if (span.isSampled) enrichSpan(in, span, dropMarkerFromSpan)
         else ZIO.unit
-
-      ZStream.execute(enrichSpanWithBindMarkers).drain ++
+      val spannedStream =
         underlying
           .execute(in)
           .tapError(enrichSpanWithErrorInformation(span))
@@ -41,7 +40,8 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
             if (cause.isDie) span.setStatus(SpanStatus.Internal(cause.prettyPrint))
             else ZIO.unit
           )
-    }
+      enrichSpanWithBindMarkers *> ZIO.succeed(spannedStream)
+    })
 
   override def executeMutation(in: CQL[MutationResult])(implicit trace: Trace): Task[MutationResult] =
     tracer.withSpan(extractQueryString(in), SpanKind.Internal) { span =>
@@ -191,6 +191,9 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
         }
         span.putAll(attrMap.toMap)
     }
+
+  override def metrics: UIO[Option[Metrics]] =
+    tracer.span("metrics")(underlying.metrics)
 }
 
 object TracedCQLExecutor {

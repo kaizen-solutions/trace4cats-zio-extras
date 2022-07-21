@@ -14,6 +14,8 @@ import zio.{NonEmptyChunk, Scope, Task, UIO, URIO}
  *   is the underlying Trace4Cats Span
  */
 final class ZSpan(private val underlying: Span[Task]) extends AnyVal {
+  def isSampled: Boolean = context.traceFlags.sampled == SampleDecision.Include
+
   def context: SpanContext = underlying.context
 
   def put(key: String, value: AttributeValue): UIO[Unit] = underlying.put(key, value).ignore

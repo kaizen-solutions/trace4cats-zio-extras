@@ -12,7 +12,7 @@ object ExampleApp extends ZIOAppDefault {
         ZStream
           .range(1, 100)
           .mapZIO(i => ZTracer.withSpan(s"name-$i")(span => ZIO.succeed((i, span.extractHeaders(ToHeaders.standard)))))
-          .traceEachElement("in-begin") { case (_, headers) =>
+          .traceEachElement(element => s"in-begin-$element") { case (_, headers) =>
             headers
           }
           .mapThrough(_._1)

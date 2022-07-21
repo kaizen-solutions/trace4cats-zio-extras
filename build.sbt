@@ -3,11 +3,11 @@ import sbtrelease.ReleaseStateTransformations._
 inThisBuild {
   val scala212 = "2.12.16"
   val scala213 = "2.13.8"
-  val scala312 = "3.1.2"
+  val scala313 = "3.1.3"
 
   Seq(
-    scalaVersion                        := scala312,
-    crossScalaVersions                  := Seq(scala212, scala213, scala312),
+    scalaVersion                        := scala313,
+    crossScalaVersions                  := Seq(scala212, scala213, scala313),
     githubWorkflowPublishTargetBranches := Seq.empty,
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     releaseTagName := s"${version.value}"
@@ -64,6 +64,8 @@ lazy val root =
       coreExample,
       fs2,
       fs2Example,
+      fs2Kafka,
+      fs2KafkaExample,
       http4s,
       http4sExample,
       zioHttp,
@@ -144,6 +146,39 @@ lazy val fs2Example = project
     }
   )
   .dependsOn(fs2)
+
+lazy val fs2Kafka =
+  project
+    .in(file("fs2-kafka"))
+    .settings(kindProjectorSettings: _*)
+    .settings(releaseSettings: _*)
+    .settings(
+      name                                     := "trace4cats-zio-extras-fs2-kafka",
+      organization                             := "io.kaizen-solutions",
+      libraryDependencies += "com.github.fd4s" %% "fs2-kafka" % Versions.fs2Kafka
+    )
+    .dependsOn(core % "compile->compile;test->test", fs2)
+
+lazy val fs2KafkaExample =
+  project
+    .in(file("fs2-kafka-examples"))
+    .settings(kindProjectorSettings: _*)
+    .settings(
+      name             := "trace4cats-zio-extras-fs2-kafka-examples",
+      organization     := "io.kaizen-solutions",
+      organizationName := "kaizen-solutions",
+      publish / skip   := true,
+      libraryDependencies ++= {
+        val http4s     = "org.http4s"
+        val trace4cats = "io.janstenpickle"
+
+        Seq(
+          http4s     %% "http4s-blaze-client"               % Versions.http4s,
+          trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats
+        )
+      }
+    )
+    .dependsOn(fs2Kafka)
 
 lazy val http4s = project
   .in(file("http4s"))

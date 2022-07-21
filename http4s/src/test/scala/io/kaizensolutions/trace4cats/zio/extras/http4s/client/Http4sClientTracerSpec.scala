@@ -38,7 +38,7 @@ object Http4sClientTracerSpec extends ZIOSpecDefault {
             (sc, client) = result
             response    <- ZIO.scoped(client.run(exampleRequest).toScopedZIO).exit
             spans       <- sc.retrieveCollected
-          } yield assertTrue(response.isFailure, spans.length == 1) && {
+          } yield assertTrue(response.isFailure: Boolean, spans.length == 1) && {
             val span = spans.head
             assertTrue(
               span.name == "GET /hello",
@@ -63,7 +63,7 @@ object Http4sClientTracerSpec extends ZIOSpecDefault {
             (sc, client) = result
             response    <- ZIO.scoped(client.run(exampleRequest).toScopedZIO).exit
             spans       <- sc.retrieveCollected
-          } yield assertTrue(response.isFailure, spans.length == 1) && {
+          } yield assertTrue(response.isFailure: Boolean, spans.length == 1) && {
             val span = spans.head
             assertTrue(
               span.name == "GET /hello",

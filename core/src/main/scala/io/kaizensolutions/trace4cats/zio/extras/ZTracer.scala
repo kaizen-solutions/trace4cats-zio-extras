@@ -104,7 +104,7 @@ final case class ZTracer private (
     kind: SpanKind = SpanKind.Internal
   )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R, E, A] = {
     ZIO.scoped[R] {
-      spanScoped(s"${fileName.value}:${line.value}", kind)
+      spanScopedManual(s"${fileName.value}:${line.value}", kind)
         .flatMap(span => current.locally(Some(span))(zio))
     }
   }
@@ -115,7 +115,7 @@ final case class ZTracer private (
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(zio: ZIO[R, E, A]): ZIO[R, E, A] =
     ZIO.scoped[R] {
-      spanScoped(name, kind, errorHandler).flatMap(span => current.locally(Some(span))(zio))
+      spanScopedManual(name, kind, errorHandler).flatMap(span => current.locally(Some(span))(zio))
     }
 
   /**
@@ -187,8 +187,8 @@ final case class ZTracer private (
    *
    * @param extractHeaders
    *   is a function that extracts the trace headers from the element
-   * @param name
-   *   is the name of the span
+   * @param extractName
+   *   is a function that extracts the name of the span
    * @param kind
    *   is the kind of span
    * @param errorHandler
@@ -205,19 +205,63 @@ final case class ZTracer private (
    */
   def traceEachElement[R, E, O](
     extractHeaders: O => TraceHeaders,
-    name: String,
+    extractName: O => String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(stream: ZStream[R, E, O]): ZStream[R, E, Spanned[O]] =
-    stream
-      .mapChunksZIO(inputs =>
-        ZIO.scoped[R](
-          ZIO.foreach(inputs)(input =>
-            fromHeadersScoped(extractHeaders(input), name, kind, errorHandler)
-              .map(Spanned(_, input))
+    ZStream
+      .fromZIO(Scope.make.flatMap(ElementTracerMap.make(_)))
+      .flatMap(tracerMap =>
+        stream.mapChunksZIO(
+          _.mapZIOPar[Any, Nothing, Spanned[O]](element =>
+            tracerMap.traceElement[O](
+              element = element,
+              callback = fromHeaders(extractHeaders(element), kind, extractName(element), errorHandler)
+            )
           )
         )
       )
+
+  /**
+   * This operation traces the execution of a (finite) ZStream and the trace
+   * will be reported once the stream completes. Do not use this on an infinite
+   * stream as it will hold the span open indefinitely.
+   *
+   * @param name
+   *   is the name of the span
+   * @param kind
+   *   is the kind of the span
+   * @param errorHandler
+   *   is the error handler for the span
+   * @param stream
+   *   is the stream that will have its execution traced
+   * @tparam R
+   *   is the environment type
+   * @tparam E
+   *   is the error type
+   * @tparam O
+   *   is the output element type
+   * @return
+   */
+  def traceEntireStream[R, E, O](
+    name: String,
+    kind: SpanKind = SpanKind.Internal,
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  )(stream: ZStream[R, E, O]): ZStream[R, E, O] =
+    ZStream.unwrap(
+      withSpan(name, kind, errorHandler)(span =>
+        ZIO.succeed(
+          stream.tapError {
+            case e: Throwable if span.isSampled => span.put("error.message", e.getLocalizedMessage)
+            case error if span.isSampled        => span.put("error.message", error.toString)
+            case _                              => ZIO.unit
+          }.tapErrorCause {
+            case c if c.isDie && span.isSampled => span.put("error.cause", c.prettyPrint)
+            case _                              => ZIO.unit
+          }
+        )
+      )
+    )
 
   /**
    * End tracing each element of the Stream
@@ -239,7 +283,9 @@ final case class ZTracer private (
     stream: ZStream[R, E, Spanned[O]],
     headers: ToHeaders = ToHeaders.standard
   ): ZStream[R, E, (O, TraceHeaders)] =
-    stream.mapChunks(_.map(s => (s.value, headers.fromContext(s.span.context))))
+    stream.mapChunksZIO(
+      _.mapZIO(s => s.closeSpan.as((s.value, headers.fromContext(s.span.context))))
+    )
 
   /**
    * This is a low level operator that can potentially be used with
@@ -271,7 +317,7 @@ final case class ZTracer private (
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(fn: ZSpan => ZIO[R, E, A]): ZIO[R, E, A] =
     ZIO.scoped[R] {
-      spanScoped(name, kind, errorHandler).flatMap(span => current.locally(Some(span))(fn(span)))
+      spanScopedManual(name, kind, errorHandler).flatMap(span => current.locally(Some(span))(fn(span)))
     }
 }
 object ZTracer {
@@ -284,6 +330,20 @@ object ZTracer {
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(zio: ZIO[R, E, A]): ZIO[R & ZTracer, E, A] =
     ZIO.service[ZTracer].flatMap(_.span(name, kind, errorHandler)(zio))
+
+  def traceEachElement[R, E, O](
+    extractName: O => String,
+    kind: SpanKind = SpanKind.Internal,
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  )(stream: ZStream[R, E, O])(extractHeaders: O => TraceHeaders): ZStream[R & ZTracer, E, Spanned[O]] =
+    ZStream.serviceWithStream[ZTracer](_.traceEachElement(extractHeaders, extractName, kind, errorHandler)(stream))
+
+  def traceEntireStream[R, E, O](
+    name: String,
+    kind: SpanKind = SpanKind.Internal,
+    errorHandler: ErrorHandler = ErrorHandler.empty
+  )(stream: ZStream[R, E, O]): ZStream[R & ZTracer, E, O] =
+    ZStream.serviceWithStream[ZTracer](_.traceEntireStream(name, kind, errorHandler)(stream))
 
   def spanScopedManual(
     name: String,
@@ -308,7 +368,7 @@ object ZTracer {
   def locally[R, E, A](span: ZSpan)(zio: ZIO[R, E, A]): ZIO[R & ZTracer, E, A] =
     ZIO.service[ZTracer].flatMap(_.locally(span)(zio))
 
-  val getCurrentSpan: URIO[ZTracer, Option[ZSpan]] =
+  val retrieveCurrentSpan: URIO[ZTracer, Option[ZSpan]] =
     ZIO.serviceWithZIO[ZTracer](_.retrieveCurrentSpan)
 
   val removeCurrentSpan: URIO[ZTracer, Unit] =
@@ -333,9 +393,8 @@ object ZTracer {
   val layer: URLayer[ZEntryPoint, ZTracer] =
     ZLayer.scoped(
       for {
-        ep <- ZIO.service[ZEntryPoint]
-        // the FiberRef will keep the parent's span when a child fiber joined
-        spanRef <- FiberRef.make[Option[ZSpan]](initial = None, join = (parent, _) => parent)
+        ep      <- ZIO.service[ZEntryPoint]
+        spanRef <- FiberRef.make[Option[ZSpan]](initial = None)
         tracer   = ZTracer.make(spanRef, ep)
       } yield tracer
     )

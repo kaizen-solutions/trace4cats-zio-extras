@@ -28,7 +28,7 @@ object Http4sClientTracer {
       val nameOfRequest = spanNamer(request: Request_)
       val spanScoped: URIO[Scope, ZSpan] =
         tracer
-          .spanScoped(
+          .spanScopedManual(
             name = nameOfRequest,
             kind = SpanKind.Client,
             errorHandler = { case UnexpectedStatus(status, _, _) =>
@@ -49,22 +49,26 @@ object Http4sClientTracer {
             else ZIO.unit
 
           enrichWithAttributes *>
-            client
-              .run(requestWithHeaders)
-              .toScopedZIO
-              .tap { response =>
-                val spanStatus     = Http4sStatusMapping.toSpanStatus(response.status)
-                val respAttributes = toAttributes(response)
-                span.putAll(respAttributes) *> span.setStatus(spanStatus).as(response)
+            tracer
+              .locally(span) {
+                client
+                  .run(requestWithHeaders)
+                  .toScopedZIO
+                  .tap { response =>
+                    val spanStatus     = Http4sStatusMapping.toSpanStatus(response.status)
+                    val respAttributes = toAttributes(response)
+                    span.putAll(respAttributes) *> span.setStatus(spanStatus).as(response)
+                  }
+                  .tapError(e =>
+                    if (spanSampled) span.put("error.message", AttributeValue.StringValue(e.getLocalizedMessage))
+                    else ZIO.unit
+                  )
+                  .tapDefect(cause =>
+                    if (cause.isDie && spanSampled)
+                      span.put("error.cause", AttributeValue.StringValue(cause.prettyPrint))
+                    else ZIO.unit
+                  )
               }
-              .tapError(e =>
-                if (spanSampled) span.put("error.message", AttributeValue.StringValue(e.getLocalizedMessage))
-                else ZIO.unit
-              )
-              .tapDefect(cause =>
-                if (cause.isDie && spanSampled) span.put("error.cause", AttributeValue.StringValue(cause.prettyPrint))
-                else ZIO.unit
-              )
         }
       Resource.scopedZIO[R, E, Response[ZIO[R, E, *]]](responseScoped)
     }(concurrentInstance[R, E].asInstanceOf[MonadCancelThrow[ZIO[R, E, *]]]) // workaround as E is fixed to Throwable
