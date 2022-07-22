@@ -5,7 +5,8 @@ import fs2.kafka.*
 import io.janstenpickle.trace4cats.ToHeaders
 import io.janstenpickle.trace4cats.model.{AttributeValue, SpanKind}
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
-import zio.{Exit, Fiber, Promise, ZIO}
+import org.apache.kafka.common.{Metric, MetricName}
+import zio.ZIO
 
 object KafkaProducerTracer {
 
@@ -14,9 +15,6 @@ object KafkaProducerTracer {
    *   is the ZTracer
    * @param underlying
    * @param headers
-   * @param tracerAckFromBroker
-   *   set to true if you plan on acknowledging the inner effect otherwise
-   *   traces will be left open causing memory leaks
    * @tparam R
    *   is the ZIO environment type
    * @tparam E
@@ -27,80 +25,72 @@ object KafkaProducerTracer {
    *   is the Kafka producer value
    * @return
    */
+  def traceMetrics[R, E <: Throwable, K, V](
+    tracer: ZTracer,
+    underlying: KafkaProducer.Metrics[ZIO[R, E, *], K, V],
+    headers: ToHeaders = ToHeaders.all
+  ): KafkaProducer.Metrics[ZIO[R, E, *], K, V] =
+    new KafkaProducer.Metrics[ZIO[R, E, *], K, V] {
+      override def produce[P](records: ProducerRecords[P, K, V]): ZIO[R, E, ZIO[R, E, ProducerResult[P, K, V]]] =
+        tracedProduce[R, E, K, V, P](tracer, underlying, headers)(records)
+
+      override def metrics: ZIO[R, E, Map[MetricName, Metric]] =
+        tracer.withSpan("kafka-producer-metrics")(span =>
+          enrichSpanWithError("error.message", "error.cause", span, underlying.metrics)
+        )
+    }
+
   def trace[R, E <: Throwable, K, V](
     tracer: ZTracer,
     underlying: KafkaProducer[ZIO[R, E, *], K, V],
-    headers: ToHeaders = ToHeaders.all,
-    tracerAckFromBroker: Boolean = true
+    headers: ToHeaders = ToHeaders.all
   ): KafkaProducer[ZIO[R, E, *], K, V] =
     new KafkaProducer[ZIO[R, E, *], K, V] {
       override def produce[P](records: ProducerRecords[P, K, V]): ZIO[R, E, ZIO[R, E, ProducerResult[P, K, V]]] =
-        for {
-          waitSpan  <- Promise.make[Nothing, ZSpan]
-          closeSpan <- Promise.make[E, Unit]
-          // NOTE: We take special care to hold the span open until the inner effect (representing the broker ack is acknowledged)
-          fiber <- tracer
-                     .withSpan("kafka-producer-send-buffer", kind = SpanKind.Producer) { span =>
-                       waitSpan.succeed(span) *> closeSpan.await
-                     }
-                     .fork
-          span   <- waitSpan.await
-          result <- tracedProduce(span, fiber, closeSpan, records, tracerAckFromBroker)
-        } yield result
+        tracedProduce[R, E, K, V, P](tracer, underlying, headers)(records)
+    }
 
-      private def tracedProduce[P](
-        span: ZSpan,
-        spanFiber: Fiber[E, Unit],
-        closeSpan: Promise[E, Unit],
-        records: ProducerRecords[P, K, V],
-        tracerAckFromBroker: Boolean
-      ): ZIO[R, E, ZIO[R, E, ProducerResult[P, K, V]]] =
-        tracer
-          .extractHeaders(headers)
-          .flatMap { traceHeaders =>
-            val enrichSpanWithTopics =
-              if (span.isSampled)
-                NonEmptyList
-                  .fromList(records.records.map(_.topic).toList)
-                  .fold(ifEmpty = ZIO.unit)(topics => span.put("topics", AttributeValue.StringList(topics)))
-              else ZIO.unit
+  private def tracedProduce[R, E <: Throwable, K, V, P](
+    tracer: ZTracer,
+    underlying: KafkaProducer[ZIO[R, E, *], K, V],
+    headers: ToHeaders
+  )(records: ProducerRecords[P, K, V]): ZIO[R, E, ZIO[R, E, ProducerResult[P, K, V]]] =
+    tracer.withSpan("kafka-producer-send-buffer", kind = SpanKind.Producer) { span =>
+      tracer
+        .extractHeaders(headers)
+        .flatMap { traceHeaders =>
+          val enrichSpanWithTopics =
+            if (span.isSampled)
+              NonEmptyList
+                .fromList(records.records.map(_.topic).toList)
+                .fold(ifEmpty = ZIO.unit)(topics => span.put("topics", AttributeValue.StringList(topics)))
+            else ZIO.unit
 
-            val kafkaTraceHeaders =
-              Headers.fromIterable(traceHeaders.values.map { case (k, v) => Header(k.toString, v) })
-            val recordsWithTraceHeaders =
-              records.records.map(record => record.withHeaders(record.headers.concat(kafkaTraceHeaders)))
+          val kafkaTraceHeaders =
+            Headers.fromIterable(traceHeaders.values.map { case (k, v) => Header(k.toString, v) })
+          val recordsWithTraceHeaders =
+            records.records.map(record => record.withHeaders(record.headers.concat(kafkaTraceHeaders)))
 
-            val sendToProducerBuffer =
-              enrichSpanWithTopics *> underlying.produce(ProducerRecords(recordsWithTraceHeaders, records.passthrough))
+          val sendToProducerBuffer =
+            enrichSpanWithTopics *> underlying.produce(ProducerRecords(recordsWithTraceHeaders, records.passthrough))
 
-            enrichSpanWithError(
-              "error.message-producer-buffer-send",
-              "error.cause-producer-buffer-send",
-              span,
-              sendToProducerBuffer
-            ).map(ackFromBroker =>
-              tracer.locally(span) {
-                // Ensure the outer span is closed once the inner ack effect is finished
-                tracer.span("kafka-producer-broker-ack") {
-                  enrichSpanWithError(
-                    "error.message-broker-ack",
-                    "error.cause-broker-ack",
-                    span,
-                    ackFromBroker
-                  ).onExit {
-                    case Exit.Success(_)     => closeSpan.succeed(())
-                    case Exit.Failure(cause) => closeSpan.refailCause(cause)
-                  }
-                }
+          enrichSpanWithError(
+            "error.message-producer-buffer-send",
+            "error.cause-producer-buffer-send",
+            span,
+            sendToProducerBuffer
+          )
+            .map(ack =>
+              // The outer span may be closed so to be safe, we extract the ID and use it to create a sub-span for the ack
+              tracer.fromHeaders(
+                headers = headers.fromContext(span.context),
+                kind = SpanKind.Producer,
+                name = "kafka-producer-broker-ack"
+              ) { span =>
+                enrichSpanWithError("error.message-broker-ack", "error.cause-broker-ack", span, ack)
               }
-            ).onInterrupt(spanFiber.interrupt)
-              .onExit(_ =>
-                // close span immediately if we don't care about tracing the acknowledgement from the broker
-                // otherwise rely on the inner effect being run
-                if (!tracerAckFromBroker) closeSpan.succeed(())
-                else ZIO.unit
-              )
-          }
+            )
+        }
     }
 
   private def enrichSpanWithError[R, E <: Throwable, A](

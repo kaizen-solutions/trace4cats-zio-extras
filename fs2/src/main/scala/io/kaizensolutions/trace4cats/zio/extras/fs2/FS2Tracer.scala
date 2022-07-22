@@ -2,11 +2,11 @@ package io.kaizensolutions.trace4cats.zio.extras.fs2
 
 import cats.effect.kernel.Resource.ExitCase
 import fs2.*
-import io.janstenpickle.trace4cats.ErrorHandler
 import io.janstenpickle.trace4cats.model.{SpanKind, TraceHeaders}
-import io.kaizensolutions.trace4cats.zio.extras.{ElementTracerMap, ZTracer}
+import io.janstenpickle.trace4cats.{ErrorHandler, ToHeaders}
+import io.kaizensolutions.trace4cats.zio.extras.{Spanned, ZTracer}
 import zio.interop.catz.*
-import zio.{Exit, RIO, Scope, ZIO}
+import zio.{RIO, ZIO}
 
 object FS2Tracer {
   def traceEachElement[R, O](
@@ -16,18 +16,14 @@ object FS2Tracer {
     kind: SpanKind,
     errorHandler: ErrorHandler
   )(extractHeaders: O => TraceHeaders): TracedStream[R, O] =
-    Stream
-      .eval(Scope.make.flatMap(ElementTracerMap.make(_)))
-      .flatMap(tracerMap =>
-        stream
-          .evalMapChunk(element =>
-            tracerMap.traceElement(
-              element,
-              tracer.fromHeaders(extractHeaders(element), kind, extractName(element), errorHandler)
-            )
-          )
-          .onFinalizeCase(_ => tracerMap.cleanup(Exit.unit).unit)
-      )
+    stream.evalMapChunk(o =>
+      tracer.fromHeaders[Any, Nothing, Spanned[O]](
+        headers = extractHeaders(o),
+        name = extractName(o),
+        kind = kind,
+        errorHandler = errorHandler
+      )(span => ZIO.succeed(Spanned(span.extractHeaders(ToHeaders.all), o)))
+    )
 
   def traceEntireStream[R, O](
     tracer: ZTracer,

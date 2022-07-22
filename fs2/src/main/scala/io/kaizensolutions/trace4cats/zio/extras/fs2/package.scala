@@ -1,7 +1,7 @@
 package io.kaizensolutions.trace4cats.zio.extras
 import _root_.fs2.*
+import io.janstenpickle.trace4cats.ErrorHandler
 import io.janstenpickle.trace4cats.model.{SpanKind, TraceHeaders}
-import io.janstenpickle.trace4cats.{ErrorHandler, ToHeaders}
 import zio.*
 import zio.interop.catz.*
 
@@ -41,35 +41,49 @@ package object fs2 {
   implicit class Fs2ZTracerSpannedOps[R <: ZTracer, +O](
     val stream: TracedStream[R, O]
   ) extends AnyVal {
-    def evalMapTraced[O1](f: O => RIO[R, O1]): TracedStream[R, O1] =
-      stream.evalMap(_.mapZIOTraced(f))
+    def evalMapTraced[O1](name: String, kind: SpanKind = SpanKind.Internal)(f: O => RIO[R, O1]): TracedStream[R, O1] =
+      stream.evalMap(_.mapZIOTraced(name, kind)(f))
 
-    def parEvalMapUnboundedTraced[O1](f: O => RIO[R, O1]): TracedStream[R, O1] =
-      stream.parEvalMapUnbounded(_.mapZIOTraced(f))
+    def parEvalMapUnboundedTraced[O1](name: String, kind: SpanKind = SpanKind.Internal)(
+      f: O => RIO[R, O1]
+    ): TracedStream[R, O1] =
+      stream.parEvalMapUnbounded(_.mapZIOTraced(name, kind)(f))
 
-    def parEvalMapTraced[O1](n: Int)(f: O => RIO[R, O1]): TracedStream[R, O1] =
-      stream.parEvalMap[RIO[R, *], Spanned[O1]](n)(_.mapZIOTraced[R, Throwable, O1](f))
+    def parEvalMapTraced[O1](name: String, kind: SpanKind = SpanKind.Internal)(n: Int)(
+      f: O => RIO[R, O1]
+    ): TracedStream[R, O1] =
+      stream.parEvalMap[RIO[R, *], Spanned[O1]](n)(_.mapZIOTraced[R, Throwable, O1](name, kind)(f))
 
-    def parEvalMapUnorderedTraced[O1](n: Int)(f: O => RIO[R, O1]): TracedStream[R, O1] =
-      stream.parEvalMapUnordered[RIO[R, *], Spanned[O1]](n)(_.mapZIOTraced[R, Throwable, O1](f))
+    def parEvalMapUnorderedTraced[O1](name: String, kind: SpanKind = SpanKind.Internal)(n: Int)(
+      f: O => RIO[R, O1]
+    ): TracedStream[R, O1] =
+      stream.parEvalMapUnordered[RIO[R, *], Spanned[O1]](n)(_.mapZIOTraced[R, Throwable, O1](name, kind)(f))
   }
 
-  implicit class Fs2SpannedOps[R, +O](val stream: TracedStream[R, O]) {
+  implicit class Fs2SpannedOps[R, +O](val stream: TracedStream[R, O]) extends AnyVal {
     def mapThrough[O1](f: O => O1): TracedStream[R, O1] = stream.map(_.map(f))
 
-    def evalMapWithTracer[O1](tracer: ZTracer)(f: O => RIO[R, O1]): TracedStream[R, O1] =
-      stream.evalMap(_.mapZIOTraced(tracer)(f))
+    def evalMapWithTracer[O1](tracer: ZTracer, name: String, kind: SpanKind = SpanKind.Internal)(
+      f: O => RIO[R, O1]
+    ): TracedStream[R, O1] =
+      stream.evalMap(_.mapZIOWithTracer(tracer, name, kind)(f))
 
-    def parEvalMapUnboundedWithTracer[O1](tracer: ZTracer)(f: O => RIO[R, O1]): TracedStream[R, O1] =
-      stream.parEvalMapUnbounded(_.mapZIOTraced(tracer)(f))
+    def parEvalMapUnboundedWithTracer[O1](tracer: ZTracer, name: String, kind: SpanKind = SpanKind.Internal)(
+      f: O => RIO[R, O1]
+    ): TracedStream[R, O1] =
+      stream.parEvalMapUnbounded(_.mapZIOWithTracer(tracer, name, kind)(f))
 
-    def parEvalMapWithTracer[O1](tracer: ZTracer)(n: Int)(f: O => RIO[R, O1]): TracedStream[R, O1] =
-      stream.parEvalMap[RIO[R, *], Spanned[O1]](n)(_.mapZIOTraced[R, Throwable, O1](tracer)(f))
+    def parEvalMapWithTracer[O1](tracer: ZTracer, name: String, kind: SpanKind = SpanKind.Internal)(n: Int)(
+      f: O => RIO[R, O1]
+    ): TracedStream[R, O1] =
+      stream.parEvalMap[RIO[R, *], Spanned[O1]](n)(_.mapZIOWithTracer[R, Throwable, O1](tracer, name, kind)(f))
 
-    def parEvalMapUnorderedWithTracer[O1](tracer: ZTracer)(n: Int)(f: O => RIO[R, O1]): TracedStream[R, O1] =
-      stream.parEvalMapUnordered[RIO[R, *], Spanned[O1]](n)(_.mapZIOTraced[R, Throwable, O1](tracer)(f))
+    def parEvalMapUnorderedWithTracer[O1](tracer: ZTracer, name: String, kind: SpanKind = SpanKind.Internal)(n: Int)(
+      f: O => RIO[R, O1]
+    ): TracedStream[R, O1] =
+      stream.parEvalMapUnordered[RIO[R, *], Spanned[O1]](n)(_.mapZIOWithTracer[R, Throwable, O1](tracer, name, kind)(f))
 
-    def endTracingEachElement(headers: ToHeaders = ToHeaders.standard): Stream[RIO[R, *], (O, TraceHeaders)] =
-      stream.mapChunks(_.map(s => (s.value, headers.fromContext(s.span.context))))
+    def endTracingEachElement: Stream[RIO[R, *], (O, TraceHeaders)] =
+      stream.mapChunks(_.map(s => (s.value, s.headers)))
   }
 }

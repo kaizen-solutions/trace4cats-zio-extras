@@ -1,12 +1,12 @@
 package io.kaizensolutions.trace4cats.zio
 
 import cats.effect.kernel.Resource
+import io.janstenpickle.trace4cats.ErrorHandler
 import io.janstenpickle.trace4cats.inject.EntryPoint
 import io.janstenpickle.trace4cats.model.{SpanKind, TraceHeaders}
-import io.janstenpickle.trace4cats.{ErrorHandler, ToHeaders}
+import zio.*
 import zio.interop.catz.*
 import zio.stream.ZStream
-import zio.*
 
 package object extras {
   implicit class TaskEntryPointOps(entryPoint: Resource[Task, EntryPoint[Task]]) {
@@ -36,25 +36,22 @@ package object extras {
     def mapThrough[B](f: A => B): ZStream[R, E, Spanned[B]] =
       s.map(_.map(f))
 
-    def mapMTraced[R1 <: R, E1 >: E, B](f: A => ZIO[R1, E1, B]): ZStream[R1 & ZTracer, E1, Spanned[B]] =
-      s.mapZIO(_.mapZIOTraced(f))
-
-    def mapMParTraced[R1 <: R, E1 >: E, B](n: Int)(
+    def mapMTraced[R1 <: R, E1 >: E, B](name: String, kind: SpanKind = SpanKind.Internal)(
       f: A => ZIO[R1, E1, B]
     ): ZStream[R1 & ZTracer, E1, Spanned[B]] =
-      s.mapZIOPar[R1 & ZTracer, E1, Spanned[B]](n)(_.mapZIOTraced(f))
+      s.mapZIO(_.mapZIOTraced(name, kind)(f))
 
-    def mapMParUnorderedTraced[R1 <: R, E1 >: E, B](n: Int)(
+    def mapMParTraced[R1 <: R, E1 >: E, B](name: String, kind: SpanKind = SpanKind.Internal)(n: Int)(
       f: A => ZIO[R1, E1, B]
     ): ZStream[R1 & ZTracer, E1, Spanned[B]] =
-      s.mapZIOParUnordered[R1 & ZTracer, E1, Spanned[B]](n)(_.mapZIOTraced(f))
+      s.mapZIOPar[R1 & ZTracer, E1, Spanned[B]](n)(_.mapZIOTraced(name, kind)(f))
 
-    def endTracingEachElement(headers: ToHeaders): ZStream[R & ZTracer, E, (A, TraceHeaders)] =
-      ZStream
-        .service[ZTracer]
-        .flatMap(_.endTracingEachElement(s, headers))
+    def mapMParUnorderedTraced[R1 <: R, E1 >: E, B](name: String, kind: SpanKind = SpanKind.Internal)(n: Int)(
+      f: A => ZIO[R1, E1, B]
+    ): ZStream[R1 & ZTracer, E1, Spanned[B]] =
+      s.mapZIOParUnordered[R1 & ZTracer, E1, Spanned[B]](n)(_.mapZIOTraced(name, kind)(f))
 
-    def endTracingEachElement: ZStream[R & ZTracer, E, (A, TraceHeaders)] =
-      ZStream.service[ZTracer].flatMap(_.endTracingEachElement(s))
+    def endTracingEachElement: ZStream[R, E, (A, TraceHeaders)] =
+      s.mapChunks(_.map(s => (s.value, s.headers)))
   }
 }

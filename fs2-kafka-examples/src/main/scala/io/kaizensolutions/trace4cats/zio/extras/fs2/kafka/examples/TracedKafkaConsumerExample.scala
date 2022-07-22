@@ -16,7 +16,7 @@ object TracedKafkaConsumerExample extends ZIOAppDefault {
   override val run: ZIO[ZIOAppArgs & Scope, Any, Any] = {
     val consumerSettings = ConsumerSettings[Effect, String, String]
       .withBootstrapServers("localhost:9092")
-      .withGroupId("example-consumer-group-100")
+      .withGroupId("example-consumer-group-10")
       .withAutoOffsetReset(AutoOffsetReset.Earliest)
 
     KafkaConsumer
@@ -24,12 +24,12 @@ object TracedKafkaConsumerExample extends ZIOAppDefault {
       .evalTap(_.subscribeTo("test-topic"))
       .flatMap(_.stream)
       .traceConsumerStream()
-      .evalMapTraced(e =>
+      .evalMapTraced("kafka-consumer-print")(e =>
         ZTracer.span(s"${e.record.topic}-${e.record.key}-${e.record.value}")(
           ZIO.succeed(println((e.record.key, e.record.value))).as(e)
         )
       )
-      .endTracingEachElement()
+      .endTracingEachElement
       .map(_._1)
       .map(_.offset)
       .through(fs2.kafka.commitBatchWithin(10, 10.seconds))

@@ -3,8 +3,8 @@ package io.kaizensolutions.trace4cats.zio.extras.fs2.kafka
 import cats.syntax.foldable.*
 import fs2.Stream
 import fs2.kafka.{CommittableConsumerRecord, CommittableOffset, Headers}
-import io.janstenpickle.trace4cats.ErrorHandler
 import io.janstenpickle.trace4cats.model.{AttributeValue, SpanKind, TraceHeaders}
+import io.janstenpickle.trace4cats.{ErrorHandler, ToHeaders}
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import io.kaizensolutions.trace4cats.zio.extras.fs2.*
 import zio.{RIO, URIO, ZIO}
@@ -24,7 +24,7 @@ object KafkaConsumerTracer {
       .traceEachElement(tracer, consumerStream, spanNameForElement, SpanKind.Consumer, ErrorHandler.empty)(comm =>
         extractTraceHeaders(comm.record.headers)
       )
-      .evalMapWithTracer(tracer) { comm =>
+      .evalMapWithTracer(tracer, "kafka-consumer") { comm =>
         val record    = comm.record
         val topic     = record.topic
         val partition = record.partition
@@ -36,6 +36,8 @@ object KafkaConsumerTracer {
         val currentSpan: URIO[R, Option[ZSpan]] = tracer.retrieveCurrentSpan
 
         currentSpan.flatMap {
+          case None => ZIO.succeed(comm)
+
           case Some(span) =>
             val coreAttributes =
               Map(
@@ -61,18 +63,18 @@ object KafkaConsumerTracer {
                     offsetAndMetadata = comm.offset.offsetAndMetadata,
                     consumerGroupId = comm.offset.consumerGroupId,
                     commit = _ =>
-                      // Ensure the same span is tied to the commit effect
-                      tracer.locally(span)(
-                        tracer.withSpan(s"${spanNameForElement(comm)}-commit")(span =>
-                          span.putAll(coreAttributes) *> comm.offset.commit
-                        )
-                      )
+                      // The outer span may be closed so to be safe, we extract the ID and use it to create a sub-span for the commit
+                      // NOTE: If you used batched commits (and you should) - all Kafka element traces won't have a corresponding commit
+                      tracer.fromHeaders(
+                        headers = ToHeaders.standard.fromContext(span.context),
+                        name = s"${spanNameForElement(comm)}-commit",
+                        kind = SpanKind.Consumer
+                      ) { span =>
+                        span.putAll(coreAttributes) *> comm.offset.commit
+                      }
                   )
                 )
               )
-
-          case None =>
-            ZIO.succeed(comm)
         }
       }
 

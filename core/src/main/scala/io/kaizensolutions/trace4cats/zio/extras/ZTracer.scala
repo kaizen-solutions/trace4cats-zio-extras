@@ -53,8 +53,8 @@ final case class ZTracer private (
    */
   def fromHeaders[R, E, A](
     headers: TraceHeaders,
-    kind: SpanKind = SpanKind.Internal,
     name: String = "root",
+    kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(fn: ZSpan => ZIO[R, E, A]): ZIO[R, E, A] =
     ZIO.scoped[R](
@@ -209,18 +209,19 @@ final case class ZTracer private (
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(stream: ZStream[R, E, O]): ZStream[R, E, Spanned[O]] =
-    ZStream
-      .fromZIO(Scope.make.flatMap(ElementTracerMap.make(_)))
-      .flatMap(tracerMap =>
-        stream.mapChunksZIO(
-          _.mapZIOPar[Any, Nothing, Spanned[O]](element =>
-            tracerMap.traceElement[O](
-              element = element,
-              callback = fromHeaders(extractHeaders(element), kind, extractName(element), errorHandler)
-            )
-          )
+    stream.mapChunksZIO(
+      _.mapZIO(o =>
+        fromHeaders[Any, Nothing, Spanned[O]](
+          headers = extractHeaders(o),
+          name = extractName(o),
+          kind = kind,
+          errorHandler = errorHandler
+        )(span =>
+          // extract the child's span header so that all stream transformations are traced under the element
+          ZIO.succeed(Spanned(span.extractHeaders(ToHeaders.all), o))
         )
       )
+    )
 
   /**
    * This operation traces the execution of a (finite) ZStream and the trace
@@ -279,13 +280,8 @@ final case class ZTracer private (
    *   is the output element type that was originally spanned
    * @return
    */
-  def endTracingEachElement[R, E, O](
-    stream: ZStream[R, E, Spanned[O]],
-    headers: ToHeaders = ToHeaders.standard
-  ): ZStream[R, E, (O, TraceHeaders)] =
-    stream.mapChunksZIO(
-      _.mapZIO(s => s.closeSpan.as((s.value, headers.fromContext(s.span.context))))
-    )
+  def endTracingEachElement[R, E, O](stream: ZStream[R, E, Spanned[O]]): ZStream[R, E, (O, TraceHeaders)] =
+    stream.mapChunks(_.map(s => (s.value, s.headers)))
 
   /**
    * This is a low level operator that can potentially be used with
@@ -373,6 +369,11 @@ object ZTracer {
 
   val removeCurrentSpan: URIO[ZTracer, Unit] =
     ZIO.serviceWithZIO[ZTracer](_.removeCurrentSpan)
+
+  def fromHeaders[R, E, A](headers: TraceHeaders, name: String, kind: SpanKind)(
+    fn: ZSpan => ZIO[R, E, A]
+  ): ZIO[R & ZTracer, E, A] =
+    ZIO.service[ZTracer].flatMap(_.fromHeaders(headers, name, kind)(fn))
 
   def withSpan[R, E, A](
     name: String,
