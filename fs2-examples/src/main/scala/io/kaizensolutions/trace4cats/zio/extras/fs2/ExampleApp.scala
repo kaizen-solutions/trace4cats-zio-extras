@@ -21,10 +21,10 @@ object ExampleApp extends App {
           .evalMap(i => ZTracer.withSpan(s"name-$i")(span => ZIO.succeed((i, span.extractHeaders(ToHeaders.standard)))))
           .traceEachElement("in-begin") { case (_, headers) => headers }
           .mapThrough(_._1)
-          .evalMapTraced(e =>
+          .evalMapTraced("Plus 1")(e =>
             ZTracer.span(s"plus 1 for $e")(ZIO.succeed(println(s"Adding ${e} + 1 = ${e + 1}")) *> ZIO.succeed(e + 1))
           )
-          .parEvalMapTraced(8)(e =>
+          .parEvalMapTraced("Plus 2")(8)(e =>
             ZTracer.span(s"plus 2 for $e")(
               ZIO
                 .succeed(println(s"Adding ${e} + 2 = ${e + 2}"))
@@ -32,7 +32,7 @@ object ExampleApp extends App {
                 ZIO.succeed(e + 2)
             )
           )
-          .parEvalMapTraced(3)(e =>
+          .parEvalMapTraced("Plus 4")(3)(e =>
             ZTracer.span(s"plus 4 for $e")(
               ZTracer.spanSource()(
                 ZIO
@@ -41,7 +41,7 @@ object ExampleApp extends App {
               ) *> ZIO.succeed(e + 2)
             )
           )
-          .endTracingEachElement()
+          .endTracingEachElement
           .compile
           .drain
       )

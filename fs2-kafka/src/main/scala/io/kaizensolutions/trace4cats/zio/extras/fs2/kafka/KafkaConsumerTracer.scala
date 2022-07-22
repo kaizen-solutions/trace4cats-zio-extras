@@ -25,7 +25,7 @@ object KafkaConsumerTracer {
       .traceEachElement(tracer, consumerStream, spanNameForElement, SpanKind.Consumer, ErrorHandler.empty)(comm =>
         extractTraceHeaders(comm.record.headers)
       )
-      .evalMapWithTracer(tracer) { comm =>
+      .evalMapWithTracer(tracer, "kafka-consumer") { comm =>
         val record    = comm.record
         val topic     = record.topic
         val partition = record.partition
