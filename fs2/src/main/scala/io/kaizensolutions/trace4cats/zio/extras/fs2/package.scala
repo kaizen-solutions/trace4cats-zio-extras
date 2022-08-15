@@ -1,7 +1,7 @@
 package io.kaizensolutions.trace4cats.zio.extras
 import _root_.fs2.*
-import io.janstenpickle.trace4cats.ErrorHandler
-import io.janstenpickle.trace4cats.model.{SpanKind, TraceHeaders}
+import trace4cats.ErrorHandler
+import trace4cats.model.{SpanKind, TraceHeaders}
 import zio.*
 import zio.interop.catz.*
 

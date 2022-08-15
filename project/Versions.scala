@@ -3,7 +3,7 @@ object Versions {
   val catsEffect     = "3.3.14"
   val fs2            = "3.2.10"
   val fs2Kafka       = "2.5.0"
-  val trace4Cats     = "0.13.1"
+  val trace4Cats     = "0.14.0"
   val zio            = "2.0.0"
   val zioInteropCats = "3.3.0"
   val zhttp          = "2.0.0-RC10"

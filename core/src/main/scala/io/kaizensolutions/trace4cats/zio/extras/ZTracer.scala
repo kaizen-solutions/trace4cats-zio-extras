@@ -1,7 +1,7 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
-import io.janstenpickle.trace4cats.model.{AttributeValue, SpanContext, SpanKind, TraceHeaders}
-import io.janstenpickle.trace4cats.{ErrorHandler, ToHeaders}
+import trace4cats.model.{AttributeValue, SpanContext, SpanKind, TraceHeaders}
+import trace4cats.{ErrorHandler, ToHeaders}
 import zio.*
 import zio.stream.ZStream
 

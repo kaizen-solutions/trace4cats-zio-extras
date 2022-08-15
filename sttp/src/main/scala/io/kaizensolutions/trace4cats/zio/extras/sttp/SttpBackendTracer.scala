@@ -1,8 +1,8 @@
 package io.kaizensolutions.trace4cats.zio.extras.sttp
 
-import io.janstenpickle.trace4cats.ToHeaders
-import io.janstenpickle.trace4cats.model.AttributeValue.{LongValue, StringValue}
-import io.janstenpickle.trace4cats.model.*
+import trace4cats.ToHeaders
+import trace4cats.model.AttributeValue.{LongValue, StringValue}
+import trace4cats.model.*
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import sttp.capabilities.Effect
 import sttp.client3.impl.zio.RIOMonadAsyncError

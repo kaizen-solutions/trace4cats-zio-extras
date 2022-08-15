@@ -2,8 +2,8 @@ package io.kaizensolutions.trace4cats.zio.extras.fs2.kafka
 
 import cats.data.NonEmptyList
 import fs2.kafka.*
-import io.janstenpickle.trace4cats.ToHeaders
-import io.janstenpickle.trace4cats.model.{AttributeValue, SpanKind}
+import trace4cats.ToHeaders
+import trace4cats.model.{AttributeValue, SpanKind}
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import org.apache.kafka.common.{Metric, MetricName}
 import zio.ZIO

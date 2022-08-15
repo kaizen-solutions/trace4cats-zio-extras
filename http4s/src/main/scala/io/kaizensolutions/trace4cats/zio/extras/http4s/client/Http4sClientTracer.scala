@@ -1,16 +1,16 @@
 package io.kaizensolutions.trace4cats.zio.extras.http4s.client
 
 import cats.effect.{MonadCancelThrow, Resource}
-import io.janstenpickle.trace4cats.ToHeaders
-import io.janstenpickle.trace4cats.http4s.common.{
+import trace4cats.ToHeaders
+import trace4cats.http4s.common.{
   Http4sHeaders,
   Http4sSpanNamer,
   Http4sStatusMapping,
   Request_,
   Response_
 }
-import io.janstenpickle.trace4cats.model.*
-import io.janstenpickle.trace4cats.model.AttributeValue.{LongValue, StringValue}
+import trace4cats.model.*
+import trace4cats.model.AttributeValue.{LongValue, StringValue}
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import org.http4s.client.{Client, UnexpectedStatus}
 import org.http4s.{Headers, Response, Uri}

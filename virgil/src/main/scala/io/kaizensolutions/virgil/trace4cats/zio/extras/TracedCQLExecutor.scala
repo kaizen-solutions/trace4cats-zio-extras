@@ -2,7 +2,7 @@ package io.kaizensolutions.virgil.trace4cats.zio.extras
 
 import com.datastax.oss.driver.api.core.metrics.Metrics
 import com.datastax.oss.driver.api.core.{CqlSession, CqlSessionBuilder}
-import io.janstenpickle.trace4cats.model.{AttributeValue, SampleDecision, SpanKind, SpanStatus}
+import trace4cats.model.{AttributeValue, SampleDecision, SpanKind, SpanStatus}
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import io.kaizensolutions.virgil.codecs.DecoderException
 import io.kaizensolutions.virgil.configuration.PageState

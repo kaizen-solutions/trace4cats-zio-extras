@@ -1,9 +1,9 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
-import io.janstenpickle.trace4cats.ToHeaders
-import io.janstenpickle.trace4cats.inject.EntryPoint
-import io.janstenpickle.trace4cats.kernel.{SpanCompleter, SpanSampler}
-import io.janstenpickle.trace4cats.model.{CompletedSpan, TraceProcess}
+import trace4cats.ToHeaders
+import trace4cats.EntryPoint
+import trace4cats.kernel.{SpanCompleter, SpanSampler}
+import trace4cats.model.{CompletedSpan, TraceProcess}
 import zio.interop.catz.*
 import zio.{Chunk, FiberRef, Queue, Scope, Task, UIO, URIO}
 

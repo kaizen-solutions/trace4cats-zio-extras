@@ -5,7 +5,7 @@ import fs2.kafka.{KafkaProducer, ProducerRecord, ProducerRecords, ProducerResult
 import io.kaizensolutions.trace4cats.zio.extras.*
 import zio.*
 import zio.interop.catz.*
-import io.janstenpickle.trace4cats.model.TraceProcess
+import trace4cats.model.TraceProcess
 import io.kaizensolutions.trace4cats.zio.extras.fs2.kafka.KafkaProducerTracer
 
 object TracedKafkaProducerExample extends ZIOAppDefault {

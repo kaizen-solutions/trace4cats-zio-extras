@@ -390,10 +390,10 @@ libraryDependencies ++= Seq(
 ```
 
 ```scala
-import io.janstenpickle.trace4cats.inject.EntryPoint
-import io.janstenpickle.trace4cats.kernel.SpanSampler
-import io.janstenpickle.trace4cats.model.TraceProcess
-import io.janstenpickle.trace4cats.newrelic.{Endpoint, NewRelicSpanCompleter}
+import trace4cats.EntryPoint
+import trace4cats.kernel.SpanSampler
+import trace4cats.model.TraceProcess
+import trace4cats.newrelic.{Endpoint, NewRelicSpanCompleter}
 import io.kaizensolutions.trace4cats.zio.extras.*
 import org.http4s.blaze.client.BlazeClientBuilder
 import zio.blocking.Blocking

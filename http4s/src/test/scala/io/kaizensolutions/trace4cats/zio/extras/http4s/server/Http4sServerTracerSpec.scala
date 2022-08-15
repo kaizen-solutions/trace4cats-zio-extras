@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras.http4s.server
 
-import io.janstenpickle.trace4cats.model.{AttributeValue, TraceProcess}
+import trace4cats.model.{AttributeValue, TraceProcess}
 import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, ZTracer}
 import org.http4s.*
 import org.http4s.dsl.Http4sDsl

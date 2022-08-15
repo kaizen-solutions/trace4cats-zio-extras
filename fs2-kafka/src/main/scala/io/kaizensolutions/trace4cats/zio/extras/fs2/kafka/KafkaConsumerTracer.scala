@@ -3,8 +3,8 @@ package io.kaizensolutions.trace4cats.zio.extras.fs2.kafka
 import cats.syntax.foldable.*
 import fs2.Stream
 import fs2.kafka.{CommittableConsumerRecord, CommittableOffset, Headers}
-import io.janstenpickle.trace4cats.model.{AttributeValue, SpanKind, TraceHeaders}
-import io.janstenpickle.trace4cats.{ErrorHandler, ToHeaders}
+import trace4cats.model.{AttributeValue, SpanKind, TraceHeaders}
+import trace4cats.{ErrorHandler, ToHeaders}
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import io.kaizensolutions.trace4cats.zio.extras.fs2.*
 import zio.{RIO, URIO, ZIO}

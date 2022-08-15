@@ -1,5 +1,5 @@
 package io.kaizensolutions.trace4cats.zio.core.examples
-import io.janstenpickle.trace4cats.ToHeaders
+import trace4cats.ToHeaders
 import io.kaizensolutions.trace4cats.zio.extras.*
 import zio.*
 import zio.Console.printLine

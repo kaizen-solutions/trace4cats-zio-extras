@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
-import io.janstenpickle.trace4cats.model.SpanKind
+import trace4cats.model.SpanKind
 import zio.stream.{ZStream, ZStreamAspect}
 import zio.{Trace, ZIO, ZIOAspect}
 

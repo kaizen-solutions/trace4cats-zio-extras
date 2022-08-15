@@ -1,7 +1,7 @@
 package io.kaizensolutions.virgil.trace4cats.zio.extras
 
 import com.datastax.oss.driver.api.core.metrics.Metrics
-import io.janstenpickle.trace4cats.model.TraceProcess
+import trace4cats.model.TraceProcess
 import io.kaizensolutions.trace4cats.zio.extras.InMemorySpanCompleter
 import io.kaizensolutions.virgil.*
 import io.kaizensolutions.virgil.configuration.PageState

@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziohttp.examples
 
-import io.janstenpickle.trace4cats.model.TraceProcess
+import trace4cats.model.TraceProcess
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.client.ZioHttpClientTracer
 import zhttp.service.{ChannelFactory, EventLoopGroup}

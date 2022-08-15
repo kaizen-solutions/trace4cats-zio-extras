@@ -1,7 +1,7 @@
 package io.kaizensolutions.trace4cats.zio.extras.http4s.client
 
 import cats.effect.Resource
-import io.janstenpickle.trace4cats.model.{SpanStatus, TraceProcess}
+import trace4cats.model.{SpanStatus, TraceProcess}
 import io.kaizensolutions.trace4cats.zio.extras.InMemorySpanCompleter
 import io.kaizensolutions.trace4cats.zio.extras.http4s.server.Http4sServerTracerSpec.dsl.Ok
 import org.http4s.client.Client

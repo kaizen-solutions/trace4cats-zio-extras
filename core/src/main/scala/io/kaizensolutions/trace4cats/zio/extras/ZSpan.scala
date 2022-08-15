@@ -1,8 +1,8 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
 import cats.data.NonEmptyList
-import io.janstenpickle.trace4cats.model.*
-import io.janstenpickle.trace4cats.{ErrorHandler, Span, ToHeaders}
+import trace4cats.model.*
+import trace4cats.{ErrorHandler, Span, ToHeaders}
 import zio.interop.catz.*
 import zio.{NonEmptyChunk, Scope, Task, UIO, URIO}
 
