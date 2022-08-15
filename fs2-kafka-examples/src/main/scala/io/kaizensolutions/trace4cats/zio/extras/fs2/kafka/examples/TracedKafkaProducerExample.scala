@@ -2,7 +2,7 @@ package io.kaizensolutions.trace4cats.zio.extras.fs2.kafka.examples
 
 import fs2.kafka.*
 import fs2.{Pipe, Stream}
-import io.janstenpickle.trace4cats.model.TraceProcess
+import trace4cats.model.TraceProcess
 import io.kaizensolutions.trace4cats.zio.extras.*
 import io.kaizensolutions.trace4cats.zio.extras.fs2.kafka.KafkaProducerTracer
 import zio.*

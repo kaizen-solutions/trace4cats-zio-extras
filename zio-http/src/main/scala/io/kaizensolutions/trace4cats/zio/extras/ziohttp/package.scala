@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
-import io.janstenpickle.trace4cats.model.{SpanStatus, TraceHeaders}
+import trace4cats.model.{SpanStatus, TraceHeaders}
 import zhttp.http.{Headers, Status}
 
 package object ziohttp {

@@ -1,7 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
-import io.janstenpickle.trace4cats.model.*
-import io.janstenpickle.trace4cats.{ErrorHandler, ToHeaders}
+import trace4cats.*
 import zio.*
 import zio.stream.ZStream
 

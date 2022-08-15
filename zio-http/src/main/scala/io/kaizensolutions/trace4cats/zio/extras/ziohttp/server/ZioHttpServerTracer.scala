@@ -1,11 +1,11 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziohttp.server
 
-import io.janstenpickle.trace4cats.ErrorHandler
-import io.janstenpickle.trace4cats.model.AttributeValue.{LongValue, StringValue}
-import io.janstenpickle.trace4cats.model.SemanticAttributeKeys.*
-import io.janstenpickle.trace4cats.model.{AttributeValue, SpanKind, SpanStatus}
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.{extractTraceHeaders, toSpanStatus}
+import trace4cats.{ErrorHandler, SpanStatus}
+import trace4cats.model.AttributeValue.{LongValue, StringValue}
+import trace4cats.model.SemanticAttributeKeys.*
+import trace4cats.model.{AttributeValue, SpanKind}
 import zhttp.http.*
 import zhttp.http.middleware.HttpMiddleware
 import zio.{Chunk, Exit, Has, ZIO}

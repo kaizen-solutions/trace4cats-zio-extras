@@ -93,15 +93,14 @@ lazy val core = project
       val zio        = "dev.zio"
 
       Seq(
-        liHaoyi    %% "sourcecode"        % Versions.sourceCode,
-        trace4cats %% "trace4cats-core"   % Versions.trace4Cats,
-        trace4cats %% "trace4cats-inject" % Versions.trace4Cats,
-        typelevel  %% "cats-effect"       % Versions.catsEffect,
-        zio        %% "zio"               % Versions.zio,
-        zio        %% "zio-streams"       % Versions.zio,
-        zio        %% "zio-interop-cats"  % Versions.zioInteropCats,
-        zio        %% "zio-test"          % Versions.zio % Test,
-        zio        %% "zio-test-sbt"      % Versions.zio % Test
+        liHaoyi    %% "sourcecode"       % Versions.sourceCode,
+        trace4cats %% "trace4cats-core"  % Versions.trace4Cats,
+        typelevel  %% "cats-effect"      % Versions.catsEffect,
+        zio        %% "zio"              % Versions.zio,
+        zio        %% "zio-streams"      % Versions.zio,
+        zio        %% "zio-interop-cats" % Versions.zioInteropCats,
+        zio        %% "zio-test"         % Versions.zio % Test,
+        zio        %% "zio-test-sbt"     % Versions.zio % Test
       )
     }
   )

@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras.tapir
 
-import io.janstenpickle.trace4cats.model.{AttributeValue, SpanKind, SpanStatus, TraceHeaders}
+import trace4cats.model.{AttributeValue, SpanKind, SpanStatus, TraceHeaders}
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import sttp.model.{HeaderNames, Headers}
 import sttp.tapir.Endpoint

@@ -1,10 +1,10 @@
 package io.kaizensolutions.trace4cats.zio.extras.http4s.server
 
-import io.janstenpickle.trace4cats.model.{AttributeValue, TraceProcess}
 import io.kaizensolutions.trace4cats.zio.extras.InMemorySpanCompleter
 import org.http4s.dsl.Http4sDsl
 import org.http4s.syntax.all.*
 import org.http4s.{HttpApp, HttpRoutes, Method, Request, Status}
+import trace4cats.{AttributeValue, TraceProcess}
 import zio.{URIO, ZIO}
 import zio.blocking.Blocking
 import zio.clock.Clock

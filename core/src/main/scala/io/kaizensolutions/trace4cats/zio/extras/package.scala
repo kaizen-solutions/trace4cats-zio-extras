@@ -1,9 +1,7 @@
 package io.kaizensolutions.trace4cats.zio
 
 import cats.effect.kernel.Resource
-import io.janstenpickle.trace4cats.ErrorHandler
-import io.janstenpickle.trace4cats.inject.EntryPoint
-import io.janstenpickle.trace4cats.model.{SpanKind, TraceHeaders}
+import trace4cats.{EntryPoint, ErrorHandler, SpanKind, TraceHeaders}
 import zio.blocking.Blocking
 import zio.clock.Clock
 import zio.interop.catz.*

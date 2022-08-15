@@ -2,7 +2,7 @@ package io.kaizensolutions.trace4cats.zio.extras.fs2
 
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import _root_.fs2.*
-import io.janstenpickle.trace4cats.ToHeaders
+import trace4cats.ToHeaders
 import zio.*
 import zio.blocking.Blocking
 import zio.clock.Clock

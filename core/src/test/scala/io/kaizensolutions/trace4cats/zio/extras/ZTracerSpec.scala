@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
-import io.janstenpickle.trace4cats.model.TraceProcess
+import trace4cats.model.TraceProcess
 import zio.stream.ZStream
 import zio.test.environment.TestEnvironment
 import zio.test.{assertTrue, DefaultRunnableSpec, ZSpec}

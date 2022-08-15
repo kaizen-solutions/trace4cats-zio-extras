@@ -1,6 +1,6 @@
 package io.kaizensolutions.http4s.examples
 
-import io.janstenpickle.trace4cats.model.TraceProcess
+import trace4cats.model.TraceProcess
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.http4s.client.Http4sClientTracer
 import org.http4s.blaze.client.BlazeClientBuilder

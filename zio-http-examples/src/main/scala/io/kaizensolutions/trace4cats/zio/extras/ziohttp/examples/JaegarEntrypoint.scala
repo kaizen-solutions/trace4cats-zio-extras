@@ -1,9 +1,9 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziohttp.examples
 
-import io.janstenpickle.trace4cats.inject.EntryPoint
-import io.janstenpickle.trace4cats.jaeger.JaegerSpanCompleter
-import io.janstenpickle.trace4cats.kernel.SpanSampler
-import io.janstenpickle.trace4cats.model.TraceProcess
+import trace4cats.EntryPoint
+import trace4cats.jaeger.JaegerSpanCompleter
+import trace4cats.kernel.SpanSampler
+import trace4cats.model.TraceProcess
 import io.kaizensolutions.trace4cats.zio.extras.*
 import zio.blocking.Blocking
 import zio.clock.Clock

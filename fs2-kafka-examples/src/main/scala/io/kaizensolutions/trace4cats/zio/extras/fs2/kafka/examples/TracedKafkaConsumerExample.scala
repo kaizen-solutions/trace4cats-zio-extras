@@ -1,7 +1,7 @@
 package io.kaizensolutions.trace4cats.zio.extras.fs2.kafka.examples
 
 import fs2.kafka.{AutoOffsetReset, ConsumerSettings, KafkaConsumer}
-import io.janstenpickle.trace4cats.model.TraceProcess
+import trace4cats.model.TraceProcess
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.fs2.*
 import io.kaizensolutions.trace4cats.zio.extras.fs2.kafka.*
