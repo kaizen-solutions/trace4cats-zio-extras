@@ -74,9 +74,7 @@ object ZTracerSpec extends ZIOSpecDefault {
             (sc, ep) = result
             tracer  <- InMemorySpanCompleter.toZTracer(ep)
             // TODO: Wait for ZStreams to add @@ for aspects
-            executed <- ZTracer
-                          .traceEntireStream("streaming-trace")(ZStream(1, 2, 3))
-                          .runCollect
+            executed <- (ZStream(1, 2, 3) @@ TraceAspects.traceEntireStream("streaming-trace")).runCollect
                           .provideEnvironment(ZEnvironment(tracer))
             spans <- sc.retrieveCollected
           } yield assertTrue(executed == Chunk(1, 2, 3), spans.length == 1)
