@@ -3,9 +3,9 @@ package io.kaizensolutions.http4s.examples
 import com.comcast.ip4s
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.http4s.server.Http4sServerTracer
-import org.http4s.ember.server.EmberServerBuilder
+import org.http4s.HttpRoutes
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{HttpApp, HttpRoutes}
+import org.http4s.ember.server.EmberServerBuilder
 import zio.*
 import zio.blocking.Blocking
 import zio.clock.Clock
