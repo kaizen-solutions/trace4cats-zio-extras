@@ -1,10 +1,11 @@
 package io.kaizensolutions.trace4cats.zio.extras.tapir.examples
 
+import com.comcast.ip4s.{Host, Port}
 import io.circe.Codec as CirceCodec
 import io.circe.generic.semiauto.deriveCodec
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.tapir.TapirServerTracer
-import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.ember.server.EmberServerBuilder
 import sttp.model.{Headers, StatusCode}
 import sttp.tapir.*
 import sttp.tapir.json.circe.*
@@ -53,10 +54,13 @@ object ExampleServerApp extends ZIOAppDefault {
         tracer  <- ZIO.service[ZTracer]
         endpoint = tracedServerEndpoint(tracer)
         httpApp  = Http4sServerInterpreter[Task]().toRoutes(endpoint).orNotFound
-        server <- BlazeServerBuilder[Task]
-                    .bindHttp(8080, "localhost")
+        port    <- ZIO.fromEither(Port.fromInt(8080).toRight(new RuntimeException("Invalid Port")))
+        server <- EmberServerBuilder
+                    .default[Task]
+                    .withHostOption(Host.fromString("localhost"))
+                    .withPort(port)
                     .withHttpApp(httpApp)
-                    .resource
+                    .build
                     .toScopedZIO <* ZIO.never
       } yield server
 

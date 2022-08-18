@@ -3,8 +3,8 @@ package io.kaizensolutions.http4s.examples
 import trace4cats.model.TraceProcess
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.http4s.client.Http4sClientTracer
-import org.http4s.blaze.client.BlazeClientBuilder
 import org.http4s.client.Client
+import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.implicits.*
 import org.http4s.{Charset, Response}
 import zio.*
@@ -20,7 +20,7 @@ object ExampleClientApp extends ZIOAppDefault {
     for {
       // NOTE: Blocking is necessary to materialize the typeclass instances needed but is not actually used
       // ZTracer is in here because I'm making use of the companion object
-      client      <- BlazeClientBuilder[ZIO[ZTracer, Throwable, *]].resource.toScopedZIO
+      client      <- EmberClientBuilder.default[ZIO[ZTracer, Throwable, *]].build.toScopedZIO
       tracer      <- ZIO.service[ZTracer]
       tracedClient = Http4sClientTracer.traceClient(tracer, client)
     } yield tracedClient

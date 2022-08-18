@@ -1,9 +1,10 @@
 package io.kaizensolutions.http4s.examples
 
+import com.comcast.ip4s.{Host, Port}
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.http4s.server.Http4sServerTracer
-import org.http4s.blaze.server.BlazeServerBuilder
 import org.http4s.dsl.Http4sDsl
+import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.{HttpApp, HttpRoutes}
 import zio.*
 import zio.interop.catz.*
@@ -33,12 +34,19 @@ object ExampleServerApp extends ZIOAppDefault {
       .flatMap { tracer =>
         val httpApp: HttpApp[Effect] = Http4sServerTracer.traceRoutes(tracer, routes).orNotFound
 
-        val server =
-          BlazeServerBuilder[Effect]
-            .bindHttp(8080, "localhost")
-            .withHttpApp(httpApp)
-            .resource
-            .toScopedZIO
+        val server = {
+          ZIO
+            .fromEither(Port.fromInt(8080).toRight(new RuntimeException("Invalid Port")))
+            .flatMap(port =>
+              EmberServerBuilder
+                .default[Effect]
+                .withHostOption(Host.fromString("localhost"))
+                .withPort(port)
+                .withHttpApp(httpApp)
+                .build
+                .toScopedZIO
+            )
+        }
 
         server <* ZIO.never
       }
