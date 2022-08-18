@@ -172,7 +172,7 @@ lazy val fs2KafkaExample =
         val trace4cats = "io.janstenpickle"
 
         Seq(
-          http4s     %% "http4s-blaze-client"               % Versions.http4s,
+          http4s     %% "http4s-ember-client"               % Versions.http4s,
           trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats
         )
       }
@@ -213,8 +213,8 @@ lazy val http4sExample =
         val trace4cats = "io.janstenpickle"
 
         Seq(
-          http4s     %% "http4s-blaze-server"               % Versions.http4s,
-          http4s     %% "http4s-blaze-client"               % Versions.http4s,
+          http4s     %% "http4s-ember-server"               % Versions.http4s,
+          http4s     %% "http4s-ember-client"               % Versions.http4s,
           trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats
         )
       }
@@ -302,7 +302,7 @@ lazy val tapirExample =
           "io.janstenpickle"            %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats,
           "com.softwaremill.sttp.tapir" %% "tapir-json-circe"                  % Versions.tapir,
           "com.softwaremill.sttp.tapir" %% "tapir-http4s-server"               % Versions.tapir,
-          "org.http4s"                  %% "http4s-blaze-server"               % Versions.http4s
+          "org.http4s"                  %% "http4s-ember-server"               % Versions.http4s
         )
     )
     .dependsOn(tapir)

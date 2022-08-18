@@ -1,8 +1,9 @@
 package io.kaizensolutions.http4s.examples
 
+import com.comcast.ip4s
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.http4s.server.Http4sServerTracer
-import org.http4s.blaze.server.BlazeServerBuilder
+import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{HttpApp, HttpRoutes}
 import zio.*
@@ -35,15 +36,18 @@ object ExampleServerApp extends App {
       .runtime[Clock & Blocking]
       .flatMap { implicit rts =>
         val _ = rts
-        ZManaged.service[ZTracer].flatMap { tracer =>
-          val httpApp: HttpApp[Effect] = Http4sServerTracer.traceRoutes(tracer, routes).orNotFound
-
-          BlazeServerBuilder[Effect]
-            .bindHttp(8080, "localhost")
-            .withHttpApp(httpApp)
-            .resource
-            .toManagedZIO
-        }
+        for {
+          tracer <- ZManaged.service[ZTracer]
+          httpApp = Http4sServerTracer.traceRoutes(tracer, routes).orNotFound
+          port   <- ZManaged.fromOption(ip4s.Port.fromInt(8080)).mapError(_ => new RuntimeException("Invalid Port"))
+          server <- EmberServerBuilder
+                      .default[Effect]
+                      .withHostOption(ip4s.Host.fromString("localhost"))
+                      .withPort(port)
+                      .withHttpApp(httpApp)
+                      .build
+                      .toManagedZIO
+        } yield server
       }
       .useForever
       .exitCode
