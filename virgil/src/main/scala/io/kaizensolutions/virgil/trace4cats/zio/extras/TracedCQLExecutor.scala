@@ -118,7 +118,7 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
             Option("virgil.error.cause" -> AttributeValue.StringValue(e.getCause.getMessage))
           else None
 
-        val attrMap: Map[String, AttributeValue] = Map.from(errorMessage ++ cause)
+        val attrMap: Map[String, AttributeValue] = (errorMessage ++ cause).toMap
 
         if (attrMap.nonEmpty) currentSpan.putAll(attrMap)
         else ZIO.unit
