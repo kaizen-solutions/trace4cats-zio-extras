@@ -27,6 +27,8 @@ object ExampleClientApp extends ZIOAppDefault {
         .tracedRequest("http://localhost:8080/bad_gateway")
         .tap(response => response.bodyAsString.flatMap(printLine(_)))
 
+    val schedule: Schedule[Any, Any, Any] = Schedule.recurs(10) *> Schedule.spaced(1.second)
+
     ZTracer
       .span("client-request") {
         ZIO
@@ -38,7 +40,7 @@ object ExampleClientApp extends ZIOAppDefault {
             )
           )
       }
-      .repeat(Schedule.recurs(10) *> Schedule.spaced(1.second))
+      .repeat(schedule)
       .exitCode
       .provide(
         ChannelFactory.auto,

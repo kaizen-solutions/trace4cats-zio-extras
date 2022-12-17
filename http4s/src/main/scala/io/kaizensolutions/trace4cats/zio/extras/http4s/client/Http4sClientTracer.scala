@@ -71,7 +71,7 @@ object Http4sClientTracer {
               }
         }
       Resource.scopedZIO[R, E, Response[ZIO[R, E, *]]](responseScoped)
-    }(concurrentInstance[R, E].asInstanceOf[MonadCancelThrow[ZIO[R, E, *]]]) // workaround as E is fixed to Throwable
+    }(concurrentInstance[R].asInstanceOf[MonadCancelThrow[ZIO[R, E, *]]]) // workaround as E is fixed to Throwable
 
   private def toAttributes(req: Request_): Map[String, AttributeValue] =
     Map[String, AttributeValue](

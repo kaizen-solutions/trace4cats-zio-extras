@@ -38,11 +38,13 @@ object ExampleClientApp extends ZIOAppDefault {
               )
             )
 
+        val schedule: Schedule[Any, Any, Any] = Schedule.recurs(10) *> Schedule.spaced(1.second)
+
         ZTracer
           .span("sttp-client-hello-error-par") {
             sayHello
               .zipPar(error)
-              .repeat(Schedule.recurs(10) *> Schedule.spaced(1.second))
+              .repeat(schedule)
           }
       }
       .provide(
