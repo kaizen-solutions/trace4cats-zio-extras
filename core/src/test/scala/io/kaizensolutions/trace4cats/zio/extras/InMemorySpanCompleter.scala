@@ -28,7 +28,7 @@ object InMemorySpanCompleter {
   def toZTracer(in: EntryPoint[Task]): URIO[Scope, ZTracer] = {
     val zep = new ZEntryPoint(in)
     FiberRef
-      .make(None: Option[ZSpan])
-      .map(spanRef => ZTracer.make(spanRef, zep))
+      .make(ZSpan.noop)
+      .map(ZTracer.make(_, zep))
   }
 }
