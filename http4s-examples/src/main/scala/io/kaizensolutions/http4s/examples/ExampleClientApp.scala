@@ -52,10 +52,12 @@ object ExampleClientApp extends ZIOAppDefault {
             }
           }
 
+        val repeat10Times1SecondPerRepeat: Schedule[Any, Any, Any] = Schedule.recurs(10) *> Schedule.spaced(1.second)
         ZTracer.span("tracer-par-client") {
           sayHello
             .zipPar(error)
-            .repeat(Schedule.recurs(10) *> Schedule.spaced(1.second))
+            .repeat(repeat10Times1SecondPerRepeat)
+            .unit
         }
       }
     }.provide(

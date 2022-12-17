@@ -14,18 +14,15 @@ import zio.stream.ZStream
  * @param entryPoint
  *   is the entrypoint into the tracing system
  */
-final case class ZTracer private (
-  private val current: FiberRef[Option[ZSpan]],
+final class ZTracer private (
+  private val current: FiberRef[ZSpan],
   private[extras] val entryPoint: ZEntryPoint
 ) { self =>
   def context: UIO[SpanContext] =
-    current.get.map(_.fold(SpanContext.invalid)(_.context))
+    current.get.map(_.context)
 
   def extractHeaders(headerTypes: ToHeaders = ToHeaders.all): UIO[TraceHeaders] =
-    current.get.map {
-      case Some(span) => span.extractHeaders(headerTypes)
-      case None       => headerTypes.fromContext(SpanContext.invalid)
-    }
+    current.get.map(_.extractHeaders(headerTypes))
 
   /**
    * Allows you to obtain a span from the trace headers
@@ -59,7 +56,7 @@ final case class ZTracer private (
   )(fn: ZSpan => ZIO[R, E, A]): ZIO[R, E, A] =
     ZIO.scoped[R](
       fromHeadersScoped(headers, name, kind, errorHandler)
-        .flatMap(child => current.locally(Some(child))(fn(child)))
+        .flatMap(child => current.locally(child)(fn(child)))
     )
 
   /**
@@ -89,25 +86,18 @@ final case class ZTracer private (
     entryPoint.fromHeadersOtherwiseRoot(headers, kind, name, errorHandler)
 
   def put(key: String, value: AttributeValue): UIO[Unit] =
-    current.get.flatMap {
-      case None       => ZIO.unit
-      case Some(span) => span.put(key, value)
-    }
+    current.get.flatMap(_.put(key, value))
 
   def putAll(fields: (String, AttributeValue)*): UIO[Unit] =
-    current.get.flatMap {
-      case None       => ZIO.unit
-      case Some(span) => span.putAll(fields*)
-    }
+    current.get.flatMap(_.putAll(fields*))
 
   def spanSource[R, E, A](
     kind: SpanKind = SpanKind.Internal
-  )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R, E, A] = {
+  )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R, E, A] =
     ZIO.scoped[R] {
       spanScopedManual(s"${fileName.value}:${line.value}", kind)
-        .flatMap(span => current.locally(Some(span))(zio))
+        .flatMap(span => current.locally(span)(zio))
     }
-  }
 
   def span[R, E, A](
     name: String,
@@ -115,7 +105,7 @@ final case class ZTracer private (
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(zio: ZIO[R, E, A]): ZIO[R, E, A] =
     ZIO.scoped[R] {
-      spanScopedManual(name, kind, errorHandler).flatMap(span => current.locally(Some(span))(zio))
+      spanScopedManual(name, kind, errorHandler).flatMap(span => current.locally(span)(zio))
     }
 
   /**
@@ -149,9 +139,9 @@ final case class ZTracer private (
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   ): URIO[Scope, ZSpan] =
-    current.get.flatMap {
-      case Some(span) => span.child(name, kind, errorHandler)
-      case None       => entryPoint.rootSpan(name, kind, errorHandler)
+    current.get.flatMap { span =>
+      if (span.context == SpanContext.invalid) entryPoint.rootSpan(name, kind, errorHandler)
+      else span.child(name, kind, errorHandler)
     }
 
   /**
@@ -173,7 +163,7 @@ final case class ZTracer private (
     retrieveCurrentSpan
       .flatMap(current =>
         spanScopedManual(name, kind, errorHandler)
-          .tap(updateCurrentSpan)
+          .tap(restore)
           .ensuring(restore(current))
       )
 
@@ -284,28 +274,16 @@ final case class ZTracer private (
     stream.mapChunks(_.map(s => (s.value, s.headers)))
 
   /**
-   * This is a low level operator that can potentially be used with
-   * [[spanScopedManual]] but using `retrieveCurrentSpan` and a finalizer
-   * calling `updateCurrentSpan` is a safer alternative to preserve the span
-   * already present rather than a complete wipe
-   */
-  val removeCurrentSpan: UIO[Unit] =
-    current.set(None)
-
-  /**
    * This is a low level operator meant to be used with [[spanScopedManual]]
    */
-  val retrieveCurrentSpan: UIO[Option[ZSpan]] =
+  val retrieveCurrentSpan: UIO[ZSpan] =
     current.get
 
-  def updateCurrentSpan(in: ZSpan): UIO[Unit] =
-    current.set(Some(in))
-
-  def restore(in: Option[ZSpan]): UIO[Unit] =
+  def restore(in: ZSpan): UIO[Unit] =
     current.set(in)
 
   def locally[R, E, A](span: ZSpan)(zio: ZIO[R, E, A]): ZIO[R, E, A] =
-    current.locally(Some(span))(zio)
+    current.locally(span)(zio)
 
   def withSpan[R, E, A](
     name: String,
@@ -313,11 +291,11 @@ final case class ZTracer private (
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(fn: ZSpan => ZIO[R, E, A]): ZIO[R, E, A] =
     ZIO.scoped[R] {
-      spanScopedManual(name, kind, errorHandler).flatMap(span => current.locally(Some(span))(fn(span)))
+      spanScopedManual(name, kind, errorHandler).flatMap(span => current.locally(span)(fn(span)))
     }
 }
 object ZTracer {
-  def make(current: FiberRef[Option[ZSpan]], entryPoint: ZEntryPoint): ZTracer =
+  def make(current: FiberRef[ZSpan], entryPoint: ZEntryPoint): ZTracer =
     new ZTracer(current, entryPoint)
 
   def span[R, E, A](
@@ -355,20 +333,14 @@ object ZTracer {
   ): URIO[ZTracer & Scope, ZSpan] =
     ZIO.serviceWithZIO[ZTracer](_.spanScoped(name, kind, errorHandler))
 
-  def updateCurrentSpan(span: ZSpan): URIO[ZTracer, Unit] =
-    ZIO.serviceWithZIO[ZTracer](_.updateCurrentSpan(span))
-
-  def restore(span: Option[ZSpan]): URIO[ZTracer, Unit] =
+  def restore(span: ZSpan): URIO[ZTracer, Unit] =
     ZIO.serviceWithZIO[ZTracer](_.restore(span))
 
   def locally[R, E, A](span: ZSpan)(zio: ZIO[R, E, A]): ZIO[R & ZTracer, E, A] =
     ZIO.service[ZTracer].flatMap(_.locally(span)(zio))
 
-  val retrieveCurrentSpan: URIO[ZTracer, Option[ZSpan]] =
+  val retrieveCurrentSpan: URIO[ZTracer, ZSpan] =
     ZIO.serviceWithZIO[ZTracer](_.retrieveCurrentSpan)
-
-  val removeCurrentSpan: URIO[ZTracer, Unit] =
-    ZIO.serviceWithZIO[ZTracer](_.removeCurrentSpan)
 
   def fromHeaders[R, E, A](headers: TraceHeaders, name: String, kind: SpanKind)(
     fn: ZSpan => ZIO[R, E, A]
@@ -395,7 +367,7 @@ object ZTracer {
     ZLayer.scoped(
       for {
         ep      <- ZIO.service[ZEntryPoint]
-        spanRef <- FiberRef.make[Option[ZSpan]](initial = None)
+        spanRef <- FiberRef.make[ZSpan](initial = ZSpan.noop)
         tracer   = ZTracer.make(spanRef, ep)
       } yield tracer
     )

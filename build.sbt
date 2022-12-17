@@ -1,13 +1,13 @@
 import sbtrelease.ReleaseStateTransformations._
 
 inThisBuild {
-  val scala212 = "2.12.16"
-  val scala213 = "2.13.8"
-  val scala313 = "3.1.3"
+  val scala212 = "2.12.17"
+  val scala213 = "2.13.10"
+  val scala32  = "3.2.1"
 
   Seq(
-    scalaVersion                        := scala313,
-    crossScalaVersions                  := Seq(scala212, scala213, scala313),
+    scalaVersion                        := scala32,
+    crossScalaVersions                  := Seq(scala212, scala213, scala32),
     githubWorkflowPublishTargetBranches := Seq.empty,
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     releaseTagName := s"${version.value}"
@@ -115,7 +115,7 @@ lazy val coreExample = project
     publish / skip   := true,
     libraryDependencies ++= {
       val trace4cats = "io.janstenpickle"
-      Seq(trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats)
+      Seq(trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter)
     }
   )
   .dependsOn(core)
@@ -135,13 +135,13 @@ lazy val fs2Example = project
   .in(file("fs2-examples"))
   .settings(kindProjectorSettings: _*)
   .settings(
-    name             := "trace4cats-zio-extras-fs2-examples",
+    name             := "trace4cats-zio-extras-fs 2-examples",
     organization     := "io.kaizen-solutions",
     organizationName := "kaizen-solutions",
     publish / skip   := true,
     libraryDependencies ++= {
       val trace4cats = "io.janstenpickle"
-      Seq(trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats)
+      Seq(trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter)
     }
   )
   .dependsOn(fs2)
@@ -173,7 +173,7 @@ lazy val fs2KafkaExample =
 
         Seq(
           http4s     %% "http4s-ember-client"               % Versions.http4s,
-          trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats
+          trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter
         )
       }
     )
@@ -192,7 +192,7 @@ lazy val http4s = project
       val http4s     = "org.http4s"
 
       Seq(
-        trace4Cats %% "trace4cats-http4s-common" % Versions.trace4Cats,
+        trace4Cats %% "trace4cats-http4s-common" % Versions.trace4CatsJaegarExporter,
         http4s     %% "http4s-client"            % Versions.http4s
       )
     }
@@ -215,7 +215,7 @@ lazy val http4sExample =
         Seq(
           http4s     %% "http4s-ember-server"               % Versions.http4s,
           http4s     %% "http4s-ember-client"               % Versions.http4s,
-          trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats
+          trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter
         )
       }
     )
@@ -245,7 +245,7 @@ lazy val zioHttpExample =
       publish / skip   := true,
       libraryDependencies ++= {
         val trace4cats = "io.janstenpickle"
-        Seq(trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats)
+        Seq(trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter)
       }
     )
     .dependsOn(zioHttp)
@@ -274,7 +274,9 @@ lazy val sttpExample =
       organization     := "io.kaizen-solutions",
       organizationName := "kaizen-solutions",
       publish / skip   := true,
-      libraryDependencies ++= Seq("io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats),
+      libraryDependencies ++= Seq(
+        "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter
+      ),
       // Prevents org.scala-lang.modules:scala-collection-compat _3, _2.13 conflicting cross-version suffixes
       excludeDependencies += "org.scala-lang.modules" % "scala-collection-compat_2.13"
     )
@@ -303,7 +305,7 @@ lazy val tapirExample =
       publish / skip   := true,
       libraryDependencies ++=
         Seq(
-          "io.janstenpickle"            %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats,
+          "io.janstenpickle"            %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
           "com.softwaremill.sttp.tapir" %% "tapir-json-circe"                  % Versions.tapir,
           "com.softwaremill.sttp.tapir" %% "tapir-http4s-server"               % Versions.tapir,
           "org.http4s"                  %% "http4s-ember-server"               % Versions.http4s
@@ -337,7 +339,7 @@ lazy val virgilExample =
       organizationName := "kaizen-solutions",
       libraryDependencies ++=
         Seq(
-          "io.janstenpickle"                   %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4Cats,
+          "io.janstenpickle"                   %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
           "com.github.kaizen-solutions.virgil" %% "virgil"                            % Versions.virgil
         )
     )
