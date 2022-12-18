@@ -303,7 +303,7 @@ object ZTracer {
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(zio: ZIO[R, E, A]): ZIO[R & ZTracer, E, A] =
-    ZIO.service[ZTracer].flatMap(_.span(name, kind, errorHandler)(zio))
+    ZIO.serviceWithZIO[ZTracer](_.span(name, kind, errorHandler)(zio))
 
   def traceEachElement[R, E, O](
     extractName: O => String,
@@ -337,7 +337,7 @@ object ZTracer {
     ZIO.serviceWithZIO[ZTracer](_.restore(span))
 
   def locally[R, E, A](span: ZSpan)(zio: ZIO[R, E, A]): ZIO[R & ZTracer, E, A] =
-    ZIO.service[ZTracer].flatMap(_.locally(span)(zio))
+    ZIO.serviceWithZIO[ZTracer](_.locally(span)(zio))
 
   val retrieveCurrentSpan: URIO[ZTracer, ZSpan] =
     ZIO.serviceWithZIO[ZTracer](_.retrieveCurrentSpan)
@@ -345,23 +345,19 @@ object ZTracer {
   def fromHeaders[R, E, A](headers: TraceHeaders, name: String, kind: SpanKind)(
     fn: ZSpan => ZIO[R, E, A]
   ): ZIO[R & ZTracer, E, A] =
-    ZIO.service[ZTracer].flatMap(_.fromHeaders(headers, name, kind)(fn))
+    ZIO.serviceWithZIO[ZTracer](_.fromHeaders(headers, name, kind)(fn))
 
   def withSpan[R, E, A](
     name: String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(fn: ZSpan => ZIO[R, E, A]): ZIO[R & ZTracer, E, A] =
-    ZIO
-      .service[ZTracer]
-      .flatMap(_.withSpan(name, kind, errorHandler)(fn))
+    ZIO.serviceWithZIO[ZTracer](_.withSpan(name, kind, errorHandler)(fn))
 
   def spanSource[R, E, A](
     kind: SpanKind = SpanKind.Internal
   )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R & ZTracer, E, A] =
-    ZIO
-      .service[ZTracer]
-      .flatMap(_.spanSource(kind)(zio)(fileName, line))
+    ZIO.serviceWithZIO[ZTracer](_.spanSource(kind)(zio)(fileName, line))
 
   val layer: URLayer[ZEntryPoint, ZTracer] =
     ZLayer.scoped(
