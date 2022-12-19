@@ -8,7 +8,7 @@ import zio.{RIO, ZIO}
 package object kafka {
   implicit class Fs2KafkaTracerConsumerOps[R <: ZTracer, K, V](
     val stream: Stream[RIO[R, *], CommittableConsumerRecord[RIO[R, *], K, V]]
-  ) {
+  ) extends AnyVal {
     def traceConsumerStream(
       spanNameForElement: CommittableConsumerRecord[RIO[R, *], K, V] => String =
         (_: CommittableConsumerRecord[RIO[R, *], K, V]) => s"kafka-receive"
