@@ -110,8 +110,7 @@ final class ZTracer private (
 
   /**
    * This is a low level operator and leaves you, the user, to manipulate the
-   * current span using [[updateCurrentSpan]] and [[removeCurrentSpan]] or
-   * [[restore]]. We recommend using [[spanScoped]] instead.
+   * current span using [[updateCurrentSpan]]. We recommend using [[spanScoped]] instead.
    *
    * For example:
    *
@@ -163,8 +162,8 @@ final class ZTracer private (
     retrieveCurrentSpan
       .flatMap(current =>
         spanScopedManual(name, kind, errorHandler)
-          .tap(restore)
-          .ensuring(restore(current))
+          .tap(updateCurrentSpan)
+          .ensuring(updateCurrentSpan(current))
       )
 
   /**
@@ -279,7 +278,7 @@ final class ZTracer private (
   val retrieveCurrentSpan: UIO[ZSpan] =
     current.get
 
-  def restore(in: ZSpan): UIO[Unit] =
+  def updateCurrentSpan(in: ZSpan): UIO[Unit] =
     current.set(in)
 
   def locally[R, E, A](span: ZSpan)(zio: ZIO[R, E, A]): ZIO[R, E, A] =
@@ -333,8 +332,8 @@ object ZTracer {
   ): URIO[ZTracer & Scope, ZSpan] =
     ZIO.serviceWithZIO[ZTracer](_.spanScoped(name, kind, errorHandler))
 
-  def restore(span: ZSpan): URIO[ZTracer, Unit] =
-    ZIO.serviceWithZIO[ZTracer](_.restore(span))
+  def updateCurrentSpan(span: ZSpan): URIO[ZTracer, Unit] =
+    ZIO.serviceWithZIO[ZTracer](_.updateCurrentSpan(span))
 
   def locally[R, E, A](span: ZSpan)(zio: ZIO[R, E, A]): ZIO[R & ZTracer, E, A] =
     ZIO.serviceWithZIO[ZTracer](_.locally(span)(zio))
