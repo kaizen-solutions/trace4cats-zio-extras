@@ -30,7 +30,6 @@ object TracedKafkaConsumerExample extends ZIOAppDefault {
         )
       )
       .endTracingEachElement
-      .map(_._1)
       .map(_.offset)
       .through(fs2.kafka.commitBatchWithin(10, 10.seconds))
       .compile
