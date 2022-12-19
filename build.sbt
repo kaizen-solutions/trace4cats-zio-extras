@@ -51,8 +51,9 @@ def releaseSettings: Seq[Def.Setting[_]] =
       commitNextVersion,
       pushChanges
     ),
-    publishTo := None,
-    publish   := (())
+    publishTo                   := None,
+    publish                     := (()),
+    releaseIgnoreUntrackedFiles := true
   )
 
 lazy val root =
