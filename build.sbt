@@ -136,7 +136,7 @@ lazy val fs2Example = project
   .in(file("fs2-examples"))
   .settings(kindProjectorSettings: _*)
   .settings(
-    name             := "trace4cats-zio-extras-fs 2-examples",
+    name             := "trace4cats-zio-extras-fs2-examples",
     organization     := "io.kaizen-solutions",
     organizationName := "kaizen-solutions",
     publish / skip   := true,
