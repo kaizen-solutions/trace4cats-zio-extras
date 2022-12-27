@@ -1,11 +1,12 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
 import trace4cats.model.{SpanStatus, TraceHeaders}
-import zhttp.http.{Headers, Status}
+import zio.http.model.{Headers, Status}
+import zio.http.model.Headers.Header
 
 package object ziohttp {
   private[ziohttp] def extractTraceHeaders(headers: Headers): TraceHeaders =
-    TraceHeaders.of(headers.toChunk.map { case (k, v) => (String.valueOf(k), String.valueOf(v)) }.toMap)
+    TraceHeaders.of(headers.map { case Header(k, v) => (String.valueOf(k), String.valueOf(v)) }.toMap)
 
   // Adapted from io.janstenpickle.trace4cats.http4s.common.Http4sStatusMapping
   private[ziohttp] def toSpanStatus(s: Status): SpanStatus = s match {
