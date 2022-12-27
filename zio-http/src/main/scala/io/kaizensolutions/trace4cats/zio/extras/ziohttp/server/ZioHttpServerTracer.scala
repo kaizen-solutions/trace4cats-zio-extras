@@ -6,9 +6,11 @@ import trace4cats.model.SemanticAttributeKeys.*
 import trace4cats.model.{AttributeValue, SpanKind, SpanStatus}
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.{extractTraceHeaders, toSpanStatus}
-import zhttp.http.*
-import zhttp.http.middleware.HttpMiddleware
+import zio.http.*
 import zio.*
+import zio.http.middleware.HttpMiddleware
+import zio.http.model.{HeaderNames, Headers}
+import zio.http.model.Headers.Header
 
 object ZioHttpServerTracer {
   type SpanNamer = Request => String
@@ -24,7 +26,7 @@ object ZioHttpServerTracer {
     new Middleware[Any, Nothing, Request, Response, Request, Response] {
       override def apply[R1 <: Any, E1 >: Nothing](
         http: Http[R1, E1, Request, Response]
-      ): Http[R1, E1, Request, Response] =
+      )(implicit trace: Trace): Http[R1, E1, Request, Response] =
         traceApp(tracer, http, dropHeadersWhen, spanNamer, errorHandler)
     }
 
@@ -36,7 +38,7 @@ object ZioHttpServerTracer {
     new Middleware[ZTracer, Nothing, Request, Response, Request, Response] {
       override def apply[R1 <: ZTracer, E1 >: Nothing](
         http: Http[R1, E1, Request, Response]
-      ): Http[R1, E1, Request, Response] =
+      )(implicit trace: Trace): Http[R1, E1, Request, Response] =
         Http
           .fromZIO(ZIO.service[ZTracer])
           .flatMap(traceApp(_, http, dropHeadersWhen, spanNamer, errorHandler))
@@ -77,7 +79,7 @@ object ZioHttpServerTracer {
     dropHeadersWhen: String => Boolean
   ): Chunk[(String, AttributeValue)] =
     Chunk[(String, AttributeValue)](
-      httpFlavor -> req.version.toJava.toString,
+      httpFlavor -> req.version.toString,
       httpMethod -> req.method.toString(),
       httpUrl    -> req.url.path.toString
     ) ++ headerFields(headers = req.headers, `type` = "req", dropWhen = dropHeadersWhen) ++
@@ -99,10 +101,10 @@ object ZioHttpServerTracer {
     `type`: String,
     dropWhen: String => Boolean
   ): Chunk[(String, AttributeValue)] =
-    headers.toChunk.collect {
-      case (name, value) if !dropWhen(String.valueOf(name)) =>
+    Chunk.fromIterable(headers.collect {
+      case Header(name, value) if !dropWhen(String.valueOf(name)) =>
         s"${`type`}.header.$name" -> AttributeValue.stringToTraceValue(String.valueOf(value))
-    }
+    })
 
   val SensitiveHeaders: Set[String] = Set(
     HeaderNames.authorization,

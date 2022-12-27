@@ -231,7 +231,7 @@ lazy val zioHttp =
       name                            := "trace4cats-zio-extras-zio-http",
       organization                    := "io.kaizen-solutions",
       organizationName                := "kaizen-solutions",
-      libraryDependencies += "io.d11" %% "zhttp" % Versions.zhttp
+      libraryDependencies += "dev.zio" %% "zio-http" % Versions.zhttp
     )
     .dependsOn(core)
 

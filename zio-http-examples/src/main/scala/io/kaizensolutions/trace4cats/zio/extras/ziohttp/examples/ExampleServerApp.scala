@@ -2,9 +2,9 @@ package io.kaizensolutions.trace4cats.zio.extras.ziohttp.examples
 
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.server.ZioHttpServerTracer.trace
-import zhttp.http.*
-import zhttp.service.Server
+import zio.http.*
 import zio.*
+import zio.http.model.{Method, Status}
 
 object ExampleServerApp extends ZIOAppDefault {
   val app: Http[Db & ZTracer, Throwable, Request, Response] =
@@ -31,8 +31,9 @@ object ExampleServerApp extends ZIOAppDefault {
 
   override val run: ZIO[ZIOAppArgs & Scope, Any, Any] =
     Server
-      .start(8080, app @@ trace)
+      .serve(app @@ trace)
       .provide(
+        Server.default,
         JaegerEntrypoint.live,
         ZTracer.layer,
         Db.live
