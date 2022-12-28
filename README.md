@@ -423,3 +423,8 @@ object NewRelicEntrypoint {
     }
 }
 ```
+
+## Developer notes
+
+In order to do a release, use `sbt release`, ensure that you set the correct tags (like prefixing the zio version) and
+JitPack will take over from this point onwards once the tags are pushed.
