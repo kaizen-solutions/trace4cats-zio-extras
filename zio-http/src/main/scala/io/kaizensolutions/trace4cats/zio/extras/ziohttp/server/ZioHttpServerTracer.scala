@@ -9,7 +9,7 @@ import io.kaizensolutions.trace4cats.zio.extras.ziohttp.{extractTraceHeaders, to
 import zio.http.*
 import zio.*
 import zio.http.middleware.HttpMiddleware
-import zio.http.model.{HeaderNames, Headers}
+import zio.http.model.{HeaderNames, Headers, Version}
 import zio.http.model.Headers.Header
 
 object ZioHttpServerTracer {
@@ -79,7 +79,7 @@ object ZioHttpServerTracer {
     dropHeadersWhen: String => Boolean
   ): Chunk[(String, AttributeValue)] =
     Chunk[(String, AttributeValue)](
-      httpFlavor -> req.version.toString,
+      httpFlavor -> renderHttpVersion(req.version),
       httpMethod -> req.method.toString(),
       httpUrl    -> req.url.path.toString
     ) ++ headerFields(headers = req.headers, `type` = "req", dropWhen = dropHeadersWhen) ++
@@ -111,4 +111,14 @@ object ZioHttpServerTracer {
     HeaderNames.cookie,
     HeaderNames.setCookie
   ).map(String.valueOf(_))
+
+  private def renderHttpVersion(in: Version): String = {
+    val http = "HTTP"
+    val version =
+      in match {
+        case Version.Http_1_0 => "1.0"
+        case Version.Http_1_1 => "1.1"
+      }
+    s"$http/$version"
+  }
 }
