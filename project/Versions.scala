@@ -7,7 +7,7 @@ object Versions {
   val trace4CatsJaegarExporter = "0.14.0"
   val zio                      = "2.0.9"
   val zioInteropCats           = "23.0.0.1"
-  val zhttp                    = "0.0.3"
+  val zhttp                    = "0.0.4"
   val http4s                   = "0.23.18"
   val tapir                    = "1.2.4"
   val sttp                     = "3.8.3"

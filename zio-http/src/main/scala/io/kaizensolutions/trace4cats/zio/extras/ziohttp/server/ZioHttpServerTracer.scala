@@ -1,78 +1,73 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziohttp.server
 
-import trace4cats.ErrorHandler
+import io.kaizensolutions.trace4cats.zio.extras.ZTracer
+import io.kaizensolutions.trace4cats.zio.extras.ziohttp.{extractTraceHeaders, toSpanStatus}
+import trace4cats.{ErrorHandler, TraceHeaders}
 import trace4cats.model.AttributeValue.{LongValue, StringValue}
 import trace4cats.model.SemanticAttributeKeys.*
 import trace4cats.model.{AttributeValue, SpanKind, SpanStatus}
-import io.kaizensolutions.trace4cats.zio.extras.ZTracer
-import io.kaizensolutions.trace4cats.zio.extras.ziohttp.{extractTraceHeaders, toSpanStatus}
-import zio.http.*
 import zio.*
-import zio.http.middleware.HttpMiddleware
-import zio.http.model.{HeaderNames, Headers, Version}
+import zio.http.*
+import zio.http.model.*
 import zio.http.model.Headers.Header
 
 object ZioHttpServerTracer {
   type SpanNamer = Request => String
 
-  val trace: HttpMiddleware[ZTracer, Nothing] = traceWithEnv()
-
-  def traceWith(
-    tracer: ZTracer,
+  def trace(
     dropHeadersWhen: String => Boolean = SensitiveHeaders.contains,
     spanNamer: SpanNamer = req => s"${req.method.toString()} ${req.url.path.toString()}",
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): HttpMiddleware[Any, Nothing] =
-    new Middleware[Any, Nothing, Request, Response, Request, Response] {
-      override def apply[R1 <: Any, E1 >: Nothing](
-        http: Http[R1, E1, Request, Response]
-      )(implicit trace: Trace): Http[R1, E1, Request, Response] =
-        traceApp(tracer, http, dropHeadersWhen, spanNamer, errorHandler)
+  ): HttpAppMiddleware[ZTracer, Nothing] =
+    new HttpAppMiddleware[ZTracer, Nothing] {
+      override def apply[R1 <: ZTracer, Err1 >: Nothing](
+        http: Http[R1, Err1, Request, Response]
+      )(implicit trace: Trace): Http[R1, Err1, Request, Response] =
+        Http.fromOptionalHandlerZIO[Request] { request =>
+          val reqFields    = requestFields(request, dropHeadersWhen)
+          val traceHeaders = extractTraceHeaders(request.headers)
+          val nameOfSpan   = spanNamer(request)
+
+          http
+            .runHandler(request)
+            .mapError(Option(_))
+            .flatMap {
+              case Some(handler) =>
+                ZIO.succeed(
+                  spanHandler(request, handler, traceHeaders, dropHeadersWhen, nameOfSpan, reqFields, errorHandler)
+                )
+
+              case None =>
+                ZIO.fail(None)
+            }
+        }
     }
 
-  def traceWithEnv(
-    dropHeadersWhen: String => Boolean = SensitiveHeaders.contains,
-    spanNamer: SpanNamer = req => s"${req.method.toString()} ${req.url.path.toString()}",
-    errorHandler: ErrorHandler = ErrorHandler.empty
-  ): HttpMiddleware[ZTracer, Nothing] =
-    new Middleware[ZTracer, Nothing, Request, Response, Request, Response] {
-      override def apply[R1 <: ZTracer, E1 >: Nothing](
-        http: Http[R1, E1, Request, Response]
-      )(implicit trace: Trace): Http[R1, E1, Request, Response] =
-        Http
-          .fromZIO(ZIO.service[ZTracer])
-          .flatMap(traceApp(_, http, dropHeadersWhen, spanNamer, errorHandler))
-    }
+  private def spanHandler[Env <: ZTracer, Err](
+    request: Request,
+    handler: Handler[Env, Err, Request, Response],
+    traceHeaders: TraceHeaders,
+    dropHeadersWhen: String => Boolean,
+    nameOfSpan: String,
+    requestFields: Chunk[(String, AttributeValue)],
+    errorHandler: ErrorHandler
+  ): Handler[Env, Err, Any, Response] =
+    Handler.fromZIO(
+      ZIO.serviceWithZIO[ZTracer](
+        _.fromHeaders(traceHeaders, nameOfSpan, SpanKind.Server, errorHandler) { span =>
+          span.putAll(requestFields*) *>
+            // NOTE: We need to call handler.runZIO and have the code executed within our span for propagation to take place
+            handler.runZIO(request).onExit {
+              case Exit.Success(response) =>
+                span.putAll(responseFields(response, dropHeadersWhen)*) *>
+                  span.setStatus(toSpanStatus(response.status))
 
-  def traceApp[R, E](
-    tracer: ZTracer,
-    httpApp: HttpApp[R, E],
-    dropHeadersWhen: String => Boolean = SensitiveHeaders.contains,
-    spanNamer: SpanNamer = req => s"${req.method.toString()} ${req.url.path.toString()}",
-    errorHandler: ErrorHandler = ErrorHandler.empty
-  ): HttpApp[R, E] =
-    Http.fromOptionFunction[Request] { request =>
-      val reqFields    = requestFields(request, dropHeadersWhen)
-      val traceHeaders = extractTraceHeaders(request.headers)
-      val nameOfSpan   = spanNamer(request)
-
-      tracer.fromHeaders(
-        headers = traceHeaders,
-        kind = SpanKind.Server,
-        name = nameOfSpan,
-        errorHandler = errorHandler
-      ) { span =>
-        span.putAll(reqFields*) *>
-          httpApp(request).onExit {
-            case Exit.Success(response) =>
-              span.setStatus(toSpanStatus(response.status)) *>
-                span.putAll(responseFields(response, dropHeadersWhen)*)
-
-            case Exit.Failure(cause) =>
-              span.setStatus(SpanStatus.Internal(cause.prettyPrint))
-          }
-      }
-    }
+              case Exit.Failure(cause) =>
+                span.setStatus(SpanStatus.Internal(cause.prettyPrint))
+            }
+        }
+      )
+    )
 
   private def requestFields(
     req: Request,

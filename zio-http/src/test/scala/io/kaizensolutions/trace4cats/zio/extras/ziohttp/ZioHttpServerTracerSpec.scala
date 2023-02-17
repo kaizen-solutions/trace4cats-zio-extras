@@ -29,10 +29,11 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
         for {
           result <-
             setup(tracer =>
-              testApp.provideEnvironment(ZEnvironment.empty.add(tracer)) @@ ZioHttpServerTracer.traceWith(tracer)
+              (testApp @@ ZioHttpServerTracer.trace())
+                .provideEnvironment(ZEnvironment.empty.add(tracer))
             )
           (completer, app) = result
-          response        <- app(Request.get(URL(!! / "plaintext")))
+          response        <- app.runZIO(Request.get(URL(!! / "plaintext")))
           spans           <- completer.retrieveCollected
           httpSpan        <- ZIO.from(spans.find(_.name == "GET /plaintext"))
           fetchSpan       <- ZIO.from(spans.find(_.name == "plaintext-fetch"))

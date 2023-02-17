@@ -1,20 +1,20 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziohttp.examples
 
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
-import io.kaizensolutions.trace4cats.zio.extras.ziohttp.server.ZioHttpServerTracer.trace
+import io.kaizensolutions.trace4cats.zio.extras.ziohttp.server.ZioHttpServerTracer.traceMiddleware
 import zio.http.*
 import zio.*
 import zio.http.model.{Method, Status}
 
 object ExampleServerApp extends ZIOAppDefault {
-  val app: Http[Db & ZTracer, Throwable, Request, Response] =
+  val http: Http[Db & ZTracer, Throwable, Request, Response] =
     Http.collectZIO[Request] {
-
       case Method.GET -> !! / "plaintext" =>
         ZTracer.withSpan("plaintext-fetch-db") { span =>
           for {
             sleep <- Random.nextIntBetween(1, 3)
             _     <- span.put("sleep-duration.seconds", sleep)
+            _     <- Console.printLine("HELLO")
             _     <- ZTracer.spanSource()(ZIO.sleep(sleep.seconds) *> Db.get(sleep))
           } yield Response
             .text(sleep.toString)
@@ -29,9 +29,12 @@ object ExampleServerApp extends ZIOAppDefault {
         ZIO.succeed(Response.status(Status.BadGateway))
     }
 
+  val app: Http[Db & ZTracer, Response, Request, Response] =
+    http.mapError(_ => Response.status(Status.InternalServerError))
+
   override val run: ZIO[ZIOAppArgs & Scope, Any, Any] =
     Server
-      .serve(app @@ trace)
+      .serve(app @@ traceMiddleware())
       .provide(
         Server.default,
         JaegerEntrypoint.live,
