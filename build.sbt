@@ -228,12 +228,12 @@ lazy val zioHttp =
     .settings(kindProjectorSettings: _*)
     .settings(releaseSettings: _*)
     .settings(
-      name                            := "trace4cats-zio-extras-zio-http",
-      organization                    := "io.kaizen-solutions",
-      organizationName                := "kaizen-solutions",
+      name                             := "trace4cats-zio-extras-zio-http",
+      organization                     := "io.kaizen-solutions",
+      organizationName                 := "kaizen-solutions",
       libraryDependencies += "dev.zio" %% "zio-http" % Versions.zhttp
     )
-    .dependsOn(core)
+    .dependsOn(core % "compile->compile;test->test")
 
 lazy val zioHttpExample =
   project
