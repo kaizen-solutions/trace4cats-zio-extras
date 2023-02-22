@@ -185,7 +185,7 @@ object ExampleServerApp extends App {
 
   override def run(args: List[String]): URIO[ZEnv, ExitCode] =
     Server
-      .start(8080, app @@ trace)  // tracing is implemented as a middleware for ZIO HTTP
+      .start(8080, app @@ trace())  // tracing is implemented as a middleware for ZIO HTTP
       .exitCode
       .provideCustomLayer(
         (JaegarEntrypoint.live >>> ZTracer.layer) ++ Db.live
