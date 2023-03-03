@@ -60,7 +60,6 @@ object TraceAspects {
         A >: Nothing <: Any
       ](stream: ZStream[R, E, A])(implicit
         trace: Trace
-      ): ZStream[R, E, A] =
-        ZTracer.traceEntireStream(name, kind, errorHandler)(stream)
+      ): ZStream[R, E, A] = ZTracer.traceEntireStream[R, E, A](name, kind, errorHandler)(stream)
     }
 }

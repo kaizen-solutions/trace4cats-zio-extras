@@ -238,7 +238,7 @@ final class ZTracer private (
     name: String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty,
-    enrich: ZSpan => ZIO[R, E, Any] = _ => ZIO.unit
+    enrich: ZSpan => ZIO[R, E, Any] = (_: ZSpan) => ZIO.unit
   )(stream: ZStream[R, E, O]): ZStream[R, E, O] =
     ZStream.unwrap(
       withSpan(name, kind, errorHandler)(span =>
@@ -317,7 +317,7 @@ object ZTracer {
     name: String,
     kind: SpanKind = SpanKind.Internal,
     errorHandler: ErrorHandler = ErrorHandler.empty,
-    enrich: ZSpan => ZIO[R, E, Any] = _ => ZIO.unit
+    enrich: ZSpan => ZIO[R, E, Any] = (_: ZSpan) => ZIO.unit
   )(stream: ZStream[R, E, O]): ZStream[R & ZTracer, E, O] =
     ZStream.serviceWithStream[ZTracer](_.traceEntireStream(name, kind, errorHandler, enrich)(stream))
 
