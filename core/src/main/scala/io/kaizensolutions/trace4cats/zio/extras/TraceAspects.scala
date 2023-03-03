@@ -1,5 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
+import trace4cats.ErrorHandler
 import trace4cats.model.SpanKind
 import zio.stream.{ZStream, ZStreamAspect}
 import zio.{Trace, ZIO, ZIOAspect}
@@ -49,7 +50,8 @@ object TraceAspects {
 
   def traceEntireStream(
     name: String,
-    kind: SpanKind = SpanKind.Internal
+    kind: SpanKind = SpanKind.Internal,
+    errorHandler: ErrorHandler = ErrorHandler.empty
   ): ZStreamAspect[Nothing, ZTracer, Nothing, Any, Nothing, Any] =
     new ZStreamAspect[Nothing, ZTracer, Nothing, Any, Nothing, Any] {
       override def apply[
@@ -59,6 +61,6 @@ object TraceAspects {
       ](stream: ZStream[R, E, A])(implicit
         trace: Trace
       ): ZStream[R, E, A] =
-        ZTracer.traceEntireStream(name, kind)(stream)
+        ZTracer.traceEntireStream(name, kind, errorHandler)(stream)
     }
 }

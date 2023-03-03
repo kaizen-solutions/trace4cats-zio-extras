@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
-import trace4cats.model.TraceProcess
+import trace4cats.model.{AttributeValue, TraceProcess}
 import zio.stream.ZStream
 import zio.test.{assertTrue, Spec, TestEnvironment, ZIOSpecDefault}
 import zio.{Chunk, Scope, URIO, ZEnvironment, ZIO}
@@ -73,11 +73,27 @@ object ZTracerSpec extends ZIOSpecDefault {
             result  <- InMemorySpanCompleter.entryPoint(TraceProcess("streaming-trace-test"))
             (sc, ep) = result
             tracer  <- InMemorySpanCompleter.toZTracer(ep)
-            // TODO: Wait for ZStreams to add @@ for aspects
             executed <- (ZStream(1, 2, 3) @@ TraceAspects.traceEntireStream("streaming-trace")).runCollect
                           .provideEnvironment(ZEnvironment(tracer))
             spans <- sc.retrieveCollected
           } yield assertTrue(executed == Chunk(1, 2, 3), spans.length == 1)
+        } +
+        test("streaming spans are enriched") {
+          for {
+            result  <- InMemorySpanCompleter.entryPoint(TraceProcess("streaming-trace-test"))
+            (sc, ep) = result
+            tracer  <- InMemorySpanCompleter.toZTracer(ep)
+            executed <-
+              tracer
+                .traceEntireStream("streaming-trace", enrich = span => span.put("stream-key", 1))(ZStream(1, 2, 3))
+                .runCollect
+                .provideEnvironment(ZEnvironment(tracer))
+            spans <- sc.retrieveCollected
+          } yield assertTrue(
+            executed == Chunk(1, 2, 3),
+            spans.length == 1,
+            spans.head.attributes("stream-key") == AttributeValue.LongValue(1)
+          )
         }
     }
 }

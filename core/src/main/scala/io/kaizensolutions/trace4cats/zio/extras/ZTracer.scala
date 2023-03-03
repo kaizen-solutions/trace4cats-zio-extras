@@ -110,7 +110,8 @@ final class ZTracer private (
 
   /**
    * This is a low level operator and leaves you, the user, to manipulate the
-   * current span using [[updateCurrentSpan]]. We recommend using [[spanScoped]] instead.
+   * current span using [[updateCurrentSpan]]. We recommend using [[spanScoped]]
+   * instead.
    *
    * For example:
    *
@@ -236,11 +237,12 @@ final class ZTracer private (
   def traceEntireStream[R, E, O](
     name: String,
     kind: SpanKind = SpanKind.Internal,
-    errorHandler: ErrorHandler = ErrorHandler.empty
+    errorHandler: ErrorHandler = ErrorHandler.empty,
+    enrich: ZSpan => ZIO[R, E, Any] = _ => ZIO.unit
   )(stream: ZStream[R, E, O]): ZStream[R, E, O] =
     ZStream.unwrap(
       withSpan(name, kind, errorHandler)(span =>
-        ZIO.succeed(
+        enrich(span) *> ZIO.succeed(
           stream.tapError {
             case e: Throwable if span.isSampled => span.put("error.message", e.getLocalizedMessage)
             case error if span.isSampled        => span.put("error.message", error.toString)
@@ -314,9 +316,10 @@ object ZTracer {
   def traceEntireStream[R, E, O](
     name: String,
     kind: SpanKind = SpanKind.Internal,
-    errorHandler: ErrorHandler = ErrorHandler.empty
+    errorHandler: ErrorHandler = ErrorHandler.empty,
+    enrich: ZSpan => ZIO[R, E, Any] = _ => ZIO.unit
   )(stream: ZStream[R, E, O]): ZStream[R & ZTracer, E, O] =
-    ZStream.serviceWithStream[ZTracer](_.traceEntireStream(name, kind, errorHandler)(stream))
+    ZStream.serviceWithStream[ZTracer](_.traceEntireStream(name, kind, errorHandler, enrich)(stream))
 
   def spanScopedManual(
     name: String,
