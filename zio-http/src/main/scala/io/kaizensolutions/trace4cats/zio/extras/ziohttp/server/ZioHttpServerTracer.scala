@@ -2,7 +2,7 @@ package io.kaizensolutions.trace4cats.zio.extras.ziohttp.server
 
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.{extractTraceHeaders, toSpanStatus}
-import trace4cats.{ErrorHandler, TraceHeaders}
+import trace4cats.{ErrorHandler, ToHeaders, TraceHeaders}
 import trace4cats.model.AttributeValue.{LongValue, StringValue}
 import trace4cats.model.SemanticAttributeKeys.*
 import trace4cats.model.{AttributeValue, SpanKind, SpanStatus}
@@ -67,9 +67,19 @@ object ZioHttpServerTracer {
     Handler.fromZIO(
       ZIO.serviceWithZIO[ZTracer](
         _.fromHeaders(traceHeaders, nameOfSpan, SpanKind.Server, errorHandler) { span =>
+          val logTraceContext = {
+            val headers =
+              span
+                .extractHeaders(ToHeaders.standard)
+                .values
+                .collect { case (k, v) if v.nonEmpty => (k.toString, v) }
+                .toSeq
+            ZIOAspect.annotated(annotations = headers*)
+          }
+
           span.putAll(requestFields*) *>
             // NOTE: We need to call handler.runZIO and have the code executed within our span for propagation to take place
-            handler.runZIO(request).onExit {
+            (handler.runZIO(request) @@ logTraceContext).onExit {
               case Exit.Success(response) =>
                 span.putAll(responseFields(response, dropHeadersWhen)*) *>
                   span.setStatus(toSpanStatus(response.status))
