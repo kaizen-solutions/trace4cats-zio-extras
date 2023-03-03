@@ -12,21 +12,33 @@ import zio.http.model.*
 import zio.http.model.Headers.Header
 
 object ZioHttpServerTracer {
-  type SpanNamer = Request => String
+
+  /**
+   * SpanNamer is a custom mapping so if you had a path parameter like
+   * /user/1234, you could map it to /user/:id to reduce the cardinality of your
+   * traces
+   */
+  type SpanNamer = PartialFunction[Request, String]
 
   def trace(
     dropHeadersWhen: String => Boolean = SensitiveHeaders.contains,
-    spanNamer: SpanNamer = req => s"${req.method.toString()} ${req.url.path.toString()}",
+    spanNamer: SpanNamer = Map.empty[Request, String],
     errorHandler: ErrorHandler = ErrorHandler.empty
   ): HttpAppMiddleware[ZTracer, Nothing] =
     new HttpAppMiddleware[ZTracer, Nothing] {
+
+      private val spanNamerTotal: Request => String = {
+        val default = (req: Request) => s"${req.method.toString()} ${req.url.path.toString()}"
+        spanNamer.applyOrElse(_, default)
+      }
+
       override def apply[R1 <: ZTracer, Err1 >: Nothing](
         http: Http[R1, Err1, Request, Response]
       )(implicit trace: Trace): Http[R1, Err1, Request, Response] =
         Http.fromOptionalHandlerZIO[Request] { request =>
           val reqFields    = requestFields(request, dropHeadersWhen)
           val traceHeaders = extractTraceHeaders(request.headers)
-          val nameOfSpan   = spanNamer(request)
+          val nameOfSpan   = spanNamerTotal(request)
 
           http
             .runHandler(request)
