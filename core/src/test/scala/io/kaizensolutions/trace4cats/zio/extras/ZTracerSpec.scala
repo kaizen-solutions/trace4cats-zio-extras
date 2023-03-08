@@ -85,7 +85,10 @@ object ZTracerSpec extends ZIOSpecDefault {
             tracer  <- InMemorySpanCompleter.toZTracer(ep)
             executed <-
               tracer
-                .traceEntireStream("streaming-trace", enrich = span => span.put("stream-key", 1L))(ZStream(1, 2, 3))
+                .traceEntireStream(
+                  "streaming-trace",
+                  enrich = span => span.put("stream-key", AttributeValue.LongValue(1L))
+                )(ZStream(1, 2, 3))
                 .runCollect
                 .provideEnvironment(ZEnvironment(tracer))
             spans <- sc.retrieveCollected
