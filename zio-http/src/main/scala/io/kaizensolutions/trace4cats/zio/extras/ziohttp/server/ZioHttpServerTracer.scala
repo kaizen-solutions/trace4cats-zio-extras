@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziohttp.server
 
-import io.kaizensolutions.trace4cats.zio.extras.ZTracer
+import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.{extractTraceHeaders, toSpanStatus}
 import trace4cats.{ErrorHandler, ToHeaders, TraceHeaders}
 import trace4cats.model.AttributeValue.{LongValue, StringValue}
@@ -20,10 +20,28 @@ object ZioHttpServerTracer {
    */
   type SpanNamer = PartialFunction[Request, String]
 
+  /**
+   * Tracing middleware for ZIO HTTP apps
+   *
+   * @param dropHeadersWhen
+   *   drop headers when this predicate is true
+   * @param spanNamer
+   *   is used when you want to override the default span name especially when
+   *   you have path parameters
+   * @param errorHandler
+   *   is used to handle errors
+   * @param enrichLogs
+   *   whether to enrich logs with trace information
+   * @param logHeaders
+   *   which headers to log
+   * @return
+   */
   def trace(
     dropHeadersWhen: String => Boolean = SensitiveHeaders.contains,
     spanNamer: SpanNamer = Map.empty[Request, String],
-    errorHandler: ErrorHandler = ErrorHandler.empty
+    errorHandler: ErrorHandler = ErrorHandler.empty,
+    enrichLogs: Boolean = false,
+    logHeaders: ToHeaders = ToHeaders.standard
   ): HttpAppMiddleware[ZTracer, Nothing] =
     new HttpAppMiddleware[ZTracer, Nothing] {
 
@@ -36,7 +54,6 @@ object ZioHttpServerTracer {
         http: Http[R1, Err1, Request, Response]
       )(implicit trace: Trace): Http[R1, Err1, Request, Response] =
         Http.fromOptionalHandlerZIO[Request] { request =>
-          val reqFields    = requestFields(request, dropHeadersWhen)
           val traceHeaders = extractTraceHeaders(request.headers)
           val nameOfSpan   = spanNamerTotal(request)
 
@@ -46,7 +63,16 @@ object ZioHttpServerTracer {
             .flatMap {
               case Some(handler) =>
                 ZIO.succeed(
-                  spanHandler(request, handler, traceHeaders, dropHeadersWhen, nameOfSpan, reqFields, errorHandler)
+                  spanHandler(
+                    request = request,
+                    handler = handler,
+                    traceHeaders = traceHeaders,
+                    dropHeadersWhen = dropHeadersWhen,
+                    nameOfSpan = nameOfSpan,
+                    errorHandler = errorHandler,
+                    enrichLogs = enrichLogs,
+                    logHeaders = logHeaders
+                  )
                 )
 
               case None =>
@@ -61,35 +87,52 @@ object ZioHttpServerTracer {
     traceHeaders: TraceHeaders,
     dropHeadersWhen: String => Boolean,
     nameOfSpan: String,
-    requestFields: Chunk[(String, AttributeValue)],
-    errorHandler: ErrorHandler
+    errorHandler: ErrorHandler,
+    enrichLogs: Boolean,
+    logHeaders: ToHeaders
   ): Handler[Env, Err, Any, Response] =
     Handler.fromZIO(
       ZIO.serviceWithZIO[ZTracer](
         _.fromHeaders(traceHeaders, nameOfSpan, SpanKind.Server, errorHandler) { span =>
-          val logTraceContext = {
-            val headers =
-              span
-                .extractHeaders(ToHeaders.standard)
-                .values
-                .collect { case (k, v) if v.nonEmpty => (k.toString, v) }
-                .toSeq
-            ZIOAspect.annotated(annotations = headers*)
-          }
+          val logTraceContext =
+            if (enrichLogs) {
+              val headers =
+                span
+                  .extractHeaders(logHeaders)
+                  .values
+                  .collect { case (k, v) if v.nonEmpty => (k.toString, v) }
+                  .toSeq
+              ZIOAspect.annotated(annotations = headers*)
+            } else noop
 
-          span.putAll(requestFields*) *>
+          enrichRequest(request, dropHeadersWhen, span) *>
             // NOTE: We need to call handler.runZIO and have the code executed within our span for propagation to take place
             (handler.runZIO(request) @@ logTraceContext).onExit {
-              case Exit.Success(response) =>
-                span.putAll(responseFields(response, dropHeadersWhen)*) *>
-                  span.setStatus(toSpanStatus(response.status))
-
-              case Exit.Failure(cause) =>
-                span.setStatus(SpanStatus.Internal(cause.prettyPrint))
+              case Exit.Success(response) => enrichResponse(response, dropHeadersWhen, span)
+              case Exit.Failure(cause)    => span.setStatus(SpanStatus.Internal(cause.prettyPrint))
             }
         }
       )
     )
+
+  private def enrichRequest(request: Request, dropHeadersWhen: String => Boolean, span: ZSpan): UIO[Unit] = {
+    val reqFields = requestFields(request, dropHeadersWhen)
+    if (span.isSampled) span.putAll(reqFields*)
+    else ZIO.unit
+  }
+
+  private def enrichResponse(response: Response, dropHeadersWhen: String => Boolean, span: ZSpan): UIO[Unit] = {
+    val respFields    = responseFields(response, dropHeadersWhen)
+    val spanRespAttrs = if (span.isSampled) span.putAll(respFields*) else ZIO.unit
+    spanRespAttrs *> span.setStatus(toSpanStatus(response.status))
+  }
+
+  val noop: ZIOAspect[Nothing, Any, Nothing, Any, Nothing, Any] =
+    new ZIOAspect[Nothing, Any, Nothing, Any, Nothing, Any] {
+      override def apply[R >: Nothing <: Any, E >: Nothing <: Any, A >: Nothing <: Any](zio: ZIO[R, E, A])(implicit
+        trace: Trace
+      ): ZIO[R, E, A] = zio
+    }
 
   private def requestFields(
     req: Request,
