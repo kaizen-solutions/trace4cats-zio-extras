@@ -14,7 +14,7 @@ object ExampleServerApp extends ZIOAppDefault {
           for {
             sleep <- Random.nextIntBetween(1, 3)
             _     <- span.put("sleep-duration.seconds", sleep)
-            _     <- Console.printLine("HELLO")
+            _     <- ZIO.logInfo("HELLO")
             _     <- ZTracer.spanSource()(ZIO.sleep(sleep.seconds) *> Db.get(sleep))
           } yield Response
             .text(sleep.toString)
