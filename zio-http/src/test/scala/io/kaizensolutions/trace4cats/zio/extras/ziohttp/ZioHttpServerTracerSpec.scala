@@ -45,12 +45,12 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
           spans           <- completer.retrieveCollected
           httpSpan        <- ZIO.from(spans.find(_.name == "GET /plaintext"))
           fetchSpan       <- ZIO.from(spans.find(_.name == "plaintext-fetch"))
-        } yield {
-          assertTrue(response.status == Status.Ok) &&
-          assertTrue(spans.length == 2) &&
-          assertTrue(httpSpan.attributes.contains("resp.header.custom-header")) &&
-          assertTrue(fetchSpan.context.parent.map(_.spanId).contains(httpSpan.context.spanId))
-        }
+        } yield assertTrue(
+          response.status == Status.Ok,
+          spans.length == 2,
+          httpSpan.attributes.contains("resp.header.custom-header"),
+          fetchSpan.context.parent.map(_.spanId).contains(httpSpan.context.spanId)
+        )
       } +
         test("renamed spans are traced as per the provided function") {
           val customSpanNamer: SpanNamer = { case Method.GET -> !! / "user" / _ =>
