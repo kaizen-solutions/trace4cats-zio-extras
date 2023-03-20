@@ -5,8 +5,11 @@ import io.kaizensolutions.trace4cats.zio.extras.ziohttp.server.ZioHttpServerTrac
 import zio.http.*
 import zio.*
 import zio.http.model.{Method, Status}
+import zio.logging.backend.SLF4J
 
 object ExampleServerApp extends ZIOAppDefault {
+  override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] = Runtime.removeDefaultLoggers >>> SLF4J.slf4j
+
   val http: Http[Db & ZTracer, Throwable, Request, Response] =
     Http.collectZIO[Request] {
       case Method.GET -> !! / "plaintext" =>
@@ -33,7 +36,7 @@ object ExampleServerApp extends ZIOAppDefault {
 
   override val run: ZIO[ZIOAppArgs & Scope, Any, Any] =
     Server
-      .serve(app @@ trace())
+      .serve(app @@ trace(enrichLogs = true))
       .provide(
         Server.default,
         JaegerEntrypoint.live,
