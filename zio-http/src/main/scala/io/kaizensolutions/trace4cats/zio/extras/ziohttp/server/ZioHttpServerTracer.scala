@@ -45,9 +45,10 @@ object ZioHttpServerTracer {
   ): HttpAppMiddleware[ZTracer, Nothing] =
     new HttpAppMiddleware[ZTracer, Nothing] {
 
-      private val spanNamerTotal: Request => String = {
-        val default = (req: Request) => s"${req.method.toString()} ${req.url.path.toString()}"
-        spanNamer.applyOrElse(_, default)
+      private val spanNamerTotal: Request => String = { request =>
+        val httpMethod = request.method.toString()
+        if (spanNamer.isDefinedAt(request)) s"$httpMethod ${spanNamer(request)}"
+        else s"$httpMethod ${request.url.path.toString()}"
       }
 
       override def apply[R1 <: ZTracer, Err1 >: Nothing](

@@ -54,7 +54,7 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
       } +
         test("renamed spans are traced as per the provided function") {
           val customSpanNamer: SpanNamer = { case Method.GET -> !! / "user" / _ =>
-            s"GET /user/:userId"
+            s"/user/:userId"
           }
 
           for {

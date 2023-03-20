@@ -246,7 +246,12 @@ lazy val zioHttpExample =
       publish / skip   := true,
       libraryDependencies ++= {
         val trace4cats = "io.janstenpickle"
-        Seq(trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter)
+        Seq(
+          trace4cats      %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
+          "dev.zio"       %% "zio-logging-slf4j"                 % "2.1.11",
+          "dev.zio"       %% "zio-logging-slf4j-bridge"          % "2.1.11",
+          "ch.qos.logback" % "logback-classic"                   % "1.4.6"
+        )
       }
     )
     .dependsOn(zioHttp)
