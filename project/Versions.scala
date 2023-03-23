@@ -9,7 +9,7 @@ object Versions {
   val zioInteropCats           = "23.0.0.2"
   val zhttp                    = "0.0.5"
   val http4s                   = "0.23.18"
-  val tapir                    = "1.2.10"
+  val tapir                    = "1.2.11"
   val sttp                     = "3.8.12"
   val virgil                   = "0.10.5-zio2"
   val scribe                   = "3.11.1"
