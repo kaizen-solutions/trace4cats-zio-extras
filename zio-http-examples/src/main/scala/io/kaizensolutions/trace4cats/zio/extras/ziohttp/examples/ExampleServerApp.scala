@@ -32,8 +32,7 @@ object ExampleServerApp extends ZIOAppDefault {
         ZIO.succeed(Response.status(Status.BadGateway))
     }
 
-  val app: Http[Db & ZTracer, Response, Request, Response] =
-    http.mapError(_ => Response.status(Status.InternalServerError))
+  val app: App[Db & ZTracer] = http.mapError(_ => Response.status(Status.InternalServerError))
 
   override val run: ZIO[ZIOAppArgs & Scope, Any, Any] =
     Server

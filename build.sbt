@@ -3,7 +3,7 @@ import sbtrelease.ReleaseStateTransformations._
 inThisBuild {
   val scala212 = "2.12.17"
   val scala213 = "2.13.10"
-  val scala32  = "3.2.1"
+  val scala32  = "3.2.2"
 
   Seq(
     scalaVersion                        := scala32,
@@ -89,6 +89,7 @@ lazy val core = project
     organizationName := "kaizen-solutions",
     libraryDependencies ++= {
       val liHaoyi    = "com.lihaoyi"
+      val scribe     = "com.outr"
       val trace4cats = "io.janstenpickle"
       val typelevel  = "org.typelevel"
       val zio        = "dev.zio"
@@ -100,8 +101,9 @@ lazy val core = project
         zio        %% "zio"              % Versions.zio,
         zio        %% "zio-streams"      % Versions.zio,
         zio        %% "zio-interop-cats" % Versions.zioInteropCats,
-        zio        %% "zio-test"         % Versions.zio % Test,
-        zio        %% "zio-test-sbt"     % Versions.zio % Test
+        zio        %% "zio-test"         % Versions.zio    % Test,
+        zio        %% "zio-test-sbt"     % Versions.zio    % Test,
+        scribe     %% "scribe-slf4j"     % Versions.scribe % Test
       )
     }
   )
@@ -228,6 +230,9 @@ lazy val zioHttp =
     .settings(kindProjectorSettings: _*)
     .settings(releaseSettings: _*)
     .settings(
+      tpolecatExcludeOptions += ScalacOptions.lintInferAny
+    ) // zio-http's @@ causes this (Scala 2.13) unless explicitly typed
+    .settings(
       name                             := "trace4cats-zio-extras-zio-http",
       organization                     := "io.kaizen-solutions",
       organizationName                 := "kaizen-solutions",
@@ -239,6 +244,9 @@ lazy val zioHttpExample =
   project
     .in(file("zio-http-examples"))
     .settings(kindProjectorSettings: _*)
+    .settings(
+      tpolecatExcludeOptions += ScalacOptions.lintInferAny
+    ) // zio-http's @@ causes this (Scala 2.13) unless explicitly typed
     .settings(
       name             := "trace4cats-zio-extras-zio-http-examples",
       organization     := "io.kaizen-solutions",

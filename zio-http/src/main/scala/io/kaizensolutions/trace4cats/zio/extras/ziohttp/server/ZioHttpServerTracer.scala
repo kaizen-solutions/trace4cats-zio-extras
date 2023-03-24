@@ -42,8 +42,8 @@ object ZioHttpServerTracer {
     errorHandler: ErrorHandler = ErrorHandler.empty,
     enrichLogs: Boolean = false,
     logHeaders: ToHeaders = ToHeaders.standard
-  ): HttpAppMiddleware[ZTracer, Nothing] =
-    new HttpAppMiddleware[ZTracer, Nothing] {
+  ): HttpAppMiddleware.Simple[ZTracer, Nothing] =
+    new HttpAppMiddleware.Simple[ZTracer, Nothing] {
 
       private val spanNamerTotal: Request => String = { request =>
         val httpMethod = request.method.toString()
