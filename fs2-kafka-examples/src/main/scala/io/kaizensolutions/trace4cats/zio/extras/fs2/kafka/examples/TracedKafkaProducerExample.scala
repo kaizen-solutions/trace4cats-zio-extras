@@ -17,11 +17,11 @@ object TracedKafkaProducerExample extends ZIOAppDefault {
 
     def producerPipe(
       tracer: ZTracer
-    ): Stream[Effect, Pipe[Effect, ProducerRecords[Unit, String, String], ProducerResult[Unit, String, String]]] =
+    ): Stream[Effect, Pipe[Effect, ProducerRecords[String, String], ProducerResult[String, String]]] =
       KafkaProducer
         .stream[Effect, String, String](producerSettings)
         .map(underlying => KafkaProducerTracer.trace(tracer, underlying))
-        .map(producer => KafkaProducer.pipe[Effect, String, String, Unit](producerSettings, producer))
+        .map(producer => KafkaProducer.pipe[Effect, String, String](producer))
 
     ZIO
       .service[ZTracer]

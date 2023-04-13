@@ -2,8 +2,8 @@ package io.kaizensolutions.trace4cats.zio.extras.ziohttp.examples
 
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.server.ZioHttpServerTracer.trace
-import zio.http.*
 import zio.*
+import zio.http.*
 import zio.http.model.{Method, Status}
 import zio.logging.backend.SLF4J
 

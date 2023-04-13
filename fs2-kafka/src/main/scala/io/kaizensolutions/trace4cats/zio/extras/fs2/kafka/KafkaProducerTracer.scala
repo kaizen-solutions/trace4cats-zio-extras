@@ -31,8 +31,8 @@ object KafkaProducerTracer {
     headers: ToHeaders = ToHeaders.all
   ): KafkaProducer.Metrics[ZIO[R, E, *], K, V] =
     new KafkaProducer.Metrics[ZIO[R, E, *], K, V] {
-      override def produce[P](records: ProducerRecords[P, K, V]): ZIO[R, E, ZIO[R, E, ProducerResult[P, K, V]]] =
-        tracedProduce[R, E, K, V, P](tracer, underlying, headers)(records)
+      override def produce(records: ProducerRecords[K, V]): ZIO[R, E, ZIO[R, E, ProducerResult[K, V]]] =
+        tracedProduce[R, E, K, V](tracer, underlying, headers)(records)
 
       override def metrics: ZIO[R, E, Map[MetricName, Metric]] =
         tracer.withSpan("kafka-producer-metrics")(span =>
@@ -46,15 +46,15 @@ object KafkaProducerTracer {
     headers: ToHeaders = ToHeaders.all
   ): KafkaProducer[ZIO[R, E, *], K, V] =
     new KafkaProducer[ZIO[R, E, *], K, V] {
-      override def produce[P](records: ProducerRecords[P, K, V]): ZIO[R, E, ZIO[R, E, ProducerResult[P, K, V]]] =
-        tracedProduce[R, E, K, V, P](tracer, underlying, headers)(records)
+      override def produce(records: ProducerRecords[K, V]): ZIO[R, E, ZIO[R, E, ProducerResult[K, V]]] =
+        tracedProduce[R, E, K, V](tracer, underlying, headers)(records)
     }
 
-  private def tracedProduce[R, E <: Throwable, K, V, P](
+  private def tracedProduce[R, E <: Throwable, K, V](
     tracer: ZTracer,
     underlying: KafkaProducer[ZIO[R, E, *], K, V],
     headers: ToHeaders
-  )(records: ProducerRecords[P, K, V]): ZIO[R, E, ZIO[R, E, ProducerResult[P, K, V]]] =
+  )(records: ProducerRecords[K, V]): ZIO[R, E, ZIO[R, E, ProducerResult[K, V]]] =
     tracer.withSpan("kafka-producer-send-buffer", kind = SpanKind.Producer) { span =>
       tracer
         .extractHeaders(headers)
@@ -62,17 +62,17 @@ object KafkaProducerTracer {
           val enrichSpanWithTopics =
             if (span.isSampled)
               NonEmptyList
-                .fromList(records.records.map(_.topic).toList)
+                .fromList(records.map(_.topic).toList)
                 .fold(ifEmpty = ZIO.unit)(topics => span.put("topics", AttributeValue.StringList(topics)))
             else ZIO.unit
 
           val kafkaTraceHeaders =
             Headers.fromIterable(traceHeaders.values.map { case (k, v) => Header(k.toString, v) })
           val recordsWithTraceHeaders =
-            records.records.map(record => record.withHeaders(record.headers.concat(kafkaTraceHeaders)))
+            records.map(record => record.withHeaders(record.headers.concat(kafkaTraceHeaders)))
 
           val sendToProducerBuffer =
-            enrichSpanWithTopics *> underlying.produce(ProducerRecords(recordsWithTraceHeaders, records.passthrough))
+            enrichSpanWithTopics *> underlying.produce(ProducerRecords(recordsWithTraceHeaders))
 
           enrichSpanWithError(
             "error.message-producer-buffer-send",
