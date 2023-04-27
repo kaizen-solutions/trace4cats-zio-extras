@@ -4,7 +4,6 @@ import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.server.ZioHttpServerTracer.trace
 import zio.*
 import zio.http.*
-import zio.http.model.{Method, Status}
 import zio.logging.backend.SLF4J
 
 object ExampleServerApp extends ZIOAppDefault {
@@ -22,7 +21,7 @@ object ExampleServerApp extends ZIOAppDefault {
           } yield Response
             .text(sleep.toString)
             .updateHeaders(_.addHeader("custom-header", sleep.toString))
-            .setStatus(Status.Ok)
+            .withStatus(Status.Ok)
         }
 
       case Method.GET -> !! / "fail" =>
