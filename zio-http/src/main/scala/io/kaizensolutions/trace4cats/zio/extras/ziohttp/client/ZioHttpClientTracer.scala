@@ -7,7 +7,6 @@ import trace4cats.model.SemanticAttributeKeys.{serviceHostname, servicePort}
 import trace4cats.model.{AttributeValue, SampleDecision, SemanticAttributeKeys, SpanKind}
 import trace4cats.{ErrorHandler, ToHeaders}
 import zio.*
-import zio.http.model.{Header, Headers, Method}
 import zio.http.*
 
 object ZioHttpClientTracer {
@@ -20,8 +19,10 @@ object ZioHttpClientTracer {
   ): ZIO[Client, Throwable, Response] = {
     val nameOfRequest = spanNamer(request)
     tracer.withSpan(name = nameOfRequest, kind = SpanKind.Client, errorHandler = errorHandler) { span =>
-      val traceHeaders            = span.extractHeaders(toHeaders)
-      val zioHttpTraceHeaders     = Headers(traceHeaders.values.map { case (header, value) => Header(header.toString, value) })
+      val traceHeaders = span.extractHeaders(toHeaders)
+      val zioHttpTraceHeaders = Headers(traceHeaders.values.map { case (header, value) =>
+        Header.Custom(header.toString, value)
+      })
       val requestWithTraceHeaders = request.updateHeaders(_ ++ zioHttpTraceHeaders)
 
       val enrichWithAttributes =
@@ -48,7 +49,6 @@ object ZioHttpClientTracer {
         makeRequest(
           tracer = tracer,
           request = request,
-//          clientConfig = clientConfig,
           toHeaders = toHeaders,
           spanNamer = spanNamer,
           errorHandler = errorHandler
@@ -66,7 +66,7 @@ object ZioHttpClientTracer {
     errorHandler: ErrorHandler = ErrorHandler.empty
   ): ZIO[Client, Throwable, Response] =
     ZIO
-      .fromEither(URL.fromString(url))
+      .fromEither(URL.decode(url))
       .flatMap(url =>
         makeRequest(
           tracer = tracer,

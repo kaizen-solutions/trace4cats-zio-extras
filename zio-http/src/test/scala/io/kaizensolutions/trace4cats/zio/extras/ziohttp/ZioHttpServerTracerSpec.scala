@@ -6,7 +6,6 @@ import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, ZTracer}
 import trace4cats.TraceProcess
 import zio.*
 import zio.http.*
-import zio.http.model.*
 import zio.test.*
 
 object ZioHttpServerTracerSpec extends ZIOSpecDefault {
@@ -20,14 +19,14 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
               Response
                 .text(sleep.toString)
                 .updateHeaders(_.addHeader("custom-header", sleep.toString))
-                .setStatus(Status.Ok)
+                .withStatus(Status.Ok)
             )
         }
       case Method.GET -> !! / "user" / userId =>
         ZIO.succeed(
           Response
             .json(s"{ 'userId': '$userId', 'name': 'Bob' }")
-            .setStatus(Status.Ok)
+            .withStatus(Status.Ok)
         )
     }
 

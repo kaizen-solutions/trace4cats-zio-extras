@@ -8,8 +8,6 @@ import trace4cats.model.SemanticAttributeKeys.*
 import trace4cats.model.{AttributeValue, SpanKind, SpanStatus}
 import zio.*
 import zio.http.*
-import zio.http.model.*
-import zio.http.model.Headers.Header
 
 object ZioHttpServerTracer {
 
@@ -163,15 +161,15 @@ object ZioHttpServerTracer {
     dropWhen: String => Boolean
   ): Chunk[(String, AttributeValue)] =
     Chunk.fromIterable(headers.collect {
-      case Header(name, value) if !dropWhen(String.valueOf(name)) =>
-        s"${`type`}.header.$name" -> AttributeValue.stringToTraceValue(String.valueOf(value))
+      case header if !dropWhen(header.headerName) =>
+        s"${`type`}.header.${header.headerName}" -> AttributeValue.stringToTraceValue(header.renderedValue)
     })
 
-  val SensitiveHeaders: Set[String] = Set(
-    HeaderNames.authorization,
-    HeaderNames.cookie,
-    HeaderNames.setCookie
-  ).map(String.valueOf(_))
+  private val SensitiveHeaders: Set[String] = Set(
+    Header.Authorization,
+    Header.Cookie,
+    Header.SetCookie
+  ).map(_.name)
 
   private def renderHttpVersion(in: Version): String = {
     val http = "HTTP"
