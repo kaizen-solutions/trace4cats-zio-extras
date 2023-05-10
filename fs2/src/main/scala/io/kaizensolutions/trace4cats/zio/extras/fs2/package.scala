@@ -44,6 +44,11 @@ package object fs2 {
     def evalMapTraced[O1](name: String, kind: SpanKind = SpanKind.Internal)(f: O => RIO[R, O1]): TracedStream[R, O1] =
       stream.evalMap(_.mapZIOTraced(name, kind)(f))
 
+    def evalMapChunkTraced[O1](name: String, kind: SpanKind = SpanKind.Internal)(
+      f: O => RIO[R, O1]
+    ): TracedStream[R, O1] =
+      stream.evalMapChunk(_.mapZIOTraced(name, kind)(f))
+
     def parEvalMapUnboundedTraced[O1](name: String, kind: SpanKind = SpanKind.Internal)(
       f: O => RIO[R, O1]
     ): TracedStream[R, O1] =
@@ -67,6 +72,11 @@ package object fs2 {
       f: O => RIO[R, O1]
     ): TracedStream[R, O1] =
       stream.evalMap(_.mapZIOWithTracer(tracer, name, kind)(f))
+
+    def evalMapChunkWithTracer[O1](tracer: ZTracer, name: String, kind: SpanKind = SpanKind.Internal)(
+      f: O => RIO[R, O1]
+    ): TracedStream[R, O1] =
+      stream.evalMapChunk(_.mapZIOWithTracer(tracer, name, kind)(f))
 
     def parEvalMapUnboundedWithTracer[O1](tracer: ZTracer, name: String, kind: SpanKind = SpanKind.Internal)(
       f: O => RIO[R, O1]
