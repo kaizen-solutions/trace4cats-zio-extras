@@ -5,7 +5,7 @@ import trace4cats.EntryPoint
 import trace4cats.kernel.{SpanCompleter, SpanSampler}
 import trace4cats.model.{CompletedSpan, TraceProcess}
 import zio.interop.catz.*
-import zio.{Chunk, FiberRef, Queue, Scope, Task, UIO, URIO}
+import zio.{Chunk, FiberRef, Queue, Scope, Task, UIO, URIO, ZEnvironment, ZLayer}
 
 class InMemorySpanCompleter(private val process: TraceProcess, private val state: Queue[CompletedSpan])
     extends SpanCompleter[Task] {
@@ -30,5 +30,16 @@ object InMemorySpanCompleter {
     FiberRef
       .make(ZSpan.noop)
       .map(ZTracer.make(_, zep))
+  }
+
+  def layer(serviceName: String) = {
+    ZLayer.scopedEnvironment[Any](
+      for {
+        z <- entryPoint(TraceProcess(serviceName))
+        (completer, entrypoint) = z
+        tracer <- toZTracer(entrypoint)
+      } yield ZEnvironment(completer, tracer)
+    )
+
   }
 }

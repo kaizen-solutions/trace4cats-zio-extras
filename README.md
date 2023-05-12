@@ -20,7 +20,8 @@ libraryDependencies ++= {
     org %% "trace4cats-zio-extras-sttp"     % "<See Latest Release on JitPack>",  // core + sttp client integration
     org %% "trace4cats-zio-extras-tapir"    % "<See Latest Release on JitPack>",  // core + tapir integration
     org %% "trace4cats-zio-extras-virgil"   % "<See Latest Release on JitPack>",  // core + virgil integration
-    org %% "trace4cats-zio-extras-fs2"      % "<See Latest Release on JitPack>"   // core + fs2-streams integration
+    org %% "trace4cats-zio-extras-fs2"      % "<See Latest Release on JitPack>",  // core + fs2-streams integration
+    org %% "trace4cats-zio-extras-doobie"   % "<See Latest Release on JitPack>"   // core + doobie integration
   )
 }
 ```
@@ -371,6 +372,13 @@ If you make a mistake, let's say you had incorrectly named your Person datatype 
 the database (let's say you did `case class Person(a: Int, age: Int, name: String)`) then you'll get more informative 
 error details in the span:
 ![image](https://user-images.githubusercontent.com/14280155/170741667-2fba1d9f-480b-418d-b0fb-140118232a9f.png)
+
+## Doobie integration
+See example in [doobie-example](doobie-examples/src/main/scala/doobie/PostgresExampleApp.scala)
+
+We trace query text and query parameters separately. This allows grouping by query
+
+![image](https://user-images.githubusercontent.com/14280155/237998798-0ebd8fc7-b985-4447-af19-89c5798d891b.png)
 
 ## Local setup
 
