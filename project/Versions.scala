@@ -12,5 +12,6 @@ object Versions {
   val tapir                    = "1.2.13"
   val sttp                     = "3.8.15"
   val virgil                   = "0.12.0"
+  val doobie                   = "1.0.0-RC2"
   val scribe                   = "3.11.1"
 }

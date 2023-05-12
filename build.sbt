@@ -76,7 +76,9 @@ lazy val root =
       tapir,
       tapirExample,
       virgil,
-      virgilExample
+      virgilExample,
+      doobie,
+      doobieExample
     )
 
 lazy val core = project
@@ -358,3 +360,26 @@ lazy val virgilExample =
         )
     )
     .dependsOn(core, virgil)
+
+lazy val doobie =
+  project
+    .in(file("doobie"))
+    .settings(kindProjectorSettings*)
+    .settings(releaseSettings*)
+    .settings(
+      libraryDependencies += "org.tpolecat" %% "doobie-core" % Versions.doobie
+    )
+    .dependsOn(core % "compile->compile;test->test")
+
+lazy val doobieExample =
+  project
+    .in(file("doobie-examples"))
+    .settings(kindProjectorSettings*)
+    .settings(releaseSettings*)
+    .settings(
+      libraryDependencies ++= Seq(
+        "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
+        "org.tpolecat"     %% "doobie-postgres"                   % Versions.doobie
+      )
+    )
+    .dependsOn(core, doobie)
