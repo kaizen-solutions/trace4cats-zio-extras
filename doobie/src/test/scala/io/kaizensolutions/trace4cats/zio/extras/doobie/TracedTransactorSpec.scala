@@ -55,7 +55,6 @@ object TracedTransactorSpec extends ZIOSpecDefault{
       for {
         _ <- ZIO.serviceWithZIO[Transactor[Task]](xa => q.transact(xa))
         spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
-        _ <- ZIO.debug("spans: " + spans.map(_.attributes.view.mapValues(_.value.value).toMap))
       } yield assertTrue(
         spans.exists(span =>
           span.name == "SELECT ?, ?" &&
