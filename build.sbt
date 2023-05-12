@@ -367,7 +367,12 @@ lazy val doobie =
     .settings(kindProjectorSettings*)
     .settings(releaseSettings*)
     .settings(
-      libraryDependencies += "org.tpolecat" %% "doobie-core" % Versions.doobie
+      libraryDependencies ++=
+        Seq(
+          "org.tpolecat" %% "doobie-core"     % Versions.doobie,
+          "org.tpolecat" %% "doobie-postgres" % Versions.doobie % Test,
+          "io.zonky.test" % "embedded-postgres" % "2.0.3" % Test
+        )
     )
     .dependsOn(core % "compile->compile;test->test")
 
