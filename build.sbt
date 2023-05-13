@@ -388,3 +388,28 @@ lazy val doobieExample =
       )
     )
     .dependsOn(core, doobie)
+
+lazy val skunk =
+  project
+    .in(file("skunk"))
+    .settings(kindProjectorSettings*)
+    .settings(releaseSettings*)
+    .settings(
+      libraryDependencies += "org.tpolecat" %% "skunk-core" % Versions.skunk
+    )
+    .dependsOn(
+      core % "compile->compile;test->test",
+      fs2
+    )
+
+lazy val skunkExample =
+  project
+    .in(file("skunk-examples"))
+    .settings(kindProjectorSettings*)
+    .settings(releaseSettings*)
+    .settings(
+      libraryDependencies ++= Seq(
+        "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter
+      )
+    )
+    .dependsOn(skunk)
