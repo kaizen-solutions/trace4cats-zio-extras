@@ -14,5 +14,6 @@ object Versions {
   val virgil                   = "0.12.0"
   val doobie                   = "1.0.0-RC2"
   val skunk                    = "0.6.0-RC2"
+  val embeddedPostgres         = "2.0.3"
   val scribe                   = "3.11.1"
 }

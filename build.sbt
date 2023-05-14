@@ -78,7 +78,9 @@ lazy val root =
       virgil,
       virgilExample,
       doobie,
-      doobieExample
+      doobieExample,
+      skunk,
+      skunkExample
     )
 
 lazy val core = project
@@ -369,9 +371,9 @@ lazy val doobie =
     .settings(
       libraryDependencies ++=
         Seq(
-          "org.tpolecat" %% "doobie-core"     % Versions.doobie,
-          "org.tpolecat" %% "doobie-postgres" % Versions.doobie % Test,
-          "io.zonky.test" % "embedded-postgres" % "2.0.3" % Test
+          "org.tpolecat" %% "doobie-core"       % Versions.doobie,
+          "org.tpolecat" %% "doobie-postgres"   % Versions.doobie           % Test,
+          "io.zonky.test" % "embedded-postgres" % Versions.embeddedPostgres % Test
         )
     )
     .dependsOn(core % "compile->compile;test->test")
@@ -395,7 +397,11 @@ lazy val skunk =
     .settings(kindProjectorSettings*)
     .settings(releaseSettings*)
     .settings(
-      libraryDependencies += "org.tpolecat" %% "skunk-core" % Versions.skunk
+      libraryDependencies ++=
+        Seq(
+          "org.tpolecat" %% "skunk-core"        % Versions.skunk,
+          "io.zonky.test" % "embedded-postgres" % Versions.embeddedPostgres % Test
+        )
     )
     .dependsOn(
       core % "compile->compile;test->test",
