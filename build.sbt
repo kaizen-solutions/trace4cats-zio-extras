@@ -222,7 +222,7 @@ lazy val http4sExample =
           http4s     %% "http4s-ember-client"               % Versions.http4s,
           trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter
         )
-      }
+      },
     )
     .dependsOn(http4s)
 
@@ -325,7 +325,8 @@ lazy val tapirExample =
           "com.softwaremill.sttp.tapir" %% "tapir-json-circe"                  % Versions.tapir,
           "com.softwaremill.sttp.tapir" %% "tapir-http4s-server"               % Versions.tapir,
           "org.http4s"                  %% "http4s-ember-server"               % Versions.http4s
-        )
+        ),
+      publish / skip := true
     )
     .dependsOn(tapir)
 
@@ -357,7 +358,8 @@ lazy val virgilExample =
         Seq(
           "io.janstenpickle"                   %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
           "com.github.kaizen-solutions.virgil" %% "virgil"                            % Versions.virgil
-        )
+        ),
+      publish / skip := true
     )
     .dependsOn(core, virgil)
 
@@ -367,6 +369,9 @@ lazy val doobie =
     .settings(kindProjectorSettings*)
     .settings(releaseSettings*)
     .settings(
+      name := "trace4cats-zio-extras-doobie",
+      organization := "io.kaizen-solutions",
+      organizationName := "kaizen-solutions",
       libraryDependencies ++=
         Seq(
           "org.tpolecat" %% "doobie-core"     % Versions.doobie,
@@ -384,7 +389,8 @@ lazy val doobieExample =
     .settings(
       libraryDependencies ++= Seq(
         "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
-        "org.tpolecat"     %% "doobie-postgres"                   % Versions.doobie
-      )
+        "org.tpolecat"     %% "doobie-postgres"                   % Versions.doobie,
+      ),
+      publish / skip := true
     )
     .dependsOn(core, doobie)

@@ -1,3 +1,5 @@
+jdk:
+  - openjdk11
 install:
   - sbt +clean
   - sbt +publishM2
