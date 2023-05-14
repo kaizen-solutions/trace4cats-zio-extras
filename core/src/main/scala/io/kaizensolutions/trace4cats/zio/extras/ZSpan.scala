@@ -50,5 +50,5 @@ final class ZSpan(private val underlying: Span[Task]) extends AnyVal {
 }
 object ZSpan {
   def make(underlying: Span[Task]): ZSpan = new ZSpan(underlying)
-  def noop: ZSpan = new ZSpan(Span.noopInstance[Task])
+  def noop: ZSpan                         = new ZSpan(Span.noopInstance[Task])
 }

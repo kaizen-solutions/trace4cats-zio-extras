@@ -19,10 +19,13 @@ object TracedSessionSpec extends ZIOSpecDefault {
           for {
             take    <- ZIO.service[TakeSession]
             session <- take.access
-            param   <- session.parameters.get
+            _       <- session.parameters.get
             sc      <- ZIO.service[InMemorySpanCompleter]
             spans   <- sc.retrieveCollected
-          } yield assertTrue(spans.length == 1, spans.exists(_.name == "skunk.parameters.get"))
+          } yield assertTrue(
+              spans.length == 1, 
+              spans.exists(_.name == "skunk.parameters.get")
+            )
         }
       } +
         test("parameter") {
@@ -30,10 +33,13 @@ object TracedSessionSpec extends ZIOSpecDefault {
             for {
               take    <- ZIO.service[TakeSession]
               session <- take.access
-              param   <- session.parameter("server_version").head.compile.last
+              _       <- session.parameter("server_version").head.compile.last
               sc      <- ZIO.service[InMemorySpanCompleter]
               spans   <- sc.retrieveCollected
-            } yield assertTrue(spans.length == 1, spans.exists(_.name == "skunk.parameter.server_version"))
+            } yield assertTrue(
+                spans.length == 1, 
+                spans.exists(_.name == "skunk.parameter.server_version")
+              )
           }
         } +
         test("transactionStatus") {
@@ -41,10 +47,13 @@ object TracedSessionSpec extends ZIOSpecDefault {
             for {
               take    <- ZIO.service[TakeSession]
               session <- take.access
-              status  <- session.transactionStatus.get
+              _       <- session.transactionStatus.get
               sc      <- ZIO.service[InMemorySpanCompleter]
               spans   <- sc.retrieveCollected
-            } yield assertTrue(spans.length == 1, spans.exists(_.name == "skunk.transactionStatus.get"))
+            } yield assertTrue(
+                spans.length == 1, 
+                spans.exists(_.name == "skunk.transactionStatus.get")
+              )
           }
         } +
         test("execute") {
@@ -53,7 +62,7 @@ object TracedSessionSpec extends ZIOSpecDefault {
               take    <- ZIO.service[TakeSession]
               session <- take.access
               createTable = sql"CREATE TABLE abc (name varchar primary key)".command
-              status  <- session.execute(createTable)
+              _       <- session.execute(createTable)
               sc      <- ZIO.service[InMemorySpanCompleter]
               spans   <- sc.retrieveCollected
             } yield assertTrue(spans.length == 1, spans.exists(_.name == createTable.sql))
@@ -65,7 +74,7 @@ object TracedSessionSpec extends ZIOSpecDefault {
               take    <- ZIO.service[TakeSession]
               session <- take.access
               query = sql"SELECT 42".query(int4)
-              status  <- session.unique(query)
+              _       <- session.unique(query)
               sc      <- ZIO.service[InMemorySpanCompleter]
               spans   <- sc.retrieveCollected
             } yield assertTrue(spans.length == 1, spans.exists(_.name == query.sql))
@@ -77,7 +86,7 @@ object TracedSessionSpec extends ZIOSpecDefault {
               take    <- ZIO.service[TakeSession]
               session <- take.access
               query = sql"select schemaname, relname from pg_stat_sys_tables limit 0".query(name ~ name)
-              result  <- session.option(query)
+              _       <- session.option(query)
               sc      <- ZIO.service[InMemorySpanCompleter]
               spans   <- sc.retrieveCollected
             } yield assertTrue(spans.length == 1, spans.exists(_.name == query.sql))
@@ -89,7 +98,7 @@ object TracedSessionSpec extends ZIOSpecDefault {
               take    <- ZIO.service[TakeSession]
               session <- take.access
               query = sql"select schemaname, relname from pg_stat_sys_tables".query(name ~ name)
-              result  <- session.stream(query)(args = skunk.Void, chunkSize = 128).compile.drain
+              _ <- session.stream(query)(args = skunk.Void, chunkSize = 128).compile.drain
               sc      <- ZIO.service[InMemorySpanCompleter]
               spans   <- sc.retrieveCollected
             } yield assertTrue(spans.length == 1, spans.exists(_.name == query.sql))
@@ -101,8 +110,8 @@ object TracedSessionSpec extends ZIOSpecDefault {
               take    <- ZIO.service[TakeSession]
               session <- take.access
               query = sql"select schemaname, relname from pg_stat_sys_tables".query(name ~ name)
-              preparedQuery <- session.prepare(query)
-              result  <- preparedQuery.stream(args = skunk.Void, chunkSize = 128).compile.drain
+              pq      <- session.prepare(query)
+              _       <- pq.stream(args = skunk.Void, chunkSize = 128).compile.drain
               sc      <- ZIO.service[InMemorySpanCompleter]
               spans   <- sc.retrieveCollected
             } yield assertTrue(spans.length == 1, spans.exists(_.name == query.sql), spans.exists(_.attributes.contains("prepared")))
