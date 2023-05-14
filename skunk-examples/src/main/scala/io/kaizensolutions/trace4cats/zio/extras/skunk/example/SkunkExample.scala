@@ -6,6 +6,7 @@ import fs2.Stream
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.skunk.TracedSession
 import io.kaizensolutions.trace4cats.zio.extras.skunk.example.Skunk.AccessSession
+import org.typelevel.twiddles
 import skunk.*
 import skunk.codec.all.*
 import skunk.syntax.all.*
@@ -14,7 +15,7 @@ import zio.interop.catz.*
 
 object SkunkExample extends ZIOAppDefault {
   // Note: this is just done to illustrate tracing a cursor, just use `pq.stream` normally
-  private def cursorBasedStream(pq: PreparedQuery[Task, (Int, Int), City]): Stream[Task, City] =
+  private def cursorBasedStream(pq: PreparedQuery[Task, Int *: Int *: EmptyTuple, City]): Stream[Task, City] =
     Stream
       .resource(pq.cursor(args = (1810, 1830)))
       .flatMap(cursor => Stream.repeatEval(cursor.fetch(1)).takeThrough { case (_, more) => more })
@@ -79,18 +80,18 @@ object Skunk {
 
 final case class City(id: Int, name: String, countryCode: String, district: String, population: Int)
 object City {
+  private val twiddleIsoCity = twiddles.Iso.product[City]
+
   private val underlying = int4 *: varchar *: bpchar(3) *: varchar *: int4
-  val skunkDecoder: Decoder[City] =
-    underlying.map { case id *: name *: countryCode *: district *: population *: EmptyTuple =>
-      City(id, name, countryCode, district, population)
-    }
 
-  val skunkEncoder: Encoder[City] =
-    underlying.contramap { case City(id, name, countryCode, district, population) =>
-      id *: name *: countryCode *: district *: population *: EmptyTuple
-    }
+  val skunkDecoder: Decoder[City] = underlying.map(twiddleIsoCity.from)
 
-  def selectAllCities: Query[(Int, Int), City] =
+  val skunkEncoder: Encoder[City] = underlying.contramap(twiddleIsoCity.to)
+
+  // Alternatively, via the twiddles library (see Iso.productInstance)
+  // val skunkCodec: Codec[City] = underlying.to[City]
+
+  def selectAllCities: Query[Int *: Int *: EmptyTuple, City] =
     sql"SELECT id, name, countrycode, district, population from city  where id > $int4 and id < $int4"
       .query(City.skunkDecoder)
 }
