@@ -384,7 +384,7 @@ We trace query text and query parameters separately. This allows grouping by que
 ## Skunk integraton
 See example in [skunk-example](skunk-examples/src/main/scala/io/kaizensolutions/trace4cats/zio/extras/skunk/example/SkunkExample.scala)
 
-We trace every almost every single method (except Describe and Parse Cache) provided by `skunk.Session`. 
+We trace every single method (except Describe and Parse Cache) provided by `skunk.Session`. 
 
 Here is an example of how cursors are traced
 ![example](https://github.com/kaizen-solutions/trace4cats-zio-extras/assets/14280155/e21a18af-4b05-47c4-b5d2-6721addd379d)
