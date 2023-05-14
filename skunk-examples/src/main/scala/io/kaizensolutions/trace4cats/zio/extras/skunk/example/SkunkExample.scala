@@ -2,6 +2,7 @@ package io.kaizensolutions.trace4cats.zio.extras.skunk.example
 
 import cats.effect.kernel.Resource
 import fs2.io.net.Network
+import fs2.Stream
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.skunk.TracedSession
 import io.kaizensolutions.trace4cats.zio.extras.skunk.example.Skunk.AccessSession
@@ -12,13 +13,25 @@ import zio.*
 import zio.interop.catz.*
 
 object SkunkExample extends ZIOAppDefault {
+  // Note: this is just done to illustrate tracing a cursor, just use `pq.stream` normally
+  private def cursorBasedStream(pq: PreparedQuery[Task, (Int, Int), City]): Stream[Task, City] =
+    Stream
+      .resource(pq.cursor(args = (1810, 1830)))
+      .flatMap(cursor => Stream.repeatEval(cursor.fetch(1)).takeThrough { case (_, more) => more })
+      .flatMap { case (result, _) => Stream.iterable(result) }
+
   override def run: ZIO[ZIOAppArgs & Scope, Any, Any] = {
     val program: ZIO[AccessSession, Throwable, Unit] =
       ZIO.scoped {
         for {
-          as      <- ZIO.service[AccessSession]
-          session <- as.access
-          _       <- session.stream(City.selectAllCities)(args = (1810, 1830), chunkSize = 4).debug().compile.drain
+          as       <- ZIO.service[AccessSession]
+          sessionA <- as.access
+          sessionB <- as.access
+          _         = println(sessionA)
+          _         = println(sessionB)
+          pq       <- sessionA.prepare(City.selectAllCities)
+          _        <- pq.stream(args = (1810, 1830), chunkSize = 4).debug().compile.drain
+          _        <- cursorBasedStream(pq).debug().compile.drain
         } yield ()
       }
 

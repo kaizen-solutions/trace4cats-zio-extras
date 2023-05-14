@@ -1,14 +1,15 @@
 package io.kaizensolutions.trace4cats.zio.extras.skunk
 
-import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import cats.effect.Resource
 import cats.effect.kernel.Resource.ExitCase
+import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import fs2.*
 import fs2.concurrent.Signal
 import skunk.*
 import skunk.data.*
 import skunk.net.protocol.{Describe, Parse}
 import skunk.util.*
+import trace4cats.TraceHeaders
 import trace4cats.kernel.ToHeaders
 import trace4cats.model.{AttributeValue, SpanStatus}
 import zio.*
@@ -122,26 +123,10 @@ final class TracedSession(underlying: Session[Task], tracer: ZTracer) extends Se
     underlying
       .cursor(query)(args)
       .evalMap(underlyingCursor =>
-        tracer
-          .withSpan(query.sql)(span =>
-            Ref.make(0).map { timesPulled =>
-              new Cursor[Task, B] {
-                // NOTE: we have no guarantees that the outer span remains opened so we use TraceHeaders to propagate the context
-                private val headers = span.extractHeaders(ToHeaders.standard)
-
-                private def cursorSpan(fn: ZSpan => Task[(List[B], Boolean)]): Task[(List[B], Boolean)] =
-                  tracer.fromHeaders(headers, s"skunk.cursor.fetch")(fn)
-
-                private val updateTimesPulled = timesPulled.updateAndGet(_ + 1)
-
-                override def fetch(maxRows: Int): Task[(List[B], Boolean)] =
-                  cursorSpan { span =>
-                    updateTimesPulled.flatMap(nr => span.put("times.pulled", nr)) *>
-                      underlyingCursor.fetch(maxRows)
-                  }
-              }
-            }
-          )
+        tracer.withSpan(query.sql)(span =>
+          enrichSpan(query, args, span, methodName = "cursor") *>
+            tracedCursor(underlyingCursor, span.extractHeaders(ToHeaders.standard))
+        )
       )
 
   override def execute(command: Command[Void]): Task[Completion] =
@@ -155,13 +140,61 @@ final class TracedSession(underlying: Session[Task], tracer: ZTracer) extends Se
           .onError(e => span.setStatus(SpanStatus.Internal(e.squash.getMessage)))
     )
 
-  // TODO: Trace PreparedQuery
   override def prepare[A, B](query: Query[A, B]): Task[PreparedQuery[Task, A, B]] =
-    tracer.withSpan(query.sql)(span => span.put("prepare.query", true) *> underlying.prepare(query))
+    underlying
+      .prepare(query)
+      .map(pq =>
+        new PreparedQuery[Task, A, B] {
+          override def cursor(args: A)(implicit or: Origin): Resource[Task, Cursor[Task, B]] =
+            pq.cursor(args)
+              .evalMap(cursor =>
+                tracer.withSpan(query.sql) { span =>
+                  enrichSpan(query, args, span, methodName = "cursor", prepared = true) *>
+                    tracedCursor(cursor, span.extractHeaders(ToHeaders.standard))
+                }
+              )
 
-  // TODO: Trace PreparedCommand
+          override def stream(args: A, chunkSize: Int)(implicit or: Origin): Stream[Task, B] =
+            Stream.force(
+              tracer.withSpan(query.sql) { span =>
+                enrichSpan(query, args, span, methodName = "stream", prepared = true) *>
+                  ZIO.succeed(
+                    pq.stream(args, chunkSize).onFinalizeCaseWeak {
+                      case ExitCase.Succeeded  => ZIO.unit
+                      case ExitCase.Errored(e) => span.setStatus(SpanStatus.Internal(e.getMessage))
+                      case ExitCase.Canceled   => span.setStatus(SpanStatus.Cancelled)
+                    }
+                  )
+              }
+            )
+
+          override def option(args: A)(implicit or: Origin): Task[Option[B]] =
+            tracer.withSpan(query.sql) { span =>
+              enrichSpan(query, args, span, methodName = "option", prepared = true) *>
+                pq.option(args).onError(e => span.setStatus(SpanStatus.Internal(e.squash.getMessage)))
+            }
+
+          override def unique(args: A)(implicit or: Origin): Task[B] =
+            tracer.withSpan(query.sql)(span =>
+              enrichSpan(query, args, span, "unique") *>
+                pq.unique(args).onError(e => span.setStatus(SpanStatus.Internal(e.squash.getMessage)))
+            )
+        }
+      )
+
   override def prepare[A](command: Command[A]): Task[PreparedCommand[Task, A]] =
-    tracer.withSpan(command.sql)(span => span.put("prepare.command", true) *> underlying.prepare(command))
+    underlying
+      .prepare(command)
+      .map(pc =>
+        new PreparedCommand[Task, A] {
+          override def execute(args: A)(implicit origin: Origin): Task[Completion] = {
+            tracer.withSpan(command.sql) { span =>
+              enrichSpan(command, args, span, methodName = "execute", prepared = true) *>
+                pc.execute(args).onError(e => span.setStatus(SpanStatus.Internal(e.squash.getMessage)))
+            }
+          }
+        }
+      )
 
   override def pipe[A](command: Command[A]): Pipe[Task, A, Completion] = {
     val pipe = underlying.pipe(command)
@@ -273,6 +306,23 @@ final class TracedSession(underlying: Session[Task], tracer: ZTracer) extends Se
   override def parseCache: Parse.Cache[Task] =
     underlying.parseCache
 
+  // Note: We use TraceHeaders because the parent's span is already closed by the time we get here so we can't use the span directly
+  private def tracedCursor[B](underlyingCursor: Cursor[Task, B], parent: TraceHeaders): UIO[Cursor[Task, B]] =
+    Ref.make(0).map { timesPulled =>
+      new Cursor[Task, B] {
+        // capture the parents headers so all spans appear underneath it
+        private def withSpan[A](name: String)(fn: ZSpan => Task[A]): Task[A] = tracer.fromHeaders(parent, name)(fn)
+
+        private val updateTimesPulled = timesPulled.updateAndGet(_ + 1)
+
+        override def fetch(maxRows: Int): Task[(List[B], Boolean)] =
+          withSpan("skunk.cursor.fetch") { span =>
+            updateTimesPulled.flatMap(nr => span.put("times.pulled", nr)) *>
+              underlyingCursor.fetch(maxRows)
+          }
+      }
+    }
+
   private def tracedTransaction(tx: Transaction[Task]): Transaction[Task] =
     new Transaction[Task] {
       override type Savepoint = tx.Savepoint
@@ -297,7 +347,13 @@ final class TracedSession(underlying: Session[Task], tracer: ZTracer) extends Se
       override def commit(implicit o: Origin): Task[Completion] = tx.commit
     }
 
-  private def enrichSpan[A](statement: Statement[A], value: A, span: ZSpan, methodName: String): UIO[Unit] =
+  private def enrichSpan[A](
+    statement: Statement[A],
+    value: A,
+    span: ZSpan,
+    methodName: String,
+    prepared: Boolean = false
+  ): UIO[Unit] =
     ZIO
       .when(span.isSampled) {
         val values = statement.encoder.encode(value)
@@ -314,6 +370,7 @@ final class TracedSession(underlying: Session[Task], tracer: ZTracer) extends Se
         }
 
         builder += (("skunk.method", AttributeValue.StringValue(methodName)))
+        builder += (("prepared", AttributeValue.BooleanValue(prepared)))
 
         span.putAll(builder.result())
       }
