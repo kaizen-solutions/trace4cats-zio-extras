@@ -3,6 +3,9 @@ target/
 .swp
 local.*
 .bsb/
-.bsp
+.bsp/
+.bloop/
 .java-version
 **/.DS_store
+project/.bloop/
+project/metals.sbt
