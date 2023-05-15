@@ -403,6 +403,9 @@ lazy val skunk =
     .settings(kindProjectorSettings*)
     .settings(releaseSettings*)
     .settings(
+      name             := "trace4cats-zio-extras-skunk",
+      organization     := "io.kaizen-solutions",
+      organizationName := "kaizen-solutions",
       libraryDependencies ++=
         Seq(
           "org.tpolecat" %% "skunk-core"        % Versions.skunk,
