@@ -1,1 +1,1 @@
-ThisBuild / version := "5.7.0-zio2"
+ThisBuild / version := "5.7.1-SNAPSHOT"
