@@ -21,7 +21,8 @@ libraryDependencies ++= {
     org %% "trace4cats-zio-extras-tapir"    % "<See Latest Release on JitPack>",  // core + tapir integration
     org %% "trace4cats-zio-extras-virgil"   % "<See Latest Release on JitPack>",  // core + virgil integration
     org %% "trace4cats-zio-extras-fs2"      % "<See Latest Release on JitPack>",  // core + fs2-streams integration
-    org %% "trace4cats-zio-extras-doobie"   % "<See Latest Release on JitPack>"   // core + doobie integration
+    org %% "trace4cats-zio-extras-doobie"   % "<See Latest Release on JitPack>",  // core + doobie integration
+    org %% "trace4cats-zio-extras-skunk"    % "<See Latest Release on JitPack>"   // core + fs2 + skunk integration
   )
 }
 ```
@@ -379,6 +380,14 @@ See example in [doobie-example](doobie-examples/src/main/scala/doobie/PostgresEx
 We trace query text and query parameters separately. This allows grouping by query
 
 ![image](https://user-images.githubusercontent.com/14280155/237998798-0ebd8fc7-b985-4447-af19-89c5798d891b.png)
+
+## Skunk integraton
+See example in [skunk-example](skunk-examples/src/main/scala/io/kaizensolutions/trace4cats/zio/extras/skunk/example/SkunkExample.scala)
+
+We trace every single method (except Describe and Parse Cache) provided by `skunk.Session`. 
+
+Here is an example of how cursors are traced
+![example](https://github.com/kaizen-solutions/trace4cats-zio-extras/assets/14280155/e21a18af-4b05-47c4-b5d2-6721addd379d)
 
 ## Local setup
 

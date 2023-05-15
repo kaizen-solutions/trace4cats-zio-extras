@@ -78,7 +78,9 @@ lazy val root =
       virgil,
       virgilExample,
       doobie,
-      doobieExample
+      doobieExample,
+      skunk,
+      skunkExample
     )
 
 lazy val core = project
@@ -374,9 +376,9 @@ lazy val doobie =
       organizationName := "kaizen-solutions",
       libraryDependencies ++=
         Seq(
-          "org.tpolecat" %% "doobie-core"     % Versions.doobie,
-          "org.tpolecat" %% "doobie-postgres" % Versions.doobie % Test,
-          "io.zonky.test" % "embedded-postgres" % "2.0.3" % Test
+          "org.tpolecat" %% "doobie-core"       % Versions.doobie,
+          "org.tpolecat" %% "doobie-postgres"   % Versions.doobie           % Test,
+          "io.zonky.test" % "embedded-postgres" % Versions.embeddedPostgres % Test
         )
     )
     .dependsOn(core % "compile->compile;test->test")
@@ -394,3 +396,32 @@ lazy val doobieExample =
       publish / skip := true
     )
     .dependsOn(core, doobie)
+
+lazy val skunk =
+  project
+    .in(file("skunk"))
+    .settings(kindProjectorSettings*)
+    .settings(releaseSettings*)
+    .settings(
+      libraryDependencies ++=
+        Seq(
+          "org.tpolecat" %% "skunk-core"        % Versions.skunk,
+          "io.zonky.test" % "embedded-postgres" % Versions.embeddedPostgres % Test
+        )
+    )
+    .dependsOn(
+      core % "compile->compile;test->test",
+      fs2
+    )
+
+lazy val skunkExample =
+  project
+    .in(file("skunk-examples"))
+    .settings(kindProjectorSettings*)
+    .settings(releaseSettings*)
+    .settings(
+      libraryDependencies ++= Seq(
+        "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter
+      )
+    )
+    .dependsOn(skunk)

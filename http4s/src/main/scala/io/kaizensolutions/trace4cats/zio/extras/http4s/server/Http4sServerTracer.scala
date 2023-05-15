@@ -2,13 +2,7 @@ package io.kaizensolutions.trace4cats.zio.extras.http4s.server
 
 import cats.data.{Kleisli, OptionT}
 import trace4cats.ErrorHandler
-import trace4cats.http4s.common.{
-  Http4sHeaders,
-  Http4sSpanNamer,
-  Http4sStatusMapping,
-  Request_,
-  Response_
-}
+import trace4cats.http4s.common.{Http4sHeaders, Http4sSpanNamer, Http4sStatusMapping, Request_, Response_}
 import trace4cats.model.{AttributeValue, SampleDecision, SpanKind, SpanStatus}
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import org.http4s.{Headers, HttpApp, HttpRoutes, Request, Response}
