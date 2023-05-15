@@ -1,5 +1,6 @@
 package io.kaizensolutions.http4s.examples
 
+import fs2.io.net.Network
 import trace4cats.model.TraceProcess
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.http4s.client.Http4sClientTracer
@@ -16,6 +17,9 @@ import zio.interop.catz.*
  */
 object ExampleClientApp extends ZIOAppDefault {
   type ClientEffect[A] = RIO[ZTracer, A]
+
+  implicit val fs2NetworkForClientEffect: Network[ClientEffect] = Network.forAsync[ClientEffect]
+
   val tracedClient: ZIO[ZTracer & Scope, Throwable, Client[ClientEffect]] =
     for {
       // NOTE: Blocking is necessary to materialize the typeclass instances needed but is not actually used

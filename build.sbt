@@ -224,7 +224,7 @@ lazy val http4sExample =
           http4s     %% "http4s-ember-client"               % Versions.http4s,
           trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter
         )
-      },
+      }
     )
     .dependsOn(http4s)
 
@@ -260,9 +260,9 @@ lazy val zioHttpExample =
         val trace4cats = "io.janstenpickle"
         Seq(
           trace4cats      %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
-          "dev.zio"       %% "zio-logging-slf4j"                 % "2.1.11",
-          "dev.zio"       %% "zio-logging-slf4j-bridge"          % "2.1.11",
-          "ch.qos.logback" % "logback-classic"                   % "1.4.6"
+          "dev.zio"       %% "zio-logging-slf4j"                 % "2.1.12",
+          "dev.zio"       %% "zio-logging-slf4j-bridge"          % "2.1.12",
+          "ch.qos.logback" % "logback-classic"                   % "1.4.7"
         )
       }
     )
@@ -371,8 +371,8 @@ lazy val doobie =
     .settings(kindProjectorSettings*)
     .settings(releaseSettings*)
     .settings(
-      name := "trace4cats-zio-extras-doobie",
-      organization := "io.kaizen-solutions",
+      name             := "trace4cats-zio-extras-doobie",
+      organization     := "io.kaizen-solutions",
       organizationName := "kaizen-solutions",
       libraryDependencies ++=
         Seq(
@@ -391,7 +391,7 @@ lazy val doobieExample =
     .settings(
       libraryDependencies ++= Seq(
         "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
-        "org.tpolecat"     %% "doobie-postgres"                   % Versions.doobie,
+        "org.tpolecat"     %% "doobie-postgres"                   % Versions.doobie
       ),
       publish / skip := true
     )

@@ -1,6 +1,7 @@
 package io.kaizensolutions.trace4cats.zio.extras.tapir.examples
 
 import com.comcast.ip4s.{Host, Port}
+import fs2.io.net.Network
 import io.circe.Codec as CirceCodec
 import io.circe.generic.semiauto.deriveCodec
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
@@ -17,6 +18,7 @@ import zio.interop.catz.*
 import java.nio.charset.Charset
 
 object ExampleServerApp extends ZIOAppDefault {
+  implicit val fs2NetworkForTask: Network[Task] = Network.forAsync[Task]
   def countCharacters(tracer: ZTracer)(in: Request): UIO[Either[NoCharacters, Int]] = {
     val l = in.input.length
     val out = tracer.spanSource() {
