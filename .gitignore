@@ -5,6 +5,7 @@ local.*
 .bsb/
 .bsp/
 .bloop/
+.metals/
 .java-version
 **/.DS_store
 project/.bloop/
