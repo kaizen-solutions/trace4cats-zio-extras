@@ -56,6 +56,16 @@ def releaseSettings: Seq[Def.Setting[_]] =
     releaseIgnoreUntrackedFiles := true
   )
 
+def mkModule(projectName: String) =
+  Project(projectName, file(projectName))
+    .settings(kindProjectorSettings*)
+    .settings(releaseSettings*)
+    .settings(
+      name             := s"trace4cats-zio-extras-$projectName",
+      organization     := "io.kaizen-solutions",
+      organizationName := "kaizen-solutions",
+    )
+
 lazy val root =
   project
     .in(file("."))
@@ -80,7 +90,9 @@ lazy val root =
       doobie,
       doobieExample,
       skunk,
-      skunkExample
+      skunkExample,
+      zioKafka,
+      zioKafkaExamples
     )
 
 lazy val core = project
@@ -428,3 +440,26 @@ lazy val skunkExample =
       )
     )
     .dependsOn(skunk)
+
+lazy val zioKafka =
+  mkModule("zio-kafka")
+    .settings(
+      libraryDependencies ++= Seq(
+        "dev.zio" %% "zio-kafka" % Versions.zioKafka
+      )
+    )
+    .dependsOn(
+      core % "compile->compile;test->test"
+    )
+
+lazy val zioKafkaExamples = {
+  mkModule("zio-kafka-examples")
+    .settings(
+      libraryDependencies ++= Seq(
+        "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter
+      )
+    )
+    .dependsOn(
+      zioKafka
+    )
+}

@@ -34,14 +34,19 @@ package object extras {
 
   implicit class ZTracerStreamSpannedOps[-R, +E, +A](val s: ZStream[R, E, Spanned[A]]) extends AnyVal {
     def mapThrough[B](f: A => B): ZStream[R, E, Spanned[B]] =
-      s.map(_.map(f))
+      s.mapChunks(_.map(_.map(f)))
 
-    def mapMTraced[R1 <: R, E1 >: E, B](name: String, kind: SpanKind = SpanKind.Internal)(
+    def mapZIOTraced[R1 <: R, E1 >: E, B](name: String, kind: SpanKind = SpanKind.Internal)(
       f: A => ZIO[R1, E1, B]
     ): ZStream[R1 & ZTracer, E1, Spanned[B]] =
-      s.mapZIO(_.mapZIOTraced(name, kind)(f))
+      s.mapChunksZIO(c => ZIO.foreach(c)(_.mapZIOTraced(name, kind)(f)))
 
-    def mapMParTraced[R1 <: R, E1 >: E, B](name: String, kind: SpanKind = SpanKind.Internal)(n: Int)(
+    def mapZIOWithTracer[R1 <: R, E1 >: E, B](tracer: ZTracer, name: String, kind: SpanKind = SpanKind.Internal)(
+      f: A => ZIO[R1, E1, B]
+    ): ZStream[R1, E1, Spanned[B]] =
+      s.mapChunksZIO(c => ZIO.foreach(c)(_.mapZIOWithTracer(tracer, name, kind)(f)))
+
+    def mapZIOParTraced[R1 <: R, E1 >: E, B](name: String, kind: SpanKind = SpanKind.Internal)(n: Int)(
       f: A => ZIO[R1, E1, B]
     ): ZStream[R1 & ZTracer, E1, Spanned[B]] =
       s.mapZIOPar[R1 & ZTracer, E1, Spanned[B]](n)(_.mapZIOTraced(name, kind)(f))
@@ -51,7 +56,10 @@ package object extras {
     ): ZStream[R1 & ZTracer, E1, Spanned[B]] =
       s.mapZIOParUnordered[R1 & ZTracer, E1, Spanned[B]](n)(_.mapZIOTraced(name, kind)(f))
 
-    def endTracingEachElement: ZStream[R, E, (A, TraceHeaders)] =
+    def endTracingEachElementKeepHeaders: ZStream[R, E, (A, TraceHeaders)] =
       s.mapChunks(_.map(s => (s.value, s.headers)))
+
+    def endTracingEachElement: ZStream[R, E, A] =
+      s.mapChunks(_.map(s => s.value))
   }
 }
