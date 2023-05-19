@@ -118,9 +118,9 @@ object TracedSessionSpec extends ZIOSpecDefault {
           }
         }
     )
-      .provideShared(Database.live, InMemorySpanCompleter.layer("skunk-test"))
-      @@ TestAspect.sequential
-      @@ TestAspect.ignore // TODO: Fix flaky test
+      .provideShared(Database.live, InMemorySpanCompleter.layer("skunk-test")) @@
+      TestAspect.sequential @@
+      TestAspect.ignore // TODO: Fix flaky test
 //      @@ TestAspect.flaky
 }
 object Database {
