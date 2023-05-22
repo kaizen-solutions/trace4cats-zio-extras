@@ -27,7 +27,7 @@ object KafkaProducerTracer {
       keySerializer: Serializer[R, K],
       valueSerializer: Serializer[R, V]
     ): RIO[R, RecordMetadata] =
-      underlying.produce(record, keySerializer, valueSerializer)
+      produceChunkAsync(Chunk.single(record), keySerializer, valueSerializer).flatten.map(_.head)
 
     def produce[R, K, V](
       topic: String,
@@ -36,7 +36,7 @@ object KafkaProducerTracer {
       keySerializer: Serializer[R, K],
       valueSerializer: Serializer[R, V]
     ): RIO[R, RecordMetadata] =
-      underlying.produce(topic, key, value, keySerializer, valueSerializer)
+      produce(new ProducerRecord(topic, key, value), keySerializer, valueSerializer)
 
     def produceAsync[R, K, V](
       record: ProducerRecord[K, V],
@@ -52,7 +52,7 @@ object KafkaProducerTracer {
       keySerializer: Serializer[R, K],
       valueSerializer: Serializer[R, V]
     ): RIO[R, Task[RecordMetadata]] =
-      underlying.produceAsync(topic, key, value, keySerializer, valueSerializer)
+      produceAsync(new ProducerRecord(topic, key, value), keySerializer, valueSerializer)
 
     def produceChunkAsync[R, K, V](
       records: Chunk[ProducerRecord[K, V]],
@@ -66,7 +66,7 @@ object KafkaProducerTracer {
       keySerializer: Serializer[R, K],
       valueSerializer: Serializer[R, V]
     ): RIO[R, Chunk[RecordMetadata]] =
-      underlying.produceChunk(records, keySerializer, valueSerializer)
+      produceChunkAsync(records, keySerializer, valueSerializer).flatten
 
     def flush: Task[Unit] = underlying.flush
 

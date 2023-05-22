@@ -17,4 +17,5 @@ object Versions {
   val embeddedPostgres         = "2.0.3"
   val scribe                   = "3.11.1"
   val zioKafka                 = "2.3.0"
+  val kafkaEmbedded            = "3.4.0.1"
 }

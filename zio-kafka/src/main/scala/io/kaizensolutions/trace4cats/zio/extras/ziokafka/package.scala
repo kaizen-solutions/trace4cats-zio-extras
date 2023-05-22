@@ -9,7 +9,10 @@ import java.nio.charset.StandardCharsets
 import scala.jdk.CollectionConverters.*
 
 package object ziokafka {
-  private[ziokafka] def addHeaders[A, B](headers: TraceHeaders, record: ProducerRecord[A, B]): Task[ProducerRecord[A, B]] =
+  private[ziokafka] def addHeaders[A, B](
+    headers: TraceHeaders,
+    record: ProducerRecord[A, B]
+  ): Task[ProducerRecord[A, B]] =
     ZIO.attempt {
       val mutableHeaders = record.headers()
       headers.values.foreach { case (k, v) =>
@@ -20,9 +23,10 @@ package object ziokafka {
 
   private[ziokafka] def extractTraceHeaders[K, V](in: CommittableRecord[K, V]): TraceHeaders =
     TraceHeaders.of(
-      in.record.headers().asScala.map(h => h.key() -> new String(h.value(), StandardCharsets.UTF_8)).toList *
+      in.record.headers().asScala.map(h => h.key() -> new String(h.value(), StandardCharsets.UTF_8)).toList*
     )
 
-  private[ziokafka] implicit def longAttributeValue(value: Long): AttributeValue.LongValue = AttributeValue.LongValue(value)
+  private[ziokafka] implicit def longAttributeValue(value: Long): AttributeValue.LongValue =
+    AttributeValue.LongValue(value)
 
 }

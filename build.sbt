@@ -445,8 +445,16 @@ lazy val zioKafka =
   mkModule("zio-kafka")
     .settings(
       libraryDependencies ++= Seq(
-        "dev.zio" %% "zio-kafka" % Versions.zioKafka
-      )
+        "dev.zio" %% "zio-kafka" % Versions.zioKafka,
+        "io.github.embeddedkafka" %% "embedded-kafka" % Versions.kafkaEmbedded % Test
+      ),
+      excludeDependencies ++= {
+        CrossVersion.partialVersion(scalaVersion.value) match {
+          case Some((3, _)) =>
+            List("org.scala-lang.modules" %% "scala-collection-compat")
+          case _ => Nil
+        }
+      }
     )
     .dependsOn(
       core % "compile->compile;test->test"

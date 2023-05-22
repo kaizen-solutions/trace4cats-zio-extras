@@ -1,7 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras
 
-import trace4cats.ToHeaders
-import trace4cats.EntryPoint
+import trace4cats.{EntryPoint, ToHeaders}
 import trace4cats.kernel.{SpanCompleter, SpanSampler}
 import trace4cats.model.{CompletedSpan, TraceProcess}
 import zio.interop.catz.*
@@ -32,7 +31,7 @@ object InMemorySpanCompleter {
       .map(ZTracer.make(_, zep))
   }
 
-  def layer(serviceName: String) = {
+  def layer(serviceName: String) =
     ZLayer.scopedEnvironment[Any](
       for {
         z                      <- entryPoint(TraceProcess(serviceName))
@@ -41,5 +40,11 @@ object InMemorySpanCompleter {
       } yield ZEnvironment(completer, tracer)
     )
 
-  }
+  def layer0(serviceName: String) =
+      ZLayer.scopedEnvironment[Any](
+          for {
+          z                      <- entryPoint(TraceProcess(serviceName))
+          (completer, entrypoint) = z
+          } yield ZEnvironment(completer, new ZEntryPoint(entrypoint))
+      )
 }
