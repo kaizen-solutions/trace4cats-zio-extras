@@ -51,10 +51,15 @@ package object extras {
     ): ZStream[R1 & ZTracer, E1, Spanned[B]] =
       s.mapZIOPar[R1 & ZTracer, E1, Spanned[B]](n)(_.mapZIOTraced(name, kind)(f))
 
-    def mapMParUnorderedTraced[R1 <: R, E1 >: E, B](name: String, kind: SpanKind = SpanKind.Internal)(n: Int)(
+    def mapZIOParUnorderedTraced[R1 <: R, E1 >: E, B](name: String, kind: SpanKind = SpanKind.Internal)(n: Int)(
       f: A => ZIO[R1, E1, B]
     ): ZStream[R1 & ZTracer, E1, Spanned[B]] =
       s.mapZIOParUnordered[R1 & ZTracer, E1, Spanned[B]](n)(_.mapZIOTraced(name, kind)(f))
+
+    def tapWithTracer[R1 <: R, E1 >: E](tracer: ZTracer, name: String, kind: SpanKind = SpanKind.Internal)(
+      f: A => ZIO[R1, E1, Any]
+    ): ZStream[R1, E1, Spanned[A]] =
+      s.mapZIOWithTracer[R1, E1, A](tracer, name, kind)(a => f(a).as(a))
 
     def endTracingEachElementKeepHeaders: ZStream[R, E, (A, TraceHeaders)] =
       s.mapChunks(_.map(s => (s.value, s.headers)))
@@ -62,4 +67,14 @@ package object extras {
     def endTracingEachElement: ZStream[R, E, A] =
       s.mapChunks(_.map(s => s.value))
   }
+
+  def toAnnotations(headers: TraceHeaders): List[(String, String)] =
+    headers.values.collect { case (k, v) => k.toString -> v }.toList
+
+  type Aspect0 = ZIOAspect[Nothing, Any, Nothing, Any, Nothing, Any]
+
+  def logAnnotateWithHeaders(traceHeaders: TraceHeaders, enrich: Boolean): Aspect0 =
+    if (enrich)
+      ZIOAspect.annotated(toAnnotations(traceHeaders)*)
+    else ZIOAspect.identity
 }

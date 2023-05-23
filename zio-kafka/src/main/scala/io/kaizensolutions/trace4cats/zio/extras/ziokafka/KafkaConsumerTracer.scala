@@ -1,9 +1,8 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziokafka
 
-import io.kaizensolutions.trace4cats.zio.extras.ZTracer
+import io.kaizensolutions.trace4cats.zio.extras.*
 import trace4cats.model.AttributeValue
 import trace4cats.{SpanKind, ToHeaders}
-import zio.*
 import zio.kafka.consumer.CommittableRecord
 import zio.stream.ZStream
 
@@ -16,17 +15,15 @@ object KafkaConsumerTracer {
   def traceConsumerStream[R, K, V](
     tracer: ZTracer,
     stream: ZStream[R, Throwable, CommittableRecord[K, V]],
-    spanNameForElement: SpanNamer[K, V] = SpanNamer.default[K, V]
-  ): ZStream[R, Throwable, CommittableRecord[K, V]] =
-    stream.mapChunksZIO { c =>
-      ZIO.foreach(c) { comm =>
-        // Start the trace from the headers of the committable record
-
-        tracer.fromHeaders(
-          headers = extractTraceHeaders(comm),
-          name = spanNameForElement(comm),
-          kind = SpanKind.Consumer
-        ) { span =>
+    spanNameForElement: SpanNamer[K, V] = SpanNamer.default[K, V],
+    enrichLogs: Boolean = true
+  ): ZStream[R, Throwable, Spanned[CommittableRecord[K, V]]] =
+    tracer
+      .traceEachElement(extractTraceHeaders[K, V], spanNameForElement, SpanKind.Consumer, enrichLogs = enrichLogs)(
+        stream
+      )
+      .mapZIOWithTracer(tracer, "kafka-consumer") { comm =>
+        tracer.retrieveCurrentSpan.flatMap { span =>
           // Now, enrich the span with the core attributes of the committable record
           val record    = comm.record
           val topic     = record.topic
@@ -64,5 +61,4 @@ object KafkaConsumerTracer {
             )
         }
       }
-    }
 }

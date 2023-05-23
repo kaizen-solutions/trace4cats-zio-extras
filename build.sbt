@@ -464,7 +464,9 @@ lazy val zioKafkaExamples = {
   mkModule("zio-kafka-examples")
     .settings(
       libraryDependencies ++= Seq(
-        "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter
+        "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
+        "dev.zio" %% "zio-logging-slf4j" % "2.1.12",
+        "ch.qos.logback" % "logback-classic" % "1.4.7"
       )
     )
     .dependsOn(

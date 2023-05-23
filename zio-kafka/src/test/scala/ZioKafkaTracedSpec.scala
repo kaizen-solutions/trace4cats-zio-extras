@@ -2,7 +2,7 @@ import cats.data.NonEmptyList
 import cats.implicits.toShow
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import io.kaizensolutions.trace4cats.zio.extras.ziokafka.{KafkaConsumerTracer, KafkaProducerTracer}
-import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.*
 import trace4cats.model.SpanKind
 import zio.*
 import zio.kafka.consumer.{Consumer, ConsumerSettings, Subscription}
@@ -68,6 +68,7 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
                    Consumer
                      .plainStream(Subscription.topics(topic), Serde.string, Serde.string)
                  )
+            .endTracingEachElement
             .debug("element")
                  .tap(_.offset.commit)
                  .tap(_ => p.succeed(()))
