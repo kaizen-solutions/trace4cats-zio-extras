@@ -16,17 +16,17 @@ object ExampleApp extends ZIOAppDefault {
             headers
           }
           .mapThrough(_._1)
-          .mapMTraced("Plus 1")(e =>
+          .mapZIOTraced("Plus 1")(e =>
             ZTracer.span(s"plus 1 for $e")(printLine(s"Adding ${e} + 1 = ${e + 1}") *> ZIO.succeed(e + 1))
           )
-          .mapMParTraced("Plus 2")(8)(e =>
+          .mapZIOParTraced("Plus 2")(8)(e =>
             ZTracer.span(s"plus 2 for $e")(
               printLine(s"Adding ${e} + 2 = ${e + 2}")
                 .delay(500.millis) *>
                 ZIO.succeed(e + 2)
             )
           )
-          .mapMParTraced("Plus 4")(3)(e =>
+          .mapZIOParTraced("Plus 4")(3)(e =>
             ZTracer.span(s"plus 4 for $e")(
               ZTracer.spanSource()(
                 printLine(s"Adding ${e} + 4 = ${e + 4}")

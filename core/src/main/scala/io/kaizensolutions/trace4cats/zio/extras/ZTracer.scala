@@ -197,7 +197,8 @@ final class ZTracer private (
     extractHeaders: O => TraceHeaders,
     extractName: O => String,
     kind: SpanKind = SpanKind.Internal,
-    errorHandler: ErrorHandler = ErrorHandler.empty
+    errorHandler: ErrorHandler = ErrorHandler.empty,
+    enrichLogs: Boolean = true
   )(stream: ZStream[R, E, O]): ZStream[R, E, Spanned[O]] =
     stream.mapChunksZIO(
       _.mapZIO(o =>
@@ -208,7 +209,7 @@ final class ZTracer private (
           errorHandler = errorHandler
         )(span =>
           // extract the child's span header so that all stream transformations are traced under the element
-          ZIO.succeed(Spanned(span.extractHeaders(ToHeaders.all), o))
+          ZIO.succeed(Spanned(span.extractHeaders(ToHeaders.all), o, enrichLogs))
         )
       )
     )
@@ -309,9 +310,12 @@ object ZTracer {
   def traceEachElement[R, E, O](
     extractName: O => String,
     kind: SpanKind = SpanKind.Internal,
-    errorHandler: ErrorHandler = ErrorHandler.empty
+    errorHandler: ErrorHandler = ErrorHandler.empty,
+    enrichLogs: Boolean = true
   )(stream: ZStream[R, E, O])(extractHeaders: O => TraceHeaders): ZStream[R & ZTracer, E, Spanned[O]] =
-    ZStream.serviceWithStream[ZTracer](_.traceEachElement(extractHeaders, extractName, kind, errorHandler)(stream))
+    ZStream.serviceWithStream[ZTracer](
+      _.traceEachElement(extractHeaders, extractName, kind, errorHandler, enrichLogs)(stream)
+    )
 
   def traceEntireStream[R, E, O](
     name: String,

@@ -56,6 +56,16 @@ def releaseSettings: Seq[Def.Setting[_]] =
     releaseIgnoreUntrackedFiles := true
   )
 
+def mkModule(projectName: String) =
+  Project(projectName, file(projectName))
+    .settings(kindProjectorSettings*)
+    .settings(releaseSettings*)
+    .settings(
+      name             := s"trace4cats-zio-extras-$projectName",
+      organization     := "io.kaizen-solutions",
+      organizationName := "kaizen-solutions",
+    )
+
 lazy val root =
   project
     .in(file("."))
@@ -80,7 +90,9 @@ lazy val root =
       doobie,
       doobieExample,
       skunk,
-      skunkExample
+      skunkExample,
+      zioKafka,
+      zioKafkaExamples
     )
 
 lazy val core = project
@@ -428,3 +440,36 @@ lazy val skunkExample =
       )
     )
     .dependsOn(skunk)
+
+lazy val zioKafka =
+  mkModule("zio-kafka")
+    .settings(
+      libraryDependencies ++= Seq(
+        "dev.zio" %% "zio-kafka" % Versions.zioKafka,
+        "io.github.embeddedkafka" %% "embedded-kafka" % Versions.kafkaEmbedded % Test
+      ),
+      excludeDependencies ++= {
+        CrossVersion.partialVersion(scalaVersion.value) match {
+          case Some((3, _)) =>
+            List("org.scala-lang.modules" %% "scala-collection-compat")
+          case _ => Nil
+        }
+      }
+    )
+    .dependsOn(
+      core % "compile->compile;test->test"
+    )
+
+lazy val zioKafkaExamples = {
+  mkModule("zio-kafka-examples")
+    .settings(
+      libraryDependencies ++= Seq(
+        "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
+        "dev.zio" %% "zio-logging-slf4j" % "2.1.12",
+        "ch.qos.logback" % "logback-classic" % "1.4.7"
+      )
+    )
+    .dependsOn(
+      zioKafka
+    )
+}
