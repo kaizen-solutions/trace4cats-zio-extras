@@ -14,114 +14,107 @@ import zio.interop.catz.*
 object TracedSessionSpec extends ZIOSpecDefault {
   override def spec: Spec[TestEnvironment, Any] =
     suite("Traced Session specification")(
-      test("parameters") {
-        ZIO.scoped {
+      test("parameters")(
+        ZIO.scoped(
           for {
             take    <- ZIO.service[TakeSession]
             session <- take.access
             _       <- session.parameters.get
             sc      <- ZIO.service[InMemorySpanCompleter]
             spans   <- sc.retrieveCollected
+          } yield assertTrue(spans.length == 1, spans.exists(_.name == "skunk.parameters.get"))
+        )
+      ),
+      test("parameter")(
+        ZIO.scoped(
+          for {
+            take    <- ZIO.service[TakeSession]
+            session <- take.access
+            _       <- session.parameter("server_version").head.compile.last
+            sc      <- ZIO.service[InMemorySpanCompleter]
+            spans   <- sc.retrieveCollected
+          } yield assertTrue(spans.length == 1, spans.exists(_.name == "skunk.parameter.server_version"))
+        )
+      ),
+      test("transactionStatus")(
+        ZIO.scoped(
+          for {
+            take    <- ZIO.service[TakeSession]
+            session <- take.access
+            _       <- session.transactionStatus.get
+            sc      <- ZIO.service[InMemorySpanCompleter]
+            spans   <- sc.retrieveCollected
+          } yield assertTrue(spans.length == 1, spans.exists(_.name == "skunk.transactionStatus.get"))
+        )
+      ),
+      test("execute")(
+        ZIO.scoped(
+          for {
+            take       <- ZIO.service[TakeSession]
+            session    <- take.access
+            createTable = sql"CREATE TABLE abc (name varchar primary key)".command
+            _          <- session.execute(createTable)
+            sc         <- ZIO.service[InMemorySpanCompleter]
+            spans      <- sc.retrieveCollected
+          } yield assertTrue(spans.length == 1, spans.exists(_.name == createTable.sql))
+        )
+      ),
+      test("unique")(
+        ZIO.scoped {
+          for {
+            take    <- ZIO.service[TakeSession]
+            session <- take.access
+            query    = sql"SELECT 42".query(int4)
+            _       <- session.unique(query)
+            sc      <- ZIO.service[InMemorySpanCompleter]
+            spans   <- sc.retrieveCollected
+          } yield assertTrue(spans.length == 1, spans.exists(_.name == query.sql))
+        }
+      ),
+      test("option")(
+        ZIO.scoped {
+          for {
+            take    <- ZIO.service[TakeSession]
+            session <- take.access
+            query    = sql"select schemaname, relname from pg_stat_sys_tables limit 0".query(name ~ name)
+            _       <- session.option(query)
+            sc      <- ZIO.service[InMemorySpanCompleter]
+            spans   <- sc.retrieveCollected
+          } yield assertTrue(spans.length == 1, spans.exists(_.name == query.sql))
+        }
+      ),
+      test("stream")(
+        ZIO.scoped {
+          for {
+            take    <- ZIO.service[TakeSession]
+            session <- take.access
+            query    = sql"select schemaname, relname from pg_stat_sys_tables".query(name ~ name)
+            _       <- session.stream(query)(args = skunk.Void, chunkSize = 128).compile.drain
+            sc      <- ZIO.service[InMemorySpanCompleter]
+            spans   <- sc.retrieveCollected
+          } yield assertTrue(spans.length == 1, spans.exists(_.name == query.sql))
+        }
+      ),
+      test("prepare + stream")(
+        ZIO.scoped {
+          for {
+            take    <- ZIO.service[TakeSession]
+            session <- take.access
+            query    = sql"select schemaname, relname from pg_stat_sys_tables".query(name ~ name)
+            pq      <- session.prepare(query)
+            _       <- pq.stream(args = skunk.Void, chunkSize = 128).compile.drain
+            sc      <- ZIO.service[InMemorySpanCompleter]
+            spans   <- sc.retrieveCollected
           } yield assertTrue(
-              spans.length == 1, 
-              spans.exists(_.name == "skunk.parameters.get")
-            )
+            spans.length == 1,
+            spans.exists(_.name == query.sql),
+            spans.exists(_.attributes.contains("prepared"))
+          )
         }
-      } +
-        test("parameter") {
-          ZIO.scoped {
-            for {
-              take    <- ZIO.service[TakeSession]
-              session <- take.access
-              _       <- session.parameter("server_version").head.compile.last
-              sc      <- ZIO.service[InMemorySpanCompleter]
-              spans   <- sc.retrieveCollected
-            } yield assertTrue(
-                spans.length == 1, 
-                spans.exists(_.name == "skunk.parameter.server_version")
-              )
-          }
-        } +
-        test("transactionStatus") {
-          ZIO.scoped {
-            for {
-              take    <- ZIO.service[TakeSession]
-              session <- take.access
-              _       <- session.transactionStatus.get
-              sc      <- ZIO.service[InMemorySpanCompleter]
-              spans   <- sc.retrieveCollected
-            } yield assertTrue(
-                spans.length == 1, 
-                spans.exists(_.name == "skunk.transactionStatus.get")
-              )
-          }
-        } +
-        test("execute") {
-          ZIO.scoped {
-            for {
-              take    <- ZIO.service[TakeSession]
-              session <- take.access
-              createTable = sql"CREATE TABLE abc (name varchar primary key)".command
-              _       <- session.execute(createTable)
-              sc      <- ZIO.service[InMemorySpanCompleter]
-              spans   <- sc.retrieveCollected
-            } yield assertTrue(spans.length == 1, spans.exists(_.name == createTable.sql))
-          }
-        } +
-        test("unique") {
-          ZIO.scoped {
-            for {
-              take    <- ZIO.service[TakeSession]
-              session <- take.access
-              query = sql"SELECT 42".query(int4)
-              _       <- session.unique(query)
-              sc      <- ZIO.service[InMemorySpanCompleter]
-              spans   <- sc.retrieveCollected
-            } yield assertTrue(spans.length == 1, spans.exists(_.name == query.sql))
-          }
-        } + 
-        test("option") {
-          ZIO.scoped {
-            for {
-              take    <- ZIO.service[TakeSession]
-              session <- take.access
-              query = sql"select schemaname, relname from pg_stat_sys_tables limit 0".query(name ~ name)
-              _       <- session.option(query)
-              sc      <- ZIO.service[InMemorySpanCompleter]
-              spans   <- sc.retrieveCollected
-            } yield assertTrue(spans.length == 1, spans.exists(_.name == query.sql))
-          }
-        } + 
-        test("stream") {
-          ZIO.scoped {
-            for {
-              take    <- ZIO.service[TakeSession]
-              session <- take.access
-              query = sql"select schemaname, relname from pg_stat_sys_tables".query(name ~ name)
-              _ <- session.stream(query)(args = skunk.Void, chunkSize = 128).compile.drain
-              sc      <- ZIO.service[InMemorySpanCompleter]
-              spans   <- sc.retrieveCollected
-            } yield assertTrue(spans.length == 1, spans.exists(_.name == query.sql))
-          }
-        } + 
-        test("prepare + stream") {
-          ZIO.scoped {
-            for {
-              take    <- ZIO.service[TakeSession]
-              session <- take.access
-              query = sql"select schemaname, relname from pg_stat_sys_tables".query(name ~ name)
-              pq      <- session.prepare(query)
-              _       <- pq.stream(args = skunk.Void, chunkSize = 128).compile.drain
-              sc      <- ZIO.service[InMemorySpanCompleter]
-              spans   <- sc.retrieveCollected
-            } yield assertTrue(spans.length == 1, spans.exists(_.name == query.sql), spans.exists(_.attributes.contains("prepared")))
-          }
-        }
+      )
     )
       .provideShared(Database.live, InMemorySpanCompleter.layer("skunk-test")) @@
-      TestAspect.sequential @@
-      TestAspect.ignore // TODO: Fix flaky test
-//      @@ TestAspect.flaky
+      TestAspect.sequential
 }
 object Database {
   import cats.effect.std.Console
@@ -153,7 +146,14 @@ object Database {
 
   val live: RLayer[ZTracer, TakeSession] = {
     val postgres: ZIO[Scope, Throwable, EmbeddedPostgres] =
-      ZIO.acquireRelease(ZIO.attempt(EmbeddedPostgres.start()))(ep => ZIO.attempt(ep.close()).ignoreLogged)
+      ZIO.acquireRelease(
+        ZIO.attempt(
+          EmbeddedPostgres
+            .builder()
+            .setCleanDataDirectory(false)
+            .start()
+        )
+      )(ep => ZIO.attempt(ep.close()).ignoreLogged)
 
     ZLayer.scoped(postgres.flatMap(sessionPool))
   }

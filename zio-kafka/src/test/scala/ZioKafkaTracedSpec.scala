@@ -49,7 +49,7 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
               span.kind == SpanKind.Producer &&
               span.attributes.exists { case (k, v) =>
                 k == "topics" &&
-                  v.value.value == NonEmptyList.of(topic)
+                v.value.value == NonEmptyList.of(topic)
               }
           ),
           spans.exists(span => span.name == "kafka-producer-broker-ack")
@@ -61,15 +61,14 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
         val topic = UUID.randomUUID().toString
         for {
           tracer <- ZIO.service[ZTracer]
-          p <- Promise.make[Nothing, Unit]
+          p      <- Promise.make[Nothing, Unit]
           _ <- KafkaConsumerTracer
                  .traceConsumerStream(
                    tracer,
                    Consumer
                      .plainStream(Subscription.topics(topic), Serde.string, Serde.string)
                  )
-            .endTracingEachElement
-            .debug("element")
+                 .endTracingEachElement
                  .tap(_.offset.commit)
                  .tap(_ => p.succeed(()))
                  .runDrain
@@ -78,15 +77,6 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
           _     <- Producer.produce(topic, "key", "value", Serde.string, Serde.string)
           _     <- p.await
           spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
-          _ <- ZIO.debug(
-            spans.map(s => s"name: ${s.name}, id: ${s.context.spanId.show}, parent: ${s.context.parent.map(_.spanId.show)}")
-          )
-          _ <- ZIO.debug {
-            for {
-              child <- spans.find(_.name == "kafka-receive")
-              parent <- spans.find(_.context.spanId.show == child.context.parent.map(_.spanId.show).getOrElse(""))
-            } yield s"child: ${child}, parent: ${parent}"
-          }
         } yield assertTrue(
           spans.exists(consumerSpan =>
             consumerSpan.name == "kafka-receive" &&
@@ -94,7 +84,7 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
                 parent.kind == SpanKind.Producer &&
                   consumerSpan.context.parent.map(_.spanId.show).contains(parent.context.spanId.show)
               )
-            )
+          )
         )
       }
     )
@@ -105,5 +95,5 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
       embeddedKafka,
       InMemorySpanCompleter.layer("ziokafka"),
       Scope.default
-  ) @@ TestAspect.withLiveEnvironment @@ TestAspect.sequential @@ TestAspect.timeout(30.seconds)
+    ) @@ TestAspect.withLiveEnvironment @@ TestAspect.sequential @@ TestAspect.timeout(30.seconds)
 }

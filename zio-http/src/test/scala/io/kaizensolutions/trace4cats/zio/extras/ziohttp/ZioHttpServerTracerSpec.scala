@@ -11,7 +11,7 @@ import zio.test.*
 object ZioHttpServerTracerSpec extends ZIOSpecDefault {
   val testApp: HttpApp[ZTracer, Nothing] =
     Http.collectZIO[Request] {
-      case Method.GET -> !! / "plaintext" =>
+      case Method.GET -> Root / "plaintext" =>
         ZTracer.withSpan("plaintext-fetch") { _ =>
           Random
             .nextIntBetween(1, 3)
@@ -22,7 +22,7 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
                 .withStatus(Status.Ok)
             )
         }
-      case Method.GET -> !! / "user" / userId =>
+      case Method.GET -> Root / "user" / userId =>
         ZIO.succeed(
           Response
             .json(s"{ 'userId': '$userId', 'name': 'Bob' }")
@@ -40,7 +40,7 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
                 .provideEnvironment(ZEnvironment.empty.add(tracer))
             )
           (completer, app) = result
-          response        <- app.runZIO(Request.get(URL(!! / "plaintext")))
+          response        <- app.runZIO(Request.get(URL(Root / "plaintext")))
           spans           <- completer.retrieveCollected
           httpSpan        <- ZIO.from(spans.find(_.name == "GET /plaintext"))
           fetchSpan       <- ZIO.from(spans.find(_.name == "plaintext-fetch"))
@@ -52,7 +52,7 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
         )
       } +
         test("renamed spans are traced as per the provided function") {
-          val customSpanNamer: SpanNamer = { case Method.GET -> !! / "user" / _ =>
+          val customSpanNamer: SpanNamer = { case Method.GET -> Root / "user" / _ =>
             s"/user/:userId"
           }
 
@@ -63,8 +63,8 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
                   .provideEnvironment(ZEnvironment.empty.add(tracer))
               )
             (completer, app) = result
-            _               <- app.runZIO(Request.get(URL(!! / "user" / "1234")))
-            _               <- app.runZIO(Request.get(URL(!! / "plaintext")))
+            _               <- app.runZIO(Request.get(URL(Root / "user" / "1234")))
+            _               <- app.runZIO(Request.get(URL(Root / "plaintext")))
             spans           <- completer.retrieveCollected
             _ <- ZIO
                    .from(spans.find(_.name == "GET /user/:userId"))

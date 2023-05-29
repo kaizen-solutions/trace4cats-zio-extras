@@ -3,7 +3,7 @@ import sbtrelease.ReleaseStateTransformations._
 inThisBuild {
   val scala212 = "2.12.17"
   val scala213 = "2.13.10"
-  val scala32  = "3.2.2"
+  val scala32  = "3.3.0"
 
   Seq(
     scalaVersion                        := scala32,
@@ -63,7 +63,7 @@ def mkModule(projectName: String) =
     .settings(
       name             := s"trace4cats-zio-extras-$projectName",
       organization     := "io.kaizen-solutions",
-      organizationName := "kaizen-solutions",
+      organizationName := "kaizen-solutions"
     )
 
 lazy val root =
@@ -272,8 +272,8 @@ lazy val zioHttpExample =
         val trace4cats = "io.janstenpickle"
         Seq(
           trace4cats      %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
-          "dev.zio"       %% "zio-logging-slf4j"                 % "2.1.12",
-          "dev.zio"       %% "zio-logging-slf4j-bridge"          % "2.1.12",
+          "dev.zio"       %% "zio-logging-slf4j"                 % Versions.zioLogging,
+          "dev.zio"       %% "zio-logging-slf4j-bridge"          % Versions.zioLogging,
           "ch.qos.logback" % "logback-classic"                   % "1.4.7"
         )
       }
@@ -445,7 +445,7 @@ lazy val zioKafka =
   mkModule("zio-kafka")
     .settings(
       libraryDependencies ++= Seq(
-        "dev.zio" %% "zio-kafka" % Versions.zioKafka,
+        "dev.zio"                 %% "zio-kafka"      % Versions.zioKafka,
         "io.github.embeddedkafka" %% "embedded-kafka" % Versions.kafkaEmbedded % Test
       ),
       excludeDependencies ++= {
@@ -465,8 +465,8 @@ lazy val zioKafkaExamples = {
     .settings(
       libraryDependencies ++= Seq(
         "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
-        "dev.zio" %% "zio-logging-slf4j" % "2.1.12",
-        "ch.qos.logback" % "logback-classic" % "1.4.7"
+        "dev.zio"          %% "zio-logging-slf4j"                 % Versions.zioLogging,
+        "ch.qos.logback"    % "logback-classic"                   % "1.4.7"
       )
     )
     .dependsOn(
