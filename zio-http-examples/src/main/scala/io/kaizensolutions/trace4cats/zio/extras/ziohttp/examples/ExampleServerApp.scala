@@ -11,7 +11,7 @@ object ExampleServerApp extends ZIOAppDefault {
 
   val http: Http[Db & ZTracer, Throwable, Request, Response] =
     Http.collectZIO[Request] {
-      case Method.GET -> !! / "plaintext" =>
+      case Method.GET -> Root / "plaintext" =>
         ZTracer.withSpan("plaintext-fetch-db") { span =>
           for {
             sleep <- Random.nextIntBetween(1, 3)
@@ -24,10 +24,10 @@ object ExampleServerApp extends ZIOAppDefault {
             .withStatus(Status.Ok)
         }
 
-      case Method.GET -> !! / "fail" =>
+      case Method.GET -> Root / "fail" =>
         ZIO.fail(new RuntimeException("Error"))
 
-      case Method.GET -> !! / "bad_gateway" =>
+      case Method.GET -> Root / "bad_gateway" =>
         ZIO.succeed(Response.status(Status.BadGateway))
     }
 

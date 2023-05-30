@@ -58,7 +58,6 @@ object ZioHttpServerTracer {
 
           http
             .runHandler(request)
-            .mapError(Option(_))
             .flatMap {
               case Some(handler) =>
                 ZIO.succeed(

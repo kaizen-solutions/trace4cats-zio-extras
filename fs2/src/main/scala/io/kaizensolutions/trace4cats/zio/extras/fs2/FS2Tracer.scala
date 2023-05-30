@@ -1,10 +1,10 @@
 package io.kaizensolutions.trace4cats.zio.extras.fs2
 
 import cats.effect.kernel.Resource.ExitCase
-import fs2.*
+import fs2.Stream
+import io.kaizensolutions.trace4cats.zio.extras.{Spanned, ZTracer}
 import trace4cats.model.{SpanKind, TraceHeaders}
 import trace4cats.{ErrorHandler, ToHeaders}
-import io.kaizensolutions.trace4cats.zio.extras.{Spanned, ZTracer}
 import zio.interop.catz.*
 import zio.{RIO, ZIO}
 

@@ -41,10 +41,10 @@ object InMemorySpanCompleter {
     )
 
   def layer0(serviceName: String) =
-      ZLayer.scopedEnvironment[Any](
-          for {
-          z                      <- entryPoint(TraceProcess(serviceName))
-          (completer, entrypoint) = z
-          } yield ZEnvironment(completer, new ZEntryPoint(entrypoint))
-      )
+    ZLayer.scopedEnvironment[Any](
+      for {
+        z                      <- entryPoint(TraceProcess(serviceName))
+        (completer, entrypoint) = z
+      } yield ZEnvironment(completer, new ZEntryPoint(entrypoint))
+    )
 }
