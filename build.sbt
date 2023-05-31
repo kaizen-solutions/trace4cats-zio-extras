@@ -420,8 +420,10 @@ lazy val skunk =
       organizationName := "kaizen-solutions",
       libraryDependencies ++=
         Seq(
-          "org.tpolecat" %% "skunk-core"        % Versions.skunk,
-          "io.zonky.test" % "embedded-postgres" % Versions.embeddedPostgres % Test
+          "org.tpolecat"  %% "skunk-core"        % Versions.skunk,
+          "io.zonky.test"  % "embedded-postgres" % Versions.embeddedPostgres % Test,
+          "dev.zio"       %% "zio-logging-slf4j" % Versions.zioLogging       % Test,
+          "ch.qos.logback" % "logback-classic"   % "1.4.7"                   % Test
         )
     )
     .dependsOn(
@@ -445,8 +447,10 @@ lazy val zioKafka =
   mkModule("zio-kafka")
     .settings(
       libraryDependencies ++= Seq(
-        "dev.zio"                 %% "zio-kafka"      % Versions.zioKafka,
-        "io.github.embeddedkafka" %% "embedded-kafka" % Versions.kafkaEmbedded % Test
+        "dev.zio"                 %% "zio-kafka"         % Versions.zioKafka,
+        "io.github.embeddedkafka" %% "embedded-kafka"    % Versions.kafkaEmbedded % Test,
+        "dev.zio"                 %% "zio-logging-slf4j" % Versions.zioLogging    % Test,
+        "ch.qos.logback"           % "logback-classic"   % "1.4.7"                % Test
       ),
       excludeDependencies ++= {
         CrossVersion.partialVersion(scalaVersion.value) match {

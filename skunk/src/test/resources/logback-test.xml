@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="local" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%green(%d{HH:mm:ss.SSS}) [%thread] [%mdc] %highlight(%-5level) %logger{30} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="async-local" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="local" />
+    </appender>
+
+    <root level="error"> <!-- change this to info when debugging -->
+        <appender-ref ref="async-local" />
+    </root>
+    
+</configuration>

@@ -10,8 +10,12 @@ import skunk.syntax.all.*
 import zio.*
 import zio.test.*
 import zio.interop.catz.*
+import zio.logging.backend.SLF4J
 
 object TracedSessionSpec extends ZIOSpecDefault {
+  override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
+    Runtime.removeDefaultLoggers ++ SLF4J.slf4j ++ testEnvironment
+
   override def spec: Spec[TestEnvironment, Any] =
     suite("Traced Session specification")(
       test("parameters")(

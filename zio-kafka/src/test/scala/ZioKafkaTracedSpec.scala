@@ -9,10 +9,14 @@ import zio.kafka.consumer.{Consumer, ConsumerSettings, Subscription}
 import zio.kafka.producer.{Producer, ProducerSettings}
 import zio.kafka.serde.Serde
 import zio.test.*
+import zio.logging.backend.SLF4J
 
 import java.util.UUID
 
 object ZioKafkaTracedSpec extends ZIOSpecDefault {
+
+  override val bootstrap: ZLayer[Any, Any, TestEnvironment] =
+    Runtime.removeDefaultLoggers ++ SLF4J.slf4j ++ testEnvironment
 
   val embeddedKafka: ZLayer[Any, Throwable, EmbeddedKafkaConfig] = ZLayer.scoped(
     ZIO
