@@ -97,8 +97,8 @@ lazy val root =
 
 lazy val core = project
   .in(file("core"))
-  .settings(kindProjectorSettings: _*)
-  .settings(releaseSettings: _*)
+  .settings(kindProjectorSettings*)
+  .settings(releaseSettings*)
   .settings(
     name             := "trace4cats-zio-extras-core",
     organization     := "io.kaizen-solutions",
@@ -126,7 +126,7 @@ lazy val core = project
 
 lazy val coreExample = project
   .in(file("core-examples"))
-  .settings(kindProjectorSettings: _*)
+  .settings(kindProjectorSettings*)
   .settings(
     name             := "trace4cats-zio-extras-core-examples",
     organization     := "io.kaizen-solutions",
@@ -141,8 +141,8 @@ lazy val coreExample = project
 
 lazy val fs2 = project
   .in(file("fs2"))
-  .settings(kindProjectorSettings: _*)
-  .settings(releaseSettings: _*)
+  .settings(kindProjectorSettings*)
+  .settings(releaseSettings*)
   .settings(
     name                            := "trace4cats-zio-extras-fs2",
     organization                    := "io.kaizen-solutions",
@@ -152,7 +152,7 @@ lazy val fs2 = project
 
 lazy val fs2Example = project
   .in(file("fs2-examples"))
-  .settings(kindProjectorSettings: _*)
+  .settings(kindProjectorSettings*)
   .settings(
     name             := "trace4cats-zio-extras-fs2-examples",
     organization     := "io.kaizen-solutions",
@@ -168,8 +168,8 @@ lazy val fs2Example = project
 lazy val fs2Kafka =
   project
     .in(file("fs2-kafka"))
-    .settings(kindProjectorSettings: _*)
-    .settings(releaseSettings: _*)
+    .settings(kindProjectorSettings*)
+    .settings(releaseSettings*)
     .settings(
       name                                     := "trace4cats-zio-extras-fs2-kafka",
       organization                             := "io.kaizen-solutions",
@@ -180,7 +180,7 @@ lazy val fs2Kafka =
 lazy val fs2KafkaExample =
   project
     .in(file("fs2-kafka-examples"))
-    .settings(kindProjectorSettings: _*)
+    .settings(kindProjectorSettings*)
     .settings(
       name             := "trace4cats-zio-extras-fs2-kafka-examples",
       organization     := "io.kaizen-solutions",
@@ -200,8 +200,8 @@ lazy val fs2KafkaExample =
 
 lazy val http4s = project
   .in(file("http4s"))
-  .settings(kindProjectorSettings: _*)
-  .settings(releaseSettings: _*)
+  .settings(kindProjectorSettings*)
+  .settings(releaseSettings*)
   .settings(
     name             := "trace4cats-zio-extras-http4s",
     organization     := "io.kaizen-solutions",
@@ -221,7 +221,7 @@ lazy val http4s = project
 lazy val http4sExample =
   project
     .in(file("http4s-examples"))
-    .settings(kindProjectorSettings: _*)
+    .settings(kindProjectorSettings*)
     .settings(
       name             := "trace4cats-zio-extras-http4s-examples",
       organization     := "io.kaizen-solutions",
@@ -243,8 +243,8 @@ lazy val http4sExample =
 lazy val zioHttp =
   project
     .in(file("zio-http"))
-    .settings(kindProjectorSettings: _*)
-    .settings(releaseSettings: _*)
+    .settings(kindProjectorSettings*)
+    .settings(releaseSettings*)
     .settings(
       tpolecatExcludeOptions += ScalacOptions.lintInferAny
     ) // zio-http's @@ causes this (Scala 2.13) unless explicitly typed
@@ -259,7 +259,7 @@ lazy val zioHttp =
 lazy val zioHttpExample =
   project
     .in(file("zio-http-examples"))
-    .settings(kindProjectorSettings: _*)
+    .settings(kindProjectorSettings*)
     .settings(
       tpolecatExcludeOptions += ScalacOptions.lintInferAny
     ) // zio-http's @@ causes this (Scala 2.13) unless explicitly typed
@@ -283,8 +283,8 @@ lazy val zioHttpExample =
 lazy val sttp =
   project
     .in(file("sttp"))
-    .settings(kindProjectorSettings: _*)
-    .settings(releaseSettings: _*)
+    .settings(kindProjectorSettings*)
+    .settings(releaseSettings*)
     .settings(
       name                                                   := "trace4cats-zio-extras-sttp",
       organization                                           := "io.kaizen-solutions",
@@ -298,7 +298,7 @@ lazy val sttp =
 lazy val sttpExample =
   project
     .in(file("sttp-examples"))
-    .settings(kindProjectorSettings: _*)
+    .settings(kindProjectorSettings*)
     .settings(
       name             := "trace4cats-zio-extras-zio-sttp-examples",
       organization     := "io.kaizen-solutions",
@@ -315,8 +315,8 @@ lazy val sttpExample =
 lazy val tapir =
   project
     .in(file("tapir"))
-    .settings(kindProjectorSettings: _*)
-    .settings(releaseSettings: _*)
+    .settings(kindProjectorSettings*)
+    .settings(releaseSettings*)
     .settings(
       name                                                 := "trace4cats-zio-extras-tapir",
       organization                                         := "io.kaizen-solutions",
@@ -347,33 +347,29 @@ lazy val tapirExample =
 lazy val virgil =
   project
     .in(file("virgil"))
-    .settings(kindProjectorSettings: _*)
-    .settings(releaseSettings: _*)
+    .settings(kindProjectorSettings*)
+    .settings(releaseSettings*)
     .settings(
       resolvers += "jitpack".at("https://jitpack.io"),
       name                                                        := "trace4cats-zio-extras-virgil",
       organization                                                := "io.kaizen-solutions",
       organizationName                                            := "kaizen-solutions",
-      libraryDependencies += "com.github.kaizen-solutions.virgil" %% "virgil" % Versions.virgil
+      libraryDependencies += "com.github.kaizen-solutions.virgil" %% "virgil-zio" % Versions.virgil
     )
     .dependsOn(core % "compile->compile;test->test")
 
 lazy val virgilExample =
   project
     .in(file("virgil-examples"))
-    .settings(kindProjectorSettings: _*)
-    .settings(releaseSettings: _*)
+    .settings(kindProjectorSettings*)
+    .settings(releaseSettings*)
     .settings(
       resolvers += "jitpack".at("https://jitpack.io"),
-      name             := "trace4cats-zio-extras-virgil-examples",
-      organization     := "io.kaizen-solutions",
-      organizationName := "kaizen-solutions",
-      libraryDependencies ++=
-        Seq(
-          "io.janstenpickle"                   %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
-          "com.github.kaizen-solutions.virgil" %% "virgil"                            % Versions.virgil
-        ),
-      publish / skip := true
+      name                                      := "trace4cats-zio-extras-virgil-examples",
+      organization                              := "io.kaizen-solutions",
+      organizationName                          := "kaizen-solutions",
+      libraryDependencies += "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
+      publish / skip                            := true
     )
     .dependsOn(core, virgil)
 
