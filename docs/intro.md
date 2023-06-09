@@ -1,0 +1,39 @@
+---
+sidebar_position: 1
+title: Introduction
+---
+
+# Introduction
+Trace4Cats ZIO Extras provides [**distributed tracing**](https://www.datadoghq.com/knowledge-center/distributed-tracing) 
+for ZIO and its ecosystem built on top of the excellent [trace4cats](https://github.com/trace4cats/trace4cats) library.
+
+## What it does
+This library provides the `ZTracer` abstraction in order to create [traces & spans](https://www.honeycomb.io/blog/datasets-traces-spans). 
+It also provides a variety of integrations with popular libraries such as:
+
+__HTTP__
+- [http4s](https://http4s.org/)
+- [zio-http](https://zio.dev/zio-http/)
+- [tapir](https://tapir.softwaremill.com/en/latest/)
+- [sttp](https://sttp.softwaremill.com/en/latest/)
+
+__Database__
+- [doobie](https://tpolecat.github.io/doobie/)
+- [skunk](https://typelevel.org/skunk/)
+- [virgil](https://github.com/kaizen-solutions/virgil)
+
+__Messaging__
+- [fs2-kafka](https://fd4s.github.io/fs2-kafka/)
+- [zio-kafka](https://zio.dev/zio-kafka/)
+
+__Streams__
+- [fs2](https://fs2.io/)
+
+## How it works
+Trace4Cats without making use of the typeclasses inside trace4cats (eg. `Provide`, etc.) and instead leverages `FiberRef`s 
+hiding behind the `ZTracer` abstraction to call the underlying Trace4Cats APIs in order to provide a better experience 
+for the user.
+
+## Compatibility
+This library is built for ZIO 2.x and is cross-built for Scala 2.12.x, 2.13.x and 3.3.x LTS targeting the latest version
+of Trace4Cats.
