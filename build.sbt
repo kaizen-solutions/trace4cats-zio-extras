@@ -32,6 +32,7 @@ inThisBuild {
     ),
     organization           := "io.kaizen-solutions",
     organizationName       := "kaizen-solutions",
+    homepage               := Some(url("https://www.kaizen-solutions.io")),
     sonatypeCredentialHost := "s01.oss.sonatype.org",
     sonatypeProfileName    := "io.kaizen-solutions",
     sonatypeRepository     := "https://s01.oss.sonatype.org/service/local",
@@ -90,7 +91,8 @@ lazy val root =
       skunk,
       skunkExample,
       zioKafka,
-      zioKafkaExamples
+      zioKafkaExamples,
+      docs
     )
 
 lazy val core = project
@@ -431,3 +433,24 @@ lazy val zioKafkaExamples = {
       zioKafka
     )
 }
+
+lazy val docs =
+  project
+    .in(file("trace4cats-zio-extras-docs"))
+    .enablePlugins(MdocPlugin)
+    .settings(
+      mdocVariables := Map("VERSION" -> version.value)
+    )
+    .dependsOn(
+      core,
+      fs2,
+      fs2Kafka,
+      http4s,
+      zioHttp,
+      sttp,
+      tapir,
+      virgil,
+      doobie,
+      skunk,
+      zioKafka
+    )
