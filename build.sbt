@@ -439,7 +439,8 @@ lazy val docs =
     .in(file("trace4cats-zio-extras-docs"))
     .enablePlugins(MdocPlugin)
     .settings(
-      mdocVariables := Map("VERSION" -> version.value)
+      publish / skip := true,
+      mdocVariables  := Map("VERSION" -> version.value)
     )
     .dependsOn(
       core,
