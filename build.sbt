@@ -30,6 +30,7 @@ inThisBuild {
       Developer("calvinlfer", "Calvin Fernandes", "cal@kaizen-solutions.io", url("https://www.kaizen-solutions.io")),
       Developer("soujiro32167", "Eli Kasik", "soujiro32167@gmail.com", url("https://trampolinelab.com"))
     ),
+    licenses               := List("MIT" -> url("https://opensource.org/licenses/MIT")),
     organization           := "io.kaizen-solutions",
     organizationName       := "kaizen-solutions",
     homepage               := Some(url("https://www.kaizen-solutions.io")),
