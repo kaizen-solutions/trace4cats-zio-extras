@@ -7,13 +7,6 @@ inThisBuild {
     scalaVersion       := scala213,
     crossScalaVersions := Seq(scala212, scala213, scala3),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    scalacOptions ++= {
-      CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((2, 12 | 13)) => Seq("-Xsource:3")
-        case Some((3, _))       => Seq.empty
-        case Some(_) | None     => Seq.empty
-      }
-    },
     versionScheme              := Some("early-semver"),
     githubWorkflowJavaVersions := List(JavaSpec.temurin("11")),
     githubWorkflowTargetTags ++= Seq("v*"),
@@ -44,6 +37,14 @@ inThisBuild {
     sonatypeRepository     := "https://s01.oss.sonatype.org/service/local",
     sonatypeCredentialHost := "s01.oss.sonatype.org"
   )
+}
+
+ThisBuild / scalacOptions ++= {
+  CrossVersion.partialVersion(scalaVersion.value) match {
+    case Some((2, 12 | 13)) => Seq("-Xsource:3")
+    case Some((3, _))       => Seq.empty
+    case Some(_) | None     => Seq.empty
+  }
 }
 
 val isScala3 =
