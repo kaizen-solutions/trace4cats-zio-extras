@@ -4,6 +4,9 @@
 const lightCodeTheme = require('prism-react-renderer/themes/github');
 const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 
+const organization = "kaizen-solutions";
+const project = "trace4cats-zio-extras";
+
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Trace4Cats ZIO Extras',
@@ -14,12 +17,12 @@ const config = {
   url: 'https://your-docusaurus-test-site.com',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/',
+  baseUrl: `/${project}/`,
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'kaizen-solutions',
-  projectName: 'trace4cats-zio-extras',
+  organizationName: organization,
+  projectName: project,
 
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
@@ -45,7 +48,7 @@ const config = {
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
           editUrl:
-            'https://github.com/kaizen-solutions/trace4cats-zio-extras/tree/main/',
+            `https://github.com/${organization}/${project}/tree/main/`,
         },
         theme: {
           customCss: require.resolve('./src/css/custom.css'),
@@ -105,7 +108,7 @@ const config = {
             items: [
               {
                 label: 'GitHub',
-                href: 'https://github.com/kaizen-solutions/trace4cats-zio-extras',
+                href: `https://github.com/${organization}/${project}`,
               },
             ],
           },
