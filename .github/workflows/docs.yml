@@ -5,7 +5,7 @@ on:
       - main
       - doc # TODO: for testing - remove when confirmed
 jobs:
-  deploy:
+  publish-website:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
