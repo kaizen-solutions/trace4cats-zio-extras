@@ -4,8 +4,8 @@ import styles from './styles.module.css';
 
 const FeatureList = [
   {
-    title: 'Focus on What Matters',
-    Svg: require('@site/static/img/magnifying-glass.svg').default,
+    title: 'Focus on what matters',
+    Svg: require('@site/static/img/perf.svg').default,
     description: (
       <>
         Pinpoint issues in production and find bottlenecks
