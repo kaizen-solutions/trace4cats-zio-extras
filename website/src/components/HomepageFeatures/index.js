@@ -4,32 +4,30 @@ import styles from './styles.module.css';
 
 const FeatureList = [
   {
-    title: 'Easy to Use',
-    Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
-    description: (
-      <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
-      </>
-    ),
-  },
-  {
     title: 'Focus on What Matters',
-    Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
+    Svg: require('@site/static/img/magnifying-glass.svg').default,
     description: (
       <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
+        Pinpoint issues in production and find bottlenecks
       </>
     ),
   },
   {
-    title: 'Powered by React',
-    Svg: require('@site/static/img/undraw_docusaurus_react.svg').default,
+    title: 'Distributed tracing made easy',
+    Svg: require('@site/static/img/spans-traces.svg').default,
     description: (
       <>
-        Extend or customize your website layout by reusing React. Docusaurus can
-        be extended while reusing the same header and footer.
+        Trace4Cats ZIO Extras was designed to be used with ZIO and
+        makes it easy to add distributed tracing to your ZIO applications.
+      </>
+    )
+  },
+  {
+    title: 'Powered by Functional Programming',
+    Svg: require('@site/static/img/scala.svg').default,
+    description: (
+      <>
+        Trace4Cats ZIO Extras is built on top of <b>ZIO</b> and <b>Cats Effect</b> to empower your applications.
       </>
     ),
   },
