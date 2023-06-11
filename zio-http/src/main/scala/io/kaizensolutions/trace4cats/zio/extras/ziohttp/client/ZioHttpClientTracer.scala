@@ -14,10 +14,10 @@ object ZioHttpClientTracer {
     tracer: ZTracer,
     request: Request,
     toHeaders: ToHeaders = ToHeaders.standard,
-    spanNamer: Request => String = methodWithPathSpanNamer,
+    spanNamer: Map[Request, String] = Map.empty[Request, String],
     errorHandler: ErrorHandler = ErrorHandler.empty
   ): ZIO[Client, Throwable, Response] = {
-    val nameOfRequest = spanNamer(request)
+    val nameOfRequest = spanNamer.getOrElse(request, defaultSpanNamer(request))
     tracer.withSpan(name = nameOfRequest, kind = SpanKind.Client, errorHandler = errorHandler) { span =>
       val traceHeaders = span.extractHeaders(toHeaders)
       val zioHttpTraceHeaders = Headers(traceHeaders.values.map { case (header, value) =>
@@ -40,7 +40,7 @@ object ZioHttpClientTracer {
   def makeTracedRequest(
     request: Request,
     toHeaders: ToHeaders = ToHeaders.standard,
-    spanNamer: Request => String = methodWithPathSpanNamer,
+    spanNamer: Map[Request, String] = Map.empty[Request, String],
     errorHandler: ErrorHandler = ErrorHandler.empty
   ): ZIO[Client & ZTracer, Throwable, Response] =
     ZIO
@@ -62,7 +62,7 @@ object ZioHttpClientTracer {
     headers: Headers = Headers.empty,
     content: Body = Body.empty,
     toHeaders: ToHeaders = ToHeaders.standard,
-    spanNamer: Request => String = methodWithPathSpanNamer,
+    spanNamer: Map[Request, String] = Map.empty[Request, String],
     errorHandler: ErrorHandler = ErrorHandler.empty
   ): ZIO[Client, Throwable, Response] =
     ZIO
@@ -83,7 +83,7 @@ object ZioHttpClientTracer {
     headers: Headers = Headers.empty,
     content: Body = Body.empty,
     toHeaders: ToHeaders = ToHeaders.standard,
-    spanNamer: Request => String = methodWithPathSpanNamer,
+    spanNamer: Map[Request, String] = Map.empty[Request, String],
     errorHandler: ErrorHandler = ErrorHandler.empty
   ): ZIO[Client & ZTracer, Throwable, Response] =
     ZIO
@@ -101,7 +101,7 @@ object ZioHttpClientTracer {
         )
       )
 
-  def methodWithPathSpanNamer(req: Request): String =
+  private def defaultSpanNamer(req: Request): String =
     s"${req.method.toString()} ${req.url.path.toString()}"
 
   private def toAttributes(req: Request): Map[String, AttributeValue] =
