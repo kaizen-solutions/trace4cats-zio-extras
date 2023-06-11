@@ -49,5 +49,5 @@ As you've probably noticed, revealing headers for each Tapir endpoint can be a b
 Hence, we recommend a more streamlined approach:
 
 Instead of managing headers directly in Tapir, try compiling the Tapir endpoints first, and then accessing the 
-underlying server integration (like [HTTP4S](../HTTP/http4s.md) & [ZIO HTTP](../HTTP/ziohttp)). 
+underlying server integration (like [HTTP4S](../HTTP/http4s.md) & [ZIO HTTP](../HTTP/ziohttp.md)). 
 This approach tends to be more straightforward.

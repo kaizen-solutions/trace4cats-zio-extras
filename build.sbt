@@ -450,6 +450,7 @@ lazy val docs =
       http4sExample,
       zioHttp,
       sttp,
+      sttpExample,
       tapir,
       virgil,
       doobie,
