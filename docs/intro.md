@@ -25,7 +25,7 @@ __Database__
 __Messaging__
 - [fs2-kafka](https://fd4s.github.io/fs2-kafka/)
 - [zio-kafka](https://zio.dev/zio-kafka/)
-
+    
 __Streams__
 - [fs2](https://fs2.io/)
 
