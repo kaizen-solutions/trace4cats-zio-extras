@@ -28,11 +28,12 @@ __Messaging__
     
 __Streams__
 - [fs2](https://fs2.io/)
+- [zio-streams](https://zio.dev/reference/stream/)
 
 ## How it works
-Trace4Cats without making use of the typeclasses inside trace4cats (eg. `Provide`, etc.) and instead leverages `FiberRef`s 
-hiding behind the `ZTracer` abstraction to call the underlying Trace4Cats APIs in order to provide a better experience 
-for the user.
+This library leverages Trace4Cats without making use of the typeclasses inside trace4cats (eg. `Provide`, etc.) and 
+instead leverages `FiberRef`s hiding behind the `ZTracer` abstraction to call the underlying Trace4Cats APIs in order to 
+provide a better experience for the user.
 
 ## Compatibility
 This library is built for ZIO 2.x and is cross-built for Scala 2.12.x, 2.13.x and 3.3.x LTS targeting the latest version
