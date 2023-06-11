@@ -447,6 +447,7 @@ lazy val docs =
       fs2,
       fs2Kafka,
       http4s,
+      http4sExample,
       zioHttp,
       sttp,
       tapir,
