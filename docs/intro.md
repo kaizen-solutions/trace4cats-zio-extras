@@ -9,7 +9,7 @@ for ZIO and its ecosystem built on top of the excellent [trace4cats](https://git
 
 ## Getting started
 
-Latest Release
+[Latest Release](https://search.maven.org/search?q=g:io.kaizen-solutions%20AND%20a:trace4cats-zio-extras-*)
 
 [![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.kaizen-solutions/trace4cats-zio-extras-core_2.13/badge.svg)](https://maven-badges.herokuapp.com/maven-central/io.kaizen-solutions/trace4cats-zio-extras-core_2.13)
 
