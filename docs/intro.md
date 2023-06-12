@@ -7,7 +7,50 @@ title: Introduction
 Trace4Cats ZIO Extras provides [**distributed tracing**](https://www.datadoghq.com/knowledge-center/distributed-tracing) 
 for ZIO and its ecosystem built on top of the excellent [trace4cats](https://github.com/trace4cats/trace4cats) library.
 
-## What it does
+## Getting started
+
+Latest Release
+
+[![Maven Central](https://maven-badges.herokuapp.com/maven-central/io.kaizen-solutions/trace4cats-zio-extras-core_2.13/badge.svg)](https://maven-badges.herokuapp.com/maven-central/io.kaizen-solutions/trace4cats-zio-extras-core_2.13)
+
+
+```scala
+libraryDependencies ++= {
+  val org = "io.kaizensolutions"
+  val version = "@VERSION@"
+
+  Seq(
+    org %% "trace4cats-zio-extras-core"       % version,  // core 
+
+    // streaming
+    org %% "trace4cats-zio-extras-fs2"        % version,  // fs2
+
+    // http
+    org %% "trace4cats-zio-extras-http4s"     % version,  // http4s
+    org %% "trace4cats-zio-extras-sttp"       % version,  // sttp
+    org %% "trace4cats-zio-extras-tapir"      % version,  // tapir
+    org %% "trace4cats-zio-extras-zio-http"   % version,  // zio-http
+
+    // database
+    org %% "trace4cats-zio-extras-virgil"     % version,  // virgil
+    org %% "trace4cats-zio-extras-doobie"     % version,  // doobie
+    org %% "trace4cats-zio-extras-skunk"      % version,  // skunk
+    
+    // messaging
+    org %% "trace4cats-zio-extras-fs2-kafka"  % version,  // fs2-kafka
+    org %% "trace4cats-zio-extras-zio-kafka"  % version   // zio-kafka
+  )
+}
+```
+
+This library is also available on [JitPack](https://jitpack.io/#kaizen-solutions/trace4cats-zio-extras):
+
+[![JitPack](https://jitpack.io/v/kaizen-solutions/trace4cats-zio-extras.svg)](https://jitpack.io/#kaizen-solutions/trace4cats-zio-extras)
+
+**NOTE:** that the coordinates on JitPack are different from the ones on Maven Central. 
+Please click the JitPack link or badge above to see the correct coordinates if you choose to go the JitPack route.
+
+## Summary
 This library provides the `ZTracer` abstraction in order to create [traces & spans](https://www.honeycomb.io/blog/datasets-traces-spans). 
 It also provides a variety of integrations with popular libraries such as:
 
