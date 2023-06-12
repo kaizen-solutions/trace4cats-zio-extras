@@ -57,10 +57,20 @@ const config = {
     ],
   ],
 
+  plugins: [
+    require.resolve("@cmfcmf/docusaurus-search-local")
+  ],
+
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
       image: 'img/social-card.svg',
+      metadata: [
+        {
+          name: 'keywords',
+          content: 'functional-programming, scala, zio, distributed-tracing, trace4cats, trace4cats-zio-extras'
+        }
+      ],
       navbar: {
         title: 'Trace4Cats ZIO Extras',
         logo: {
