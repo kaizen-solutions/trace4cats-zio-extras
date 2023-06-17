@@ -16,7 +16,7 @@ for ZIO and its ecosystem built on top of the excellent [trace4cats](https://git
 
 ```scala
 libraryDependencies ++= {
-  val org = "io.kaizensolutions"
+  val org = "io.kaizen-solutions"
   val version = "@VERSION@"
 
   Seq(
