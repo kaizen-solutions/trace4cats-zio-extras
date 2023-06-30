@@ -49,7 +49,7 @@ object TracedTransactor {
           span.putAll(attributes) *>
             ZIO.foreachDiscard(failure)(f => span.setStatus(SpanStatus.Internal(f.getMessage)))
         ).unit
-      } *> ZIO.debug(logEvent)
+      }
     }
 
     logEvent match {
