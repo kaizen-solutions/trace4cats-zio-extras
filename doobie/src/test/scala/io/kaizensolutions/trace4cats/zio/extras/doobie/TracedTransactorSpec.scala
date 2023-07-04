@@ -1,5 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras.doobie
 
+import cats.data.NonEmptyList
 import doobie.Transactor
 import doobie.implicits.*
 import doobie.util.ExecutionContexts
@@ -18,7 +19,8 @@ object TracedTransactorSpec extends ZIOSpecDefault {
       .fromDataSource[Task]
       .apply[DataSource](
         _,
-        ExecutionContexts.synchronous
+        ExecutionContexts.synchronous,
+        None
       )
   )
 
@@ -27,7 +29,7 @@ object TracedTransactorSpec extends ZIOSpecDefault {
   )
 
   val tracedXa: ZLayer[DataSource & ZTracer, Throwable, doobie.Transactor[Task]] =
-    xa >>> TracedTransactor.layer
+    xa >>> TracedTransactor.default
   def spec = suite("Traced Transactor")(
     test("Captures queries") {
       val q = sql"SELECT 1".query[Int].unique
@@ -60,8 +62,7 @@ object TracedTransactorSpec extends ZIOSpecDefault {
       } yield assertTrue(
         spans.exists(span =>
           span.name == "SELECT ?, ?" &&
-            span.attributes.exists { case (k, v) => k == "?1" && v.value.value == p1.toString } &&
-            span.attributes.exists { case (k, v) => k == "?2" && v.value.value == p2.toString }
+            span.attributes.exists { case (k, v) => k == "query.arguments" && v.value.value == NonEmptyList.of(p1.toString, p2.toString) }
         )
       )
     }

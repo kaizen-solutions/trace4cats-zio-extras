@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <appender name="local" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%green(%d{HH:mm:ss.SSS}) [%thread] [%mdc] %highlight(%-5level) %logger{30} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="lmax-disruptor" class="net.logstash.logback.appender.LoggingEventAsyncDisruptorAppender">
+        <appender-ref ref="local" />
+    </appender>
+
+    <root level="info"> <!-- change this to info when debugging -->
+        <appender-ref ref="local" />
+    </root>
+</configuration>
