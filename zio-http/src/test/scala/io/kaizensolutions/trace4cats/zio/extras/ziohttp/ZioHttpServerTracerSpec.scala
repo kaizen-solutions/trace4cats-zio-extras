@@ -77,38 +77,39 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
                    .from(spans.find(_.name == "plaintext-fetch"))
                    .orElseFail(new IllegalStateException("Expected plaintext-fetch span not found"))
           } yield assertTrue(spans.length == 3)
-        } + suite("Header injection"){
-            val app = Http.collectZIO[Request] {
-              case Method.GET -> Root => ZIO.succeed(Response.ok)
-              case Method.GET -> Root / "fail" => ZIO.fail(new RuntimeException("fail"))
-            }
-        val wrappedApp: http.App[ZTracer] = app.withDefaultErrorResponse @@ ZioHttpServerTracer.injectHeaders() @@ ZioHttpServerTracer.trace()
+        } + suite("Header injection") {
+          val app = Http.collectZIO[Request] {
+            case Method.GET -> Root          => ZIO.succeed(Response.ok)
+            case Method.GET -> Root / "fail" => ZIO.fail(new RuntimeException("fail"))
+          }
+          val wrappedApp: http.App[ZTracer] =
+            app.withDefaultErrorResponse @@ ZioHttpServerTracer.injectHeaders() @@ ZioHttpServerTracer.trace()
 
-        test("Succeeds on a successful response") {
-          for {
-            res <- wrappedApp.runZIO(Request.get(URL(Root)))
-            spans <- InMemorySpanCompleter.retrieveCollected
-            httpHeadersFromSpan = toHttpHeaders(spans.head, ToHeaders.standard)
-          } yield assertTrue(
-            res.headers.toSeq
-              .diff(httpHeadersFromSpan.toSeq)
-              .isEmpty
-          )
-        } + test("Succeeds on a failing response") {
-          for {
-            res <- wrappedApp.runZIO(Request.get(URL(Root / "fail")))
-            spans <- InMemorySpanCompleter.retrieveCollected
-            httpHeadersFromSpan = toHttpHeaders(spans.head, ToHeaders.standard)
-          } yield assertTrue(
-            res.headers.toSeq
-              .diff(httpHeadersFromSpan.toSeq)
-              .isEmpty
-          )
-        }
+          test("Succeeds on a successful response") {
+            for {
+              res                <- wrappedApp.runZIO(Request.get(URL(Root)))
+              spans              <- InMemorySpanCompleter.retrieveCollected
+              httpHeadersFromSpan = toHttpHeaders(spans.head, ToHeaders.standard)
+            } yield assertTrue(
+              res.headers.toSeq
+                .diff(httpHeadersFromSpan.toSeq)
+                .isEmpty
+            )
+          } + test("Succeeds on a failing response") {
+            for {
+              res                <- wrappedApp.runZIO(Request.get(URL(Root / "fail")))
+              spans              <- InMemorySpanCompleter.retrieveCollected
+              httpHeadersFromSpan = toHttpHeaders(spans.head, ToHeaders.standard)
+            } yield assertTrue(
+              res.headers.toSeq
+                .diff(httpHeadersFromSpan.toSeq)
+                .isEmpty
+            )
+          }
 
-      }.provide(
-        InMemorySpanCompleter.layer("foo-app")
-      )
+        }.provide(
+          InMemorySpanCompleter.layer("foo-app")
+        )
     )
 
   def setup[A](f: ZTracer => A): RIO[Scope, (InMemorySpanCompleter, A)] =
@@ -121,8 +122,8 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
 
   private def toHttpHeaders(span: CompletedSpan, whichHeaders: ToHeaders): Headers =
     Headers(
-      whichHeaders.fromContext(span.context)
-        .values
-        .collect { case (k, v) if v.nonEmpty => Header.Custom(k.toString, v) }
+      whichHeaders.fromContext(span.context).values.collect {
+        case (k, v) if v.nonEmpty => Header.Custom(k.toString, v)
+      }
     )
 }
