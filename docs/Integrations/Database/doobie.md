@@ -22,11 +22,12 @@ val transactorLayer = ZLayer.succeed(
     driver = "org.postgresql.Driver",
     url = "jdbc:postgresql:postgres",
     user = "postgres",
-    pass = "postgres"
+    password = "postgres",
+    logHandler = None
   )
 )
 val tracedTransactorLayer: URLayer[ZTracer, Transactor[Task]] =
-  ZLayer.service[ZTracer] ++ transactorLayer >>> TracedTransactor.layer
+  ZLayer.service[ZTracer] ++ transactorLayer >>> TracedTransactor.default
 
 case class City(id: Int, name: String, countryCode: String, district: String, population: Int)
 
