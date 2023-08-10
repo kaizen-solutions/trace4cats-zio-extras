@@ -60,11 +60,10 @@ object KafkaProducerTracer {
         .extractHeaders(headers)
         .flatMap { traceHeaders =>
           val enrichSpanWithTopics =
-            if (span.isSampled)
-              NonEmptyList
-                .fromList(records.map(_.topic).toList)
-                .fold(ifEmpty = ZIO.unit)(topics => span.put("topics", AttributeValue.StringList(topics)))
-            else ZIO.unit
+            NonEmptyList
+              .fromList(records.map(_.topic).toList.distinct)
+              .fold(ifEmpty = ZIO.unit)(topics => span.put("topics", AttributeValue.StringList(topics)))
+              .when(span.isSampled)
 
           val kafkaTraceHeaders =
             Headers.fromIterable(traceHeaders.values.map { case (k, v) => Header(k.toString, v) })

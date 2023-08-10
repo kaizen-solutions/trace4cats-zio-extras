@@ -96,7 +96,7 @@ object KafkaProducerTracer {
           val sendToProducerBuffer = for {
             _ <- ZIO
                    .fromOption(NonEmptyList.fromList(records.toList))
-                   .flatMap(nel => span.put("topics", AttributeValue.StringList(nel.map(_.topic()))))
+                   .flatMap(nel => span.put("topics", AttributeValue.StringList(nel.map(_.topic()).distinct)))
                    .ignore
             kafkaTraceHeaders =
               traceHeaders.values.map { case (k, v) => new RecordHeader(k.toString, v.getBytes) }.toList
