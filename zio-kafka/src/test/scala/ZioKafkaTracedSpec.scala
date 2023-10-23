@@ -40,7 +40,7 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
     ZIO.serviceWith[EmbeddedKafkaConfig](producerConfig).flatMap(Producer.make)
   )
 
-  def spec = suite("Tracing ZIO Kafka producers and consumers")(
+  def spec: Spec[Any, Throwable] = suite("Tracing ZIO Kafka producers and consumers")(
     suite("Producer")(
       test("Produces traces") {
         val topic = UUID.randomUUID().toString

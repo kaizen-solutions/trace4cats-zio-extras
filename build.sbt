@@ -1,7 +1,7 @@
 inThisBuild {
   val scala212 = "2.12.18"
-  val scala213 = "2.13.11"
-  val scala3   = "3.3.0"
+  val scala213 = "2.13.12"
+  val scala3   = "3.3.1"
 
   Seq(
     scalaVersion       := scala213,
@@ -198,7 +198,7 @@ lazy val http4s = project
       val http4s     = "org.http4s"
 
       Seq(
-        trace4Cats %% "trace4cats-http4s-common" % Versions.trace4CatsJaegarExporter,
+        trace4Cats %% "trace4cats-http4s-common" % Versions.trace4CatsHttp4sCommon,
         http4s     %% "http4s-client"            % Versions.http4s
       )
     }
@@ -254,7 +254,7 @@ lazy val zioHttpExample =
           trace4cats      %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
           "dev.zio"       %% "zio-logging-slf4j"                 % Versions.zioLogging,
           "dev.zio"       %% "zio-logging-slf4j-bridge"          % Versions.zioLogging,
-          "ch.qos.logback" % "logback-classic"                   % "1.4.7"
+          "ch.qos.logback" % "logback-classic"                   % "1.4.11"
         )
       }
     )
@@ -378,7 +378,7 @@ lazy val skunk =
           "org.tpolecat"  %% "skunk-core"        % Versions.skunk,
           "io.zonky.test"  % "embedded-postgres" % Versions.embeddedPostgres % Test,
           "dev.zio"       %% "zio-logging-slf4j" % Versions.zioLogging       % Test,
-          "ch.qos.logback" % "logback-classic"   % "1.4.7"                   % Test
+          "ch.qos.logback" % "logback-classic"   % "1.4.11"                  % Test
         )
     )
     .dependsOn(
@@ -406,7 +406,7 @@ lazy val zioKafka =
         "dev.zio"                 %% "zio-kafka"         % Versions.zioKafka,
         "io.github.embeddedkafka" %% "embedded-kafka"    % Versions.kafkaEmbedded % Test,
         "dev.zio"                 %% "zio-logging-slf4j" % Versions.zioLogging    % Test,
-        "ch.qos.logback"           % "logback-classic"   % "1.4.7"                % Test
+        "ch.qos.logback"           % "logback-classic"   % "1.4.11"               % Test
       ),
       excludeDependencies ++= {
         CrossVersion.partialVersion(scalaVersion.value) match {
@@ -427,7 +427,7 @@ lazy val zioKafkaExamples = {
       libraryDependencies ++= Seq(
         "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
         "dev.zio"          %% "zio-logging-slf4j"                 % Versions.zioLogging,
-        "ch.qos.logback"    % "logback-classic"                   % "1.4.7"
+        "ch.qos.logback"    % "logback-classic"                   % "1.4.11"
       )
     )
     .dependsOn(

@@ -4,12 +4,12 @@ import io.kaizensolutions.trace4cats.zio.extras.*
 import trace4cats.model.TraceProcess
 import zio.kafka.consumer.{Consumer, ConsumerSettings, Subscription}
 import zio.kafka.serde.Serde
-import zio.{ZIO, ZIOAppDefault, ZLayer}
+import zio.{Scope, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer}
 
 import java.util.UUID
 
 object TracedKafkaConsumerExample extends ZIOAppDefault {
-  override val run = {
+  override val run: ZIO[ZIOAppArgs & Scope, Any, Any] = {
     val consumerSettings = ConsumerSettings(List(s"localhost:9092"))
       .withGroupId(UUID.randomUUID().toString)
       .withOffsetRetrieval(Consumer.OffsetRetrieval.Auto(Consumer.AutoOffsetStrategy.Earliest))
