@@ -8,7 +8,7 @@ import zio.kafka.serde.Serde
 
 object TracedKafkaProducerExample extends ZIOAppDefault {
 
-  override val run = {
+  override val run: ZIO[ZIOAppArgs & Scope, Any, Any] = {
     val producerSettings = ProducerSettings(List("localhost:9092"))
 
     ZIO.foreachDiscard(1 to 10)(i =>

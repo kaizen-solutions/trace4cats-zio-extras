@@ -76,9 +76,11 @@ object ZioHttpServerTracer {
   }
 
   /**
-    Injects span headers into the response, so that its easier to look them up in logs or monitoring software
-
-   Note: This only works in conjunction with the `trace` middleware, since it needs access to the span created for that request
+   * Injects span headers into the response, so that its easier to look them up
+   * in logs or monitoring software
+   *
+   * Note: This only works in conjunction with the `trace` middleware, since it
+   * needs access to the span created for that request
    */
   def injectHeaders(whichHeaders: ToHeaders = ToHeaders.standard): RequestHandlerMiddleware.Simple[ZTracer, Response] =
     new RequestHandlerMiddleware.Simple[ZTracer, Response] {

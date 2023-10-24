@@ -24,7 +24,7 @@ object ExampleApp extends ZIOAppDefault {
     );
    */
 
-  val run = {
+  val run: ZIO[Any & ZIOAppArgs & Scope, Any, Any] = {
     val queryProgram: ZIO[CQLExecutor & ZTracer, Throwable, Unit] =
       ZTracer
         .span("all-persons") {
