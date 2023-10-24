@@ -19,7 +19,7 @@ object KafkaProducerTracer {
   def trace(
     tracer: ZTracer,
     underlying: Producer,
-    toHeaders: ToHeaders = ToHeaders.all
+    headerFormat: ToHeaders = ToHeaders.all
   ): Producer = new Producer {
     override def produce(record: ProducerRecord[Array[Byte], Array[Byte]]): Task[RecordMetadata] =
       produceChunk(Chunk.single(record)).map(_.head)
@@ -33,24 +33,12 @@ object KafkaProducerTracer {
     override def produceChunkAsync(
       records: Chunk[ProducerRecord[Array[Byte], Array[Byte]]]
     ): Task[Task[Chunk[RecordMetadata]]] =
-      tracedProduceChunkAsyncBytes(tracer, underlying, toHeaders)(records)
+      tracedProduceChunkAsyncBytes(tracer, underlying, headerFormat)(records)
 
     override def produceChunkAsyncWithFailures(
       records: Chunk[ProducerRecord[Array[Byte], Array[Byte]]]
     ): UIO[UIO[Chunk[Either[Throwable, RecordMetadata]]]] =
-      tracer.withSpan("kafka-producer-send-buffer", kind = SpanKind.Producer) { span =>
-        tracer
-          .extractHeaders(toHeaders)
-          .flatMap { traceHeaders =>
-            val sendToProducerBuffer: UIO[UIO[Chunk[Either[Throwable, RecordMetadata]]]] = for {
-              _                  <- enrichSpanWithTopics(records, span)
-              recordsWithHeaders <- enrichRecordsWithTraceHeaders(traceHeaders, records)
-              waitForAck         <- underlying.produceChunkAsyncWithFailures(recordsWithHeaders)
-            } yield waitForAck
-
-            enrichSpanWithBufferSendAndBrokerAckInfo(tracer, span, toHeaders)(sendToProducerBuffer)
-          }
-      }
+      traceCall(tracer, headerFormat, records)(underlying.produceChunkAsyncWithFailures)
 
     override def produce[R, K, V](
       record: ProducerRecord[K, V],
@@ -89,7 +77,7 @@ object KafkaProducerTracer {
       keySerializer: Serializer[R, K],
       valueSerializer: Serializer[R, V]
     ): RIO[R, Task[Chunk[RecordMetadata]]] =
-      tracedProduceChunkAsync(tracer, underlying, toHeaders, keySerializer, valueSerializer)(records)
+      tracedProduceChunkAsync(tracer, underlying, headerFormat, keySerializer, valueSerializer)(records)
 
     override def produceChunk[R, K, V](
       records: Chunk[ProducerRecord[K, V]],
@@ -109,25 +97,45 @@ object KafkaProducerTracer {
     keySerializer: Serializer[R, K],
     valueSerializer: Serializer[R, V]
   )(records: Chunk[ProducerRecord[K, V]]): RIO[R, Task[Chunk[RecordMetadata]]] =
-    tracer.withSpan("kafka-producer-send-buffer", kind = SpanKind.Producer) { span =>
-      tracer
-        .extractHeaders(headers)
-        .flatMap { traceHeaders =>
-          val sendToProducerBuffer = for {
-            _                  <- enrichSpanWithTopics(records, span)
-            recordsWithHeaders <- enrichRecordsWithTraceHeaders(traceHeaders, records)
-            waitForAck         <- underlying.produceChunkAsync(recordsWithHeaders, keySerializer, valueSerializer)
-          } yield waitForAck
-
-          enrichSpanWithBufferSendAndBrokerAckInfo(tracer, span, headers)(sendToProducerBuffer)
-        }
-    }
+    traceCall(tracer, headers, records)(underlying.produceChunkAsync(_, keySerializer, valueSerializer))
 
   private def tracedProduceChunkAsyncBytes(
     tracer: ZTracer,
     underlying: Producer,
     headers: ToHeaders
   )(records: Chunk[ProducerRecord[Array[Byte], Array[Byte]]]): Task[Task[Chunk[RecordMetadata]]] =
+    traceCall(tracer, headers, records)(underlying.produceChunkAsync)
+
+  /**
+   * This method is used to trace the call to the underlying producer. It will
+   * create a span for the buffer send and another span for the broker ack. The
+   * broker ack span will be a child of the buffer send span.
+   *
+   * @param tracer
+   *   the tracer to use
+   * @param headers
+   *   the header format to use for the span
+   * @param records
+   *   the records to send
+   * @param underlyingCall
+   *   the call to the underlying producer
+   * @tparam Env
+   *   the environment
+   * @tparam Err
+   *   the error type
+   * @tparam K
+   *   the key type
+   * @tparam V
+   *   the value type
+   * @tparam Out
+   *   the output type
+   * @return
+   */
+  private def traceCall[Env, Err, K, V, Out](
+    tracer: ZTracer,
+    headers: ToHeaders,
+    records: Chunk[ProducerRecord[K, V]]
+  )(underlyingCall: Chunk[ProducerRecord[K, V]] => ZIO[Env, Err, IO[Err, Out]]): ZIO[Env, Err, IO[Err, Out]] =
     tracer.withSpan("kafka-producer-send-buffer", kind = SpanKind.Producer) { span =>
       tracer
         .extractHeaders(headers)
@@ -135,7 +143,7 @@ object KafkaProducerTracer {
           val sendToProducerBuffer = for {
             _                  <- enrichSpanWithTopics(records, span)
             recordsWithHeaders <- enrichRecordsWithTraceHeaders(traceHeaders, records)
-            waitForAck         <- underlying.produceChunkAsync(recordsWithHeaders)
+            waitForAck         <- underlyingCall(recordsWithHeaders)
           } yield waitForAck
 
           enrichSpanWithBufferSendAndBrokerAckInfo(tracer, span, headers)(sendToProducerBuffer)
