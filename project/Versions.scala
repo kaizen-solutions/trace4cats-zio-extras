@@ -13,7 +13,7 @@ object Versions {
   val http4s                   = "0.23.23"
   val tapir                    = "1.8.2"
   val sttp                     = "3.9.0"
-  val virgil                   = "v1.0.4"
+  val virgil                   = "1.0.4"
   val doobie                   = "1.0.0-RC4"
   val skunk                    = "0.6.1"
   val embeddedPostgres         = "2.0.4"

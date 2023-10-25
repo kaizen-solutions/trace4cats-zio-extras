@@ -319,9 +319,8 @@ lazy val virgil =
     .in(file("virgil"))
     .settings(kindProjectorSettings*)
     .settings(
-      resolvers += "jitpack".at("https://jitpack.io"),
-      name                                                        := "trace4cats-zio-extras-virgil",
-      libraryDependencies += "com.github.kaizen-solutions.virgil" %% "virgil-zio" % Versions.virgil
+      name                                         := "trace4cats-zio-extras-virgil",
+      libraryDependencies += "io.kaizen-solutions" %% "virgil-zio" % Versions.virgil
     )
     .dependsOn(core % "compile->compile;test->test")
 
@@ -330,7 +329,6 @@ lazy val virgilExample =
     .in(file("virgil-examples"))
     .settings(kindProjectorSettings*)
     .settings(
-      resolvers += "jitpack".at("https://jitpack.io"),
       name                                      := "trace4cats-zio-extras-virgil-examples",
       libraryDependencies += "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
       publish / skip                            := true
