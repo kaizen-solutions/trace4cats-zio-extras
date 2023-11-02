@@ -12,13 +12,6 @@ import zio.http.*
 object ZioHttpServerTracer {
 
   /**
-   * SpanNamer is a custom mapping so if you had a path parameter like
-   * /user/1234, you could map it to /user/:id to reduce the cardinality of your
-   * traces
-   */
-  type SpanNamer = PartialFunction[Request, String]
-
-  /**
    * Tracing middleware for ZIO HTTP apps
    *
    * @param dropHeadersWhen
@@ -36,43 +29,36 @@ object ZioHttpServerTracer {
    */
   def trace(
     dropHeadersWhen: String => Boolean = SensitiveHeaders.contains,
-    spanNamer: SpanNamer = Map.empty[Request, String],
     errorHandler: ErrorHandler = ErrorHandler.empty,
     enrichLogs: Boolean = false,
     logHeaders: ToHeaders = ToHeaders.standard
-  ): RequestHandlerMiddleware.Simple[ZTracer, Nothing] = {
-    val spanNamerTotal: Request => String = { request =>
-      val httpMethod = request.method.toString()
-      if (spanNamer.isDefinedAt(request)) s"$httpMethod ${spanNamer(request)}"
-      else s"$httpMethod ${request.url.path.toString()}"
-    }
+  ): Middleware[ZTracer] = new Middleware[ZTracer] {
+    override def apply[Env <: ZTracer, Err](routes: Routes[Env, Err]): Routes[Env, Err] =
+      Routes.fromIterable(
+        routes.routes.map(route =>
+          route.transform(handler =>
+            Handler.fromFunctionZIO[Request] { request =>
+              val traceHeaders = extractTraceHeaders(request.headers)
+              val nameOfSpan   = route.routePattern.render
 
-    new RequestHandlerMiddleware.Simple[ZTracer, Nothing] {
+              ZIO.serviceWithZIO[ZTracer](
+                _.fromHeaders(traceHeaders, nameOfSpan, SpanKind.Server, errorHandler) { span =>
+                  val logTraceContext =
+                    if (enrichLogs) ZIOAspect.annotated(annotations = extractKVHeaders(span, logHeaders).toList*)
+                    else ZIOAspect.identity
 
-      def apply[Env <: ZTracer, Err >: Nothing](
-        handler: Handler[Env, Err, Request, Response]
-      )(implicit trace: Trace): Handler[Env, Err, Request, Response] =
-        Handler.fromFunctionZIO[Request] { request =>
-          val traceHeaders = extractTraceHeaders(request.headers)
-          val nameOfSpan   = spanNamerTotal(request)
-
-          ZIO.serviceWithZIO[ZTracer](
-            _.fromHeaders(traceHeaders, nameOfSpan, SpanKind.Server, errorHandler) { span =>
-              val logTraceContext =
-                if (enrichLogs) {
-                  ZIOAspect.annotated(annotations = extractKVHeaders(span, logHeaders).toList*)
-                } else ZIOAspect.identity
-
-              enrichSpanFromRequest(request, dropHeadersWhen, span) *>
-                // NOTE: We need to call handler.runZIO and have the code executed within our span for propagation to take place
-                (handler.runZIO(request) @@ logTraceContext).onExit {
-                  case Exit.Success(response) => enrichSpanFromResponse(response, dropHeadersWhen, span)
-                  case Exit.Failure(cause)    => span.setStatus(SpanStatus.Internal(cause.prettyPrint))
+                  enrichSpanFromRequest(request, dropHeadersWhen, span) *>
+                    // NOTE: We need to call handler.runZIO and have the code executed within our span for propagation to take place
+                    (handler.runZIO(request) @@ logTraceContext).onExit {
+                      case Exit.Success(response) => enrichSpanFromResponse(response, dropHeadersWhen, span)
+                      case Exit.Failure(cause)    => span.setStatus(SpanStatus.Internal(cause.prettyPrint))
+                    }
                 }
+              )
             }
           )
-        }
-    }
+        )
+      )
   }
 
   /**
@@ -82,18 +68,18 @@ object ZioHttpServerTracer {
    * Note: This only works in conjunction with the `trace` middleware, since it
    * needs access to the span created for that request
    */
-  def injectHeaders(whichHeaders: ToHeaders = ToHeaders.standard): RequestHandlerMiddleware.Simple[ZTracer, Response] =
-    new RequestHandlerMiddleware.Simple[ZTracer, Response] {
-      def apply[Env <: ZTracer, Err >: Response](
-        handler: Handler[Env, Err, Request, Response]
-      )(implicit trace: Trace): Handler[Env, Err, Request, Response] = {
-        Handler.fromFunctionZIO(request =>
-          ZTracer.retrieveCurrentSpan.flatMap { span =>
-            val headers = toHttpHeaders(span, whichHeaders)
-            handler(request).fold(
-              _ => Response.status(Status.InternalServerError).addHeaders(headers),
-              _.addHeaders(headers)
-            )
+  def injectHeaders(whichHeaders: ToHeaders = ToHeaders.standard): Middleware[ZTracer] =
+    new Middleware[ZTracer] {
+      override def apply[Env <: ZTracer, Err](routes: Routes[Env, Err]): Routes[Env, Err] = {
+        routes.transform(handler =>
+          Handler.fromFunctionZIO[Request] { request =>
+            ZTracer.retrieveCurrentSpan.flatMap { span =>
+              val headers = toHttpHeaders(span, whichHeaders)
+              handler(request).fold(
+                _.addHeaders(headers),
+                _.addHeaders(headers)
+              )
+            }
           }
         )
       }
@@ -167,6 +153,7 @@ object ZioHttpServerTracer {
     val http = "HTTP"
     val version =
       in match {
+        case Version.Default  => "Default"
         case Version.Http_1_0 => "1.0"
         case Version.Http_1_1 => "1.1"
       }
