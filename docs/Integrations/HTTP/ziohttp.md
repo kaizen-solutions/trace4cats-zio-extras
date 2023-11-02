@@ -17,29 +17,27 @@ import io.kaizensolutions.trace4cats.zio.extras.ziohttp.server.ZioHttpServerTrac
 import zio.*
 import zio.http.*
 
-val http: Http[ZTracer, Throwable, Request, Response] =   
-  Http.collectZIO[Request] {
-      case Method.GET -> Root / "plaintext" =>
-        ZTracer.withSpan("plaintext-fetch-db") { span =>
-          for {
-            sleep <- Random.nextIntBetween(1, 3)
-            _     <- span.put("sleep-duration.seconds", sleep)
-            _     <- ZIO.logInfo("HELLO")
-            _     <- ZTracer.spanSource()(ZIO.sleep(sleep.seconds))
-          } yield Response
-            .text(sleep.toString)
-            .updateHeaders(_.addHeader("custom-header", sleep.toString))
-            .withStatus(Status.Ok)
-        }
+val http =
+  Routes(
+    Method.GET / "plaintext" -> handler(
+      ZTracer.withSpan("plaintext-fetch-db") { span =>
+        for {
+          sleep <- Random.nextIntBetween(1, 3)
+          _     <- span.put("sleep-duration.seconds", sleep)
+          _     <- ZIO.logInfo("HELLO")
+          _     <- ZTracer.spanSource()(ZIO.sleep(sleep.seconds) *> Db.get(sleep))
+        } yield Response
+          .text(sleep.toString)
+          .updateHeaders(_.addHeader("custom-header", sleep.toString))
+          .status(Status.Ok)
+      }
+    ),
+    Method.GET / "fail"        -> handler(ZIO.fail(new RuntimeException("Error"))),
+    Method.GET / "bad_gateway" -> handler(ZIO.succeed(Response.status(Status.BadGateway)))
+  )
 
-      case Method.GET -> Root / "fail" =>
-        ZIO.fail(new RuntimeException("Error"))
-
-      case Method.GET -> Root / "bad_gateway" =>
-        ZIO.succeed(Response.status(Status.BadGateway))
-    }
-
-val app: App[ZTracer] = http.withDefaultErrorResponse
+val app: HttpApp[Db & ZTracer] =
+  http.handleError(error => Response.text(error.getMessage).status(Status.InternalServerError)).toHttpApp
 
 @scala.annotation.nowarn 
 val tracedApp: App[ZTracer] = app @@ trace(enrichLogs = true) // the tracing middleware
