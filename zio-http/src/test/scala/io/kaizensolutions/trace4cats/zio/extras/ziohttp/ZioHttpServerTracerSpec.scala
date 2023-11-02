@@ -9,6 +9,7 @@ import zio.http.*
 import zio.test.*
 
 object ZioHttpServerTracerSpec extends ZIOSpecDefault {
+  val customHeaderName = "custom-header"
   val testApp: HttpApp[ZTracer] =
     Routes(
       Method.GET / "plaintext" -> handler(
@@ -18,7 +19,7 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
             .map(sleep =>
               Response
                 .text(sleep.toString)
-                .updateHeaders(_.addHeader("custom-header", sleep.toString))
+                .updateHeaders(_.addHeader(customHeaderName, sleep.toString))
                 .status(Status.Ok)
             )
         }
@@ -40,16 +41,20 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
                 (testApp @@ ZioHttpServerTracer.trace())
                   .provideEnvironment(ZEnvironment.empty.add(tracer))
               )
-            (completer, app) = result
-            response        <- app.runZIO(Request.get(URL(Root / "plaintext")))
-            spans           <- completer.retrieveCollected
-            httpSpan        <- ZIO.from(spans.find(_.name == "GET /plaintext"))
-            fetchSpan       <- ZIO.from(spans.find(_.name == "plaintext-fetch"))
+            (completer, app)     = result
+            response            <- app.runZIO(Request.get(URL(Root / "plaintext")))
+            spans               <- completer.retrieveCollected
+            httpSpan            <- ZIO.from(spans.find(_.name == "GET /plaintext"))
+            fetchSpan           <- ZIO.from(spans.find(_.name == "plaintext-fetch"))
+            parentSpanIdOfFetch <- ZIO.fromOption(fetchSpan.context.parent.map(_.spanId))
+            spanIdOfHttp         = httpSpan.context.spanId
+            // This is done because assertTrue gets confused response.status and response.status(...)
+            responseStatus = response.status
           } yield assertTrue(
-            response.status == Status.Ok,
+            responseStatus == Status.Ok,
             spans.length == 2,
-            httpSpan.attributes.contains("resp.header.custom-header"),
-            fetchSpan.context.parent.map(_.spanId).contains(httpSpan.context.spanId)
+            httpSpan.attributes.contains(s"resp.header.$customHeaderName"),
+            parentSpanIdOfFetch == spanIdOfHttp
           )
         } +
           test("spans with path parameters have reduced cardinality automatically") {
@@ -87,11 +92,9 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
             res                <- wrappedApp.runZIO(Request.get(URL(Root)))
             spans              <- InMemorySpanCompleter.retrieveCollected
             httpHeadersFromSpan = toHttpHeaders(spans.head, ToHeaders.standard)
-          } yield assertTrue(
-            res.headers.toSeq
-              .diff(httpHeadersFromSpan.toSeq)
-              .isEmpty
-          )
+            // This is done because assertTrue gets confused res.headers and res.headers(...)
+            responseHeaders = res.headers
+          } yield assertTrue(responseHeaders.toSeq.diff(httpHeadersFromSpan.toSeq).isEmpty)
         } + test("Succeeds on a failing response")(
           for {
             resActual <- wrappedApp.runZIO(Request.get(URL(Root / "fail")))
