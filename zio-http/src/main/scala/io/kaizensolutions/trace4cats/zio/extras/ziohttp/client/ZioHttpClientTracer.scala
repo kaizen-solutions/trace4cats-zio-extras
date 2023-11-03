@@ -9,6 +9,9 @@ import trace4cats.{ErrorHandler, ToHeaders}
 import zio.*
 import zio.http.*
 
+/**
+ * Warning: This API is under construction
+ */
 object ZioHttpClientTracer {
   def makeRequest(
     tracer: ZTracer,
@@ -16,7 +19,7 @@ object ZioHttpClientTracer {
     toHeaders: ToHeaders = ToHeaders.standard,
     spanNamer: Map[Request, String] = Map.empty[Request, String],
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): ZIO[Client, Throwable, Response] = {
+  ): ZIO[Client & Scope, Throwable, Response] = {
     val nameOfRequest = spanNamer.getOrElse(request, defaultSpanNamer(request))
     tracer.withSpan(name = nameOfRequest, kind = SpanKind.Client, errorHandler = errorHandler) { span =>
       val traceHeaders = span.extractHeaders(toHeaders)
@@ -42,7 +45,7 @@ object ZioHttpClientTracer {
     toHeaders: ToHeaders = ToHeaders.standard,
     spanNamer: Map[Request, String] = Map.empty[Request, String],
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): ZIO[Client & ZTracer, Throwable, Response] =
+  ): ZIO[Client & Scope & ZTracer, Throwable, Response] =
     ZIO
       .service[ZTracer]
       .flatMap(tracer =>
@@ -60,17 +63,17 @@ object ZioHttpClientTracer {
     url: String,
     method: Method = Method.GET,
     headers: Headers = Headers.empty,
-    content: Body = Body.empty,
+    body: Body = Body.empty,
     toHeaders: ToHeaders = ToHeaders.standard,
     spanNamer: Map[Request, String] = Map.empty[Request, String],
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): ZIO[Client, Throwable, Response] =
+  ): ZIO[Client & Scope, Throwable, Response] =
     ZIO
       .fromEither(URL.decode(url))
       .flatMap(url =>
         makeRequest(
           tracer = tracer,
-          request = Request.default(method, url, content).addHeaders(headers),
+          request = Request(method = method, url = url, body = body).addHeaders(headers),
           toHeaders = toHeaders,
           spanNamer = spanNamer,
           errorHandler = errorHandler
@@ -81,11 +84,11 @@ object ZioHttpClientTracer {
     url: String,
     method: Method = Method.GET,
     headers: Headers = Headers.empty,
-    content: Body = Body.empty,
+    body: Body = Body.empty,
     toHeaders: ToHeaders = ToHeaders.standard,
     spanNamer: Map[Request, String] = Map.empty[Request, String],
     errorHandler: ErrorHandler = ErrorHandler.empty
-  ): ZIO[Client & ZTracer, Throwable, Response] =
+  ): ZIO[Client & Scope & ZTracer, Throwable, Response] =
     ZIO
       .service[ZTracer]
       .flatMap(tracer =>
@@ -94,7 +97,7 @@ object ZioHttpClientTracer {
           url = url,
           method = method,
           headers = headers,
-          content = content,
+          body = body,
           toHeaders = toHeaders,
           spanNamer = spanNamer,
           errorHandler = errorHandler

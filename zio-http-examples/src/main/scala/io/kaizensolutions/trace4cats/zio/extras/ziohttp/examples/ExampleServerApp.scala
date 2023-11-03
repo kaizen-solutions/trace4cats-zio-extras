@@ -9,9 +9,9 @@ import zio.logging.backend.SLF4J
 object ExampleServerApp extends ZIOAppDefault {
   override val bootstrap: ZLayer[ZIOAppArgs, Any, Any] = Runtime.removeDefaultLoggers >>> SLF4J.slf4j
 
-  val http: Http[Db & ZTracer, Throwable, Request, Response] =
-    Http.collectZIO[Request] {
-      case Method.GET -> Root / "plaintext" =>
+  val http =
+    Routes(
+      Method.GET / "plaintext" -> handler(
         ZTracer.withSpan("plaintext-fetch-db") { span =>
           for {
             sleep <- Random.nextIntBetween(1, 3)
@@ -21,17 +21,15 @@ object ExampleServerApp extends ZIOAppDefault {
           } yield Response
             .text(sleep.toString)
             .updateHeaders(_.addHeader("custom-header", sleep.toString))
-            .withStatus(Status.Ok)
+            .status(Status.Ok)
         }
+      ),
+      Method.GET / "fail"        -> handler(ZIO.fail(new RuntimeException("Error"))),
+      Method.GET / "bad_gateway" -> handler(ZIO.succeed(Response.status(Status.BadGateway)))
+    )
 
-      case Method.GET -> Root / "fail" =>
-        ZIO.fail(new RuntimeException("Error"))
-
-      case Method.GET -> Root / "bad_gateway" =>
-        ZIO.succeed(Response.status(Status.BadGateway))
-    }
-
-  val app: App[Db & ZTracer] = http.withDefaultErrorResponse
+  val app: HttpApp[Db & ZTracer] =
+    http.handleError(error => Response.text(error.getMessage).status(Status.InternalServerError)).toHttpApp
 
   override val run: ZIO[ZIOAppArgs & Scope, Any, Any] =
     Server

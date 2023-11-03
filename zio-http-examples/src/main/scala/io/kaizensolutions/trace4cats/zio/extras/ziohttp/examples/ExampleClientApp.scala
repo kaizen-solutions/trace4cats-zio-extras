@@ -42,7 +42,7 @@ object ExampleClientApp extends ZIOAppDefault {
       }
       .repeat(schedule)
       .exitCode
-      .provide(
+      .provideSome[Scope](
         ZClient.default,
         ZLayer.scoped(JaegerEntrypoint.entryPoint(TraceProcess("zio-http-client-example")).orDie),
         ZTracer.layer
