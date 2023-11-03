@@ -25,7 +25,7 @@ val http =
           sleep <- Random.nextIntBetween(1, 3)
           _     <- span.put("sleep-duration.seconds", sleep)
           _     <- ZIO.logInfo("HELLO")
-          _     <- ZTracer.spanSource()(ZIO.sleep(sleep.seconds) *> Db.get(sleep))
+          _     <- ZTracer.spanSource()(ZIO.sleep(sleep.seconds))
         } yield Response
           .text(sleep.toString)
           .updateHeaders(_.addHeader("custom-header", sleep.toString))
@@ -36,11 +36,10 @@ val http =
     Method.GET / "bad_gateway" -> handler(ZIO.succeed(Response.status(Status.BadGateway)))
   )
 
-val app: HttpApp[Db & ZTracer] =
+val app: HttpApp[ZTracer] =
   http.handleError(error => Response.text(error.getMessage).status(Status.InternalServerError)).toHttpApp
 
-@scala.annotation.nowarn 
-val tracedApp: App[ZTracer] = app @@ trace(enrichLogs = true) // the tracing middleware
+val tracedApp: HttpApp[ZTracer] = app @@ trace(enrichLogs = true) // the tracing middleware
 ```
 
 Notice how `enrichLogs` is set to true, this will start augmenting the log context with trace header information. You 
