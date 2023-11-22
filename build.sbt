@@ -1,11 +1,10 @@
 inThisBuild {
-  val scala212 = "2.12.18"
   val scala213 = "2.13.12"
   val scala3   = "3.3.1"
 
   Seq(
     scalaVersion       := scala213,
-    crossScalaVersions := Seq(scala212, scala213, scala3),
+    crossScalaVersions := Seq(scala213, scala3),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
     versionScheme              := Some("early-semver"),
     githubWorkflowJavaVersions := List(JavaSpec.temurin("11")),
