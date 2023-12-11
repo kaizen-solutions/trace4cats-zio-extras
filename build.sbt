@@ -291,16 +291,21 @@ lazy val tapir =
     .in(file("tapir"))
     .settings(kindProjectorSettings*)
     .settings(
-      name                                                 := "trace4cats-zio-extras-tapir",
-      libraryDependencies += "com.softwaremill.sttp.tapir" %% "tapir-core" % Versions.tapir
+      name := "trace4cats-zio-extras-tapir",
+      libraryDependencies ++=
+        Seq(
+          "com.softwaremill.sttp.tapir" %% "tapir-server"        % Versions.tapir,
+          "com.softwaremill.sttp.tapir" %% "tapir-zio"           % Versions.tapir % Test,
+          "com.softwaremill.sttp.tapir" %% "tapir-http4s-server" % Versions.tapir % Test
+        )
     )
-    .dependsOn(core)
+    .dependsOn(core % "compile->compile;test->test")
 
 lazy val tapirExample =
   project
     .in(file("tapir-examples"))
     .settings(
-      name           := "trace4cats-zio-extras-zio-sttp-examples",
+      name           := "trace4cats-zio-extras-zio--sttp-examples",
       publish / skip := true,
       libraryDependencies ++=
         Seq(
@@ -375,7 +380,7 @@ lazy val skunk =
           "org.tpolecat"  %% "skunk-core"        % Versions.skunk,
           "io.zonky.test"  % "embedded-postgres" % Versions.embeddedPostgres % Test,
           "dev.zio"       %% "zio-logging-slf4j" % Versions.zioLogging       % Test,
-          "ch.qos.logback" % "logback-classic"   % "1.4.11"                  % Test
+          "ch.qos.logback" % "logback-classic"   % "1.4.14"                  % Test
         )
     )
     .dependsOn(
@@ -403,7 +408,7 @@ lazy val zioKafka =
         "dev.zio"                 %% "zio-kafka"         % Versions.zioKafka,
         "io.github.embeddedkafka" %% "embedded-kafka"    % Versions.kafkaEmbedded % Test,
         "dev.zio"                 %% "zio-logging-slf4j" % Versions.zioLogging    % Test,
-        "ch.qos.logback"           % "logback-classic"   % "1.4.11"               % Test
+        "ch.qos.logback"           % "logback-classic"   % "1.4.14"               % Test
       ),
       excludeDependencies ++= {
         CrossVersion.partialVersion(scalaVersion.value) match {

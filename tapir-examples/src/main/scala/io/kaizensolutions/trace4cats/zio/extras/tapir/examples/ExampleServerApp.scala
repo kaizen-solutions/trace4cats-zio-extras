@@ -5,13 +5,14 @@ import fs2.io.net.Network
 import io.circe.Codec as CirceCodec
 import io.circe.generic.semiauto.deriveCodec
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
-import io.kaizensolutions.trace4cats.zio.extras.tapir.TapirServerTracer
+import io.kaizensolutions.trace4cats.zio.extras.tapir.TraceInterceptor
 import org.http4s.ember.server.EmberServerBuilder
 import sttp.model.{Headers, StatusCode}
 import sttp.tapir.*
 import sttp.tapir.json.circe.*
 import sttp.tapir.server.ServerEndpoint
-import sttp.tapir.server.http4s.Http4sServerInterpreter
+import sttp.tapir.server.http4s.{Http4sServerInterpreter, Http4sServerOptions}
+import trace4cats.kernel.ToHeaders
 import zio.*
 import zio.interop.catz.*
 
@@ -22,7 +23,7 @@ object ExampleServerApp extends ZIOAppDefault {
   def countCharacters(tracer: ZTracer)(in: Request): UIO[Either[NoCharacters, Int]] = {
     val l = in.input.length
     val out = tracer.spanSource() {
-      if (l > 0) ZIO.succeed(l)
+      if (l > 0) ZIO.logInfo(s"Received ${in.input}").as(l)
       else ZIO.fail(NoCharacters("Please supply at least 1 character to count"))
     }
 
@@ -41,22 +42,16 @@ object ExampleServerApp extends ZIOAppDefault {
   def serverEndpoint(tracer: ZTracer): ServerEndpoint.Full[Unit, Unit, Request, NoCharacters, Int, Any, Task] =
     countCharactersEndpoint.serverLogic(countCharacters(tracer))
 
-  def tracedServerEndpoint(tracer: ZTracer): ServerEndpoint.Full[Unit, Unit, Request, NoCharacters, Int, Any, Task] =
-    TapirServerTracer
-      .traceEndpoint[Request, NoCharacters, Int, Any, Any, Throwable](
-        tracer = tracer,
-        serverEndpoint = serverEndpoint(tracer),
-        extractRequestHeaders = _.headers,
-        extractResponseHeaders = _ => Headers(Nil)
-      )
-
   override val run: ZIO[ZIOAppArgs & Scope, Any, Any] = {
     val program =
       for {
         tracer  <- ZIO.service[ZTracer]
-        endpoint = tracedServerEndpoint(tracer)
-        httpApp  = Http4sServerInterpreter[Task]().toRoutes(endpoint).orNotFound
-        port    <- ZIO.fromEither(Port.fromInt(8080).toRight(new RuntimeException("Invalid Port")))
+        endpoint = serverEndpoint(tracer)
+        serverOptions = Http4sServerOptions
+                          .default[Task]
+                          .prependInterceptor(TraceInterceptor(tracer, headerFormat = ToHeaders.b3Single))
+        httpApp = Http4sServerInterpreter[Task](serverOptions).toRoutes(endpoint).orNotFound
+        port   <- ZIO.fromEither(Port.fromInt(8080).toRight(new RuntimeException("Invalid Port")))
         server <- EmberServerBuilder
                     .default[Task]
                     .withHostOption(Host.fromString("localhost"))
