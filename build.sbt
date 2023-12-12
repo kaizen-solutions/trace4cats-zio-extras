@@ -1,3 +1,5 @@
+import org.typelevel.scalacoptions.ScalacOptions
+
 inThisBuild {
   val scala213 = "2.13.12"
   val scala3   = "3.3.1"

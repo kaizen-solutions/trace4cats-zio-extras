@@ -4,8 +4,8 @@ title: Tapir
 ---
 
 # Tapir
-In this section, we'll walk you through our module that enables you to trace Tapir endpoints. 
-This process requires each Tapir endpoint to reveal headers that hold trace information.
+In this section, we'll walk you through our module that enables you to trace Tapir endpoints in your application 
+using interceptors.
 
 ```scala mdoc:compile-only
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
@@ -48,12 +48,5 @@ val http4sApp =
 
 ```
 
-The tracedEndpoint can then be used when compiling your Tapir endpoints down to the server's representation.
-
 ## Recommendation
-As you've probably noticed, revealing headers for each Tapir endpoint can be a bit cumbersome. 
-Hence, we recommend a more streamlined approach:
-
-Instead of managing headers directly in Tapir, try compiling the Tapir endpoints first, and then accessing the 
-underlying server integration (like [HTTP4S](../HTTP/http4s.md) & [ZIO HTTP](../HTTP/ziohttp.md)). 
-This approach tends to be more straightforward.
+Use the Tapir interceptor instead of directly integrating with the server interpreters.
