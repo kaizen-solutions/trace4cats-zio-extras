@@ -10,17 +10,23 @@ import sttp.tapir.ztapir.*
 import trace4cats.{ToHeaders, TraceProcess}
 import zio.interop.catz.*
 import zio.test.*
-import zio.{Scope, Task, ZIOAspect}
+import zio.{Scope, Task}
 
 object TraceInterceptorSpec extends ZIOSpecDefault {
   final class TestEndpoint(tracer: ZTracer) {
     private val testEndpoint =
       endpoint.get
         .in("hello")
+        .in(path[String]("name"))
+        .in("greeting")
         .out(statusCode(StatusCode.Ok))
 
     val serverLogic: ZServerEndpoint[Any, Any] =
-      testEndpoint.zServerLogic(_ => tracer.retrieveCurrentSpan.tap(_.put("hello", "hello")).unit)
+      testEndpoint.zServerLogic(name =>
+        tracer.withSpan("moshi") { span =>
+          span.put("hello", name).unit
+        }
+      )
   }
 
   def spec: Spec[TestEnvironment & Scope, Throwable] = suite("TraceInterceptor specification")(
@@ -36,13 +42,13 @@ object TraceInterceptorSpec extends ZIOSpecDefault {
                       .default[Task]
                       .prependInterceptor(interceptor)
                   ).toRoutes(endpoint.serverLogic).orNotFound
-        response <- httpApp.run(Request(uri = uri"/hello"))
+        response <- httpApp.run(Request(uri = uri"/hello/cal/greeting"))
         spans    <- sc.retrieveCollected
-        _         = println(response)
-        _         = println(spans)
       } yield assertTrue(
         response.headers.get(CIString("traceparent")).isDefined,
-        spans.exists(_.name == "GET /hello"),
+        response.status == Status.Ok,
+        spans.exists(_.name == "GET /hello/{name}/greeting"),
+        spans.find(_.name == "moshi").exists(_.context.parent.isDefined),
         spans.exists(_.attributes.contains("hello"))
       )
     }
