@@ -311,6 +311,7 @@ lazy val tapirExample =
         Seq(
           "io.janstenpickle"            %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
           "com.softwaremill.sttp.tapir" %% "tapir-json-circe"                  % Versions.tapir,
+          "com.softwaremill.sttp.tapir" %% "tapir-zio"                         % Versions.tapir,
           "com.softwaremill.sttp.tapir" %% "tapir-http4s-server"               % Versions.tapir,
           "org.http4s"                  %% "http4s-ember-server"               % Versions.http4s
         ),
@@ -429,7 +430,7 @@ lazy val zioKafkaExamples = {
       libraryDependencies ++= Seq(
         "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
         "dev.zio"          %% "zio-logging-slf4j"                 % Versions.zioLogging,
-        "ch.qos.logback"    % "logback-classic"                   % "1.4.11"
+        "ch.qos.logback"    % "logback-classic"                   % "1.4.14"
       )
     )
     .dependsOn(
