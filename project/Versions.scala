@@ -11,7 +11,7 @@ object Versions {
   val zioInteropCats           = "23.1.0.0"
   val zioHttp                  = "3.0.0-RC3"
   val http4s                   = "0.23.24"
-  val tapir                    = "1.9.4"
+  val tapir                    = "1.9.5"
   val sttp                     = "3.9.1"
   val virgil                   = "1.0.4"
   val doobie                   = "1.0.0-RC5"
