@@ -446,7 +446,10 @@ lazy val docs =
     .enablePlugins(MdocPlugin)
     .settings(
       publish / skip := true,
-      mdocVariables  := Map("VERSION" -> version.value)
+      mdocVariables  := Map("VERSION" -> version.value),
+      libraryDependencies ++= Seq(
+        "com.softwaremill.sttp.tapir" %% "tapir-http4s-server" % Versions.tapir
+      )
     )
     .dependsOn(
       core,
