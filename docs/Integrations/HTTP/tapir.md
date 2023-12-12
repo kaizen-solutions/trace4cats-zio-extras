@@ -9,18 +9,19 @@ This process requires each Tapir endpoint to reveal headers that hold trace info
 
 ```scala mdoc:compile-only
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
-import io.kaizensolutions.trace4cats.zio.extras.tapir.TapirServerTracer
+import io.kaizensolutions.trace4cats.zio.extras.tapir.TraceInterceptor
 import sttp.tapir.*
 import sttp.tapir.server.ServerEndpoint
-import sttp.model.{Header, Headers, StatusCode}
+import sttp.tapir.server.http4s.{Http4sServerInterpreter, Http4sServerOptions}
+import sttp.model.StatusCode
 import zio.*
+import zio.interop.catz.*
 
 final class CountCharactersEndpoint(tracer: ZTracer) {
-  private val countCharactersEndpoint: Endpoint[Unit, (String, List[Header]), Unit, Int, Any] =
+  private val countCharactersEndpoint: Endpoint[Unit, String, Unit, Int, Any] =
     endpoint.post
       .in("count" / "characters")
       .in(stringBody)
-      .in(headers)
       .errorOut(statusCode(StatusCode.BadRequest))
       .out(plainBody[Int])
 
@@ -29,17 +30,22 @@ final class CountCharactersEndpoint(tracer: ZTracer) {
     else ZIO.succeed(raw.length)
   }
 
-  val countCharactersServerEndpoint: ServerEndpoint.Full[Unit, Unit, (String, List[Header]), Unit, Int, Any, Task] =
-    countCharactersEndpoint.serverLogic { case (raw, _) => countCharactersServerLogic(raw).either }
-    
-  val tracedEndpoint: ServerEndpoint.Full[Unit, Unit, (String, List[Header]), Unit, Int, Any, Task] = 
-    TapirServerTracer.traceEndpoint(
-      tracer = tracer,
-      serverEndpoint = countCharactersServerEndpoint,
-      extractRequestHeaders = (input: (String, Seq[Header])) => Headers(input._2.toList),
-      extractResponseHeaders = (_: Int) => Headers(Nil)
-    )
+  val countCharactersServerEndpoint: ServerEndpoint.Full[Unit, Unit, String, Unit, Int, Any, Task] =
+    countCharactersEndpoint.serverLogic { raw => countCharactersServerLogic(raw).either }
 }
+  
+val http4sApp =
+  for {
+    tracer     <- ZIO.service[ZTracer]
+    interceptor = TraceInterceptor(tracer)
+    endpoint    = new CountCharactersEndpoint(tracer)
+    httpApp     = Http4sServerInterpreter[Task](
+      Http4sServerOptions
+        .default[Task]
+        .prependInterceptor(interceptor)
+    ).toRoutes(endpoint.countCharactersServerEndpoint).orNotFound
+  } yield httpApp
+
 ```
 
 The tracedEndpoint can then be used when compiling your Tapir endpoints down to the server's representation.

@@ -6,7 +6,7 @@ import org.http4s.syntax.all.*
 import org.typelevel.ci.CIString
 import sttp.model.StatusCode
 import sttp.tapir.server.http4s.{Http4sServerInterpreter, Http4sServerOptions}
-import sttp.tapir.ztapir.*
+import sttp.tapir.ztapir.{path as pathParam, *}
 import trace4cats.{ToHeaders, TraceProcess}
 import zio.interop.catz.*
 import zio.test.*
@@ -17,7 +17,7 @@ object TraceInterceptorSpec extends ZIOSpecDefault {
     private val testEndpoint =
       endpoint.get
         .in("hello")
-        .in(path[String]("name"))
+        .in(pathParam[String]("name"))
         .in("greeting")
         .out(statusCode(StatusCode.Ok))
 

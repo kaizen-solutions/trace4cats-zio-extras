@@ -455,6 +455,7 @@ lazy val docs =
       sttp,
       sttpExample,
       tapir,
+      tapirExample,
       virgil,
       doobie,
       skunk,

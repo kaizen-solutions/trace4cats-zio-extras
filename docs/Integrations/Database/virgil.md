@@ -14,11 +14,16 @@ import com.datastax.oss.driver.api.core.CqlSessionBuilder
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.virgil.trace4cats.zio.extras.TracedCQLExecutor
 import io.kaizensolutions.virgil.*
+import io.kaizensolutions.virgil.codecs.*
 import io.kaizensolutions.virgil.cql.*
 import io.kaizensolutions.virgil.dsl.*
 import zio.*
 
 case class Person(id: Int, age: Int, name: String)
+object Person {
+  // explicit declaration needed for Scala 3
+  implicit val personCodec: CqlRowDecoder.Object[Person] = CqlRowDecoder.derive[Person]
+}
 
 val insert: ZIO[CQLExecutor, Throwable, Unit] =
   for {
