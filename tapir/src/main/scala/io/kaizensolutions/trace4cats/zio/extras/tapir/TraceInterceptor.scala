@@ -12,6 +12,22 @@ import trace4cats.model.{SpanKind, SpanStatus, TraceHeaders}
 import trace4cats.{AttributeValue, ToHeaders}
 import zio.*
 
+/**
+ * Tapir Request interceptor that traces requests and responses that delegates
+ * to the Endpoint interceptor in order to trace the endpoint logic with higher
+ * precision (and make use of templated endpoint information).
+ * @param tracer
+ *   the tracer to use
+ * @param dropHeadersWhen
+ *   a function that determines whether a header should be dropped from the
+ *   trace
+ * @param enrichResponseHeadersWithTraceIds
+ *   whether to add trace headers to the response
+ * @param enrichLogs
+ *   whether to add trace headers to the logs
+ * @param headerFormat
+ *   the format to use for trace headers
+ */
 final class TraceInterceptor private (
   private val tracer: ZTracer,
   private val dropHeadersWhen: String => Boolean,
@@ -127,7 +143,10 @@ private class TraceEndpointInterceptor(
     dropHeadersWhen: String => Boolean,
     span: ZSpan
   ): UIO[Unit] = {
-    val respFields    = responseFields(response.headers, dropHeadersWhen)
+    val respFields = {
+      val statusCodeField = "resp.status.code" -> AttributeValue.intToTraceValue(response.code.code)
+      statusCodeField +: responseFields(response.headers, dropHeadersWhen)
+    }
     val spanRespAttrs = if (span.isSampled) span.putAll(respFields*) else ZIO.unit
     spanRespAttrs *> span.setStatus(toSpanStatus(response.code))
   }

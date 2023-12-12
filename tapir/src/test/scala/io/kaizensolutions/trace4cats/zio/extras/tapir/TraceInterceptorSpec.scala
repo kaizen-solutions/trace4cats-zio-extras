@@ -49,7 +49,8 @@ object TraceInterceptorSpec extends ZIOSpecDefault {
         response.status == Status.Ok,
         spans.exists(_.name == "GET /hello/{name}/greeting"),
         spans.find(_.name == "moshi").exists(_.context.parent.isDefined),
-        spans.exists(_.attributes.contains("hello"))
+        spans.exists(_.attributes.contains("hello")),
+        spans.flatMap(_.attributes.get("resp.status.code")).exists(_.value.value == 200)
       )
     }
   )
