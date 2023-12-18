@@ -28,19 +28,19 @@ import zio.*
  * @param headerFormat
  *   the format to use for trace headers
  */
-final class TraceInterceptor private (
+final class TraceInterceptor[Env, Err] private (
   private val tracer: ZTracer,
   private val dropHeadersWhen: String => Boolean,
   private val enrichResponseHeadersWithTraceIds: Boolean,
   private val enrichLogs: Boolean,
   private val headerFormat: ToHeaders
-) extends RequestInterceptor[Task] {
+) extends RequestInterceptor[ZIO[Env, Err, *]] {
 
   override def apply[R, B](
-    responder: Responder[Task, B],
-    requestHandler: EndpointInterceptor[Task] => RequestHandler[Task, R, B]
-  ): RequestHandler[Task, R, B] = new RequestHandler[Task, R, B] {
-    private val tracingEndpointInterceptor = new TraceEndpointInterceptor(
+    responder: Responder[ZIO[Env, Err, *], B],
+    requestHandler: EndpointInterceptor[ZIO[Env, Err, *]] => RequestHandler[ZIO[Env, Err, *], R, B]
+  ): RequestHandler[ZIO[Env, Err, *], R, B] = new RequestHandler[ZIO[Env, Err, *], R, B] {
+    private val tracingEndpointInterceptor = new TraceEndpointInterceptor[Env, Err](
       tracer,
       dropHeadersWhen,
       enrichResponseHeadersWithTraceIds,
@@ -48,43 +48,64 @@ final class TraceInterceptor private (
       headerFormat
     )
 
-    override def apply(request: ServerRequest, endpoints: List[ServerEndpoint[R, Task]])(implicit
-      monad: MonadError[Task]
-    ): Task[RequestResult[B]] =
+    override def apply(request: ServerRequest, endpoints: List[ServerEndpoint[R, ZIO[Env, Err, *]]])(implicit
+      monad: MonadError[ZIO[Env, Err, *]]
+    ): ZIO[Env, Err, RequestResult[B]] =
       requestHandler(tracingEndpointInterceptor)(request, endpoints)
   }
 }
 object TraceInterceptor {
-  def apply(
+  def apply[Env, Err](
     tracer: ZTracer,
     dropHeadersWhen: String => Boolean = HeaderNames.isSensitive,
     enrichResponseHeadersWithTraceIds: Boolean = true,
     enrichLogs: Boolean = true,
     headerFormat: ToHeaders = ToHeaders.standard
-  ): TraceInterceptor = new TraceInterceptor(
+  ): TraceInterceptor[Env, Err] = new TraceInterceptor(
     tracer,
     dropHeadersWhen,
     enrichResponseHeadersWithTraceIds,
     enrichLogs,
     headerFormat
   )
+
+  def task(
+    tracer: ZTracer,
+    dropHeadersWhen: String => Boolean = HeaderNames.isSensitive,
+    enrichResponseHeadersWithTraceIds: Boolean = true,
+    enrichLogs: Boolean = true,
+    headerFormat: ToHeaders = ToHeaders.standard
+  ): TraceInterceptor[Any, Throwable] =
+    apply(tracer, dropHeadersWhen, enrichResponseHeadersWithTraceIds, enrichLogs, headerFormat)
+
+  def rio[R, E <: Throwable](
+    tracer: ZTracer,
+    dropHeadersWhen: String => Boolean = HeaderNames.isSensitive,
+    enrichResponseHeadersWithTraceIds: Boolean = true,
+    enrichLogs: Boolean = true,
+    headerFormat: ToHeaders = ToHeaders.standard
+  ): TraceInterceptor[R, E] =
+    apply(tracer, dropHeadersWhen, enrichResponseHeadersWithTraceIds, enrichLogs, headerFormat)
 }
 
-private class TraceEndpointInterceptor(
+private class TraceEndpointInterceptor[Env, Err](
   private val tracer: ZTracer,
   private val dropHeadersWhen: String => Boolean,
   private val enrichResponseHeadersWithTraceIds: Boolean,
   private val enrichLogs: Boolean,
   private val headerFormat: ToHeaders
-) extends EndpointInterceptor[Task] {
+) extends EndpointInterceptor[ZIO[Env, Err, *]] {
   override def apply[B](
-    responder: Responder[Task, B],
-    endpointHandler: EndpointHandler[Task, B]
-  ): EndpointHandler[Task, B] = new EndpointHandler[Task, B] {
+    responder: Responder[ZIO[Env, Err, *], B],
+    endpointHandler: EndpointHandler[ZIO[Env, Err, *], B]
+  ): EndpointHandler[ZIO[Env, Err, *], B] = new EndpointHandler[ZIO[Env, Err, *], B] {
 
     override def onDecodeSuccess[A, U, I](
-      ctx: DecodeSuccessContext[Task, A, U, I]
-    )(implicit monad: MonadError[Task], bodyListener: BodyListener[Task, B]): Task[ServerResponse[B]] = {
+      ctx: DecodeSuccessContext[ZIO[Env, Err, *], A, U, I]
+    )(implicit
+      monad: MonadError[ZIO[Env, Err, *]],
+      bodyListener: BodyListener[ZIO[Env, Err, *], B]
+    ): ZIO[Env, Err, ServerResponse[B]] = {
       val spanName     = ctx.endpoint.showShort
       val request      = ctx.request
       val traceHeaders = TraceHeaders.of(request.headers.map(h => (h.name, h.value))*)
@@ -107,13 +128,19 @@ private class TraceEndpointInterceptor(
     }
 
     override def onSecurityFailure[A](
-      ctx: SecurityFailureContext[Task, A]
-    )(implicit monad: MonadError[Task], bodyListener: BodyListener[Task, B]): Task[ServerResponse[B]] =
+      ctx: SecurityFailureContext[ZIO[Env, Err, *], A]
+    )(implicit
+      monad: MonadError[ZIO[Env, Err, *]],
+      bodyListener: BodyListener[ZIO[Env, Err, *], B]
+    ): ZIO[Env, Err, ServerResponse[B]] =
       endpointHandler.onSecurityFailure(ctx)
 
     override def onDecodeFailure(
       ctx: DecodeFailureContext
-    )(implicit monad: MonadError[Task], bodyListener: BodyListener[Task, B]): Task[Option[ServerResponse[B]]] =
+    )(implicit
+      monad: MonadError[ZIO[Env, Err, *]],
+      bodyListener: BodyListener[ZIO[Env, Err, *], B]
+    ): ZIO[Env, Err, Option[ServerResponse[B]]] =
       endpointHandler.onDecodeFailure(ctx)
   }
 

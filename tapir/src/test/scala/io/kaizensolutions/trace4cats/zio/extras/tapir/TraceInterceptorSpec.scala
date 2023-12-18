@@ -35,7 +35,7 @@ object TraceInterceptorSpec extends ZIOSpecDefault {
         result     <- InMemorySpanCompleter.entryPoint(TraceProcess("tapir-trace-interceptor-test"))
         (sc, ep)    = result
         tracer     <- InMemorySpanCompleter.toZTracer(ep)
-        interceptor = TraceInterceptor(tracer, headerFormat = ToHeaders.w3c)
+        interceptor = TraceInterceptor[Any, Throwable](tracer, headerFormat = ToHeaders.w3c)
         endpoint    = new TestEndpoint(tracer)
         httpApp = Http4sServerInterpreter[Task](
                     Http4sServerOptions
