@@ -37,7 +37,7 @@ final class CountCharactersEndpoint(tracer: ZTracer) {
 val http4sApp =
   for {
     tracer     <- ZIO.service[ZTracer]
-    interceptor = TraceInterceptor(tracer)
+    interceptor = TraceInterceptor.task(tracer)
     endpoint    = new CountCharactersEndpoint(tracer)
     httpApp     = Http4sServerInterpreter[Task](
       Http4sServerOptions
