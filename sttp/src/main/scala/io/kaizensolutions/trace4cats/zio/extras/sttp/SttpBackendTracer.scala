@@ -1,15 +1,15 @@
 package io.kaizensolutions.trace4cats.zio.extras.sttp
 
-import trace4cats.ToHeaders
-import trace4cats.model.AttributeValue.{LongValue, StringValue}
-import trace4cats.model.*
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import sttp.capabilities.Effect
 import sttp.client3.impl.zio.RIOMonadAsyncError
 import sttp.client3.{HttpError, Request, Response, SttpBackend}
 import sttp.model.{Header, HeaderNames, Headers, StatusCode}
 import sttp.monad.MonadError
-import zio.{Task, ZIO}
+import trace4cats.ToHeaders
+import trace4cats.model.*
+import trace4cats.model.AttributeValue.{LongValue, StringValue}
+import zio.{Task, ZIOAspect}
 
 // Lifted from io.janstenpickle.trace4cats.sttp.client3 to remain semantically the same
 object SttpBackendTracer {
@@ -19,7 +19,8 @@ object SttpBackendTracer {
     toHeaders: ToHeaders = ToHeaders.standard,
     spanNamer: Request[?, ?] => String = methodWithPathSpanNamer,
     dropHeadersWhen: String => Boolean = HeaderNames.isSensitive,
-    extractResponseAttributes: Response[?] => Map[String, AttributeValue] = _ => Map.empty
+    extractResponseAttributes: Response[?] => Map[String, AttributeValue] = _ => Map.empty,
+    enrichLogs: Boolean = true
   ): SttpBackend[Task, Capabilities] = new SttpBackend[Task, Capabilities] {
     override def send[T, R >: Capabilities & Effect[Task]](request: Request[T, R]): Task[Response[T]] = {
       val nameOfRequest = spanNamer(request)
@@ -28,10 +29,9 @@ object SttpBackendTracer {
         kind = SpanKind.Client,
         errorHandler = { case HttpError(body, statusCode) => toSpanStatus(body.toString, statusCode) }
       ) { span =>
-        val requestWithTraceHeaders = {
-          val traceHeaders = convertTraceHeaders(span.extractHeaders(toHeaders))
-          request.headers(traceHeaders.headers*)
-        }
+        val traceHeaders = span.extractHeaders(toHeaders)
+        val requestWithTraceHeaders =
+          request.headers(convertTraceHeaders(traceHeaders).headers*)
         val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
 
         val reqHeaderAttributes = requestFields(Headers(request.headers), dropHeadersWhen)
@@ -40,26 +40,26 @@ object SttpBackendTracer {
           if (isSampled) toAttributes(request)
           else Map.empty
 
+        val logTraceContext =
+          if (enrichLogs) ZIOAspect.annotated(traceHeaders.values.map { case (k, v) => k.toString -> v }.toSeq*)
+          else ZIOAspect.identity
+
         val tracedRequest =
           for {
             _                   <- span.putAll((reqHeaderAttributes ++ reqExtraAttrs)*)
             response            <- underlying.send(requestWithTraceHeaders)
             _                   <- span.setStatus(toSpanStatus(response.statusText, response.code))
-            respHeaderAttributes = responseFields(Headers(response.headers), dropHeadersWhen)
+            respHeaderAttributes = responseFields(response, dropHeadersWhen)
             // extractResponseAttributes has the potential to be expensive, so only call if the span is sampled
             respExtraAttributes = if (isSampled) extractResponseAttributes(response) else Map.empty
             _                  <- span.putAll((respHeaderAttributes ++ respExtraAttributes)*)
           } yield response
 
         tracedRequest
-          .tapError(e =>
-            if (isSampled) span.put("error.message", AttributeValue.StringValue(e.getLocalizedMessage))
-            else ZIO.unit
-          )
+          .tapError(e => span.put("error.message", AttributeValue.StringValue(e.getLocalizedMessage)).when(isSampled))
           .tapDefect(cause =>
-            if (cause.isDie && isSampled) span.put("error.cause", AttributeValue.StringValue(cause.prettyPrint))
-            else ZIO.unit
-          )
+            span.put("error.cause", AttributeValue.StringValue(cause.prettyPrint)).when(cause.isDie && isSampled)
+          ) @@ logTraceContext
       }
     }
 
@@ -69,7 +69,7 @@ object SttpBackendTracer {
   }
 
   def methodWithPathSpanNamer(req: Request[?, ?]): String =
-    s"${req.method.method} ${req.uri.path.mkString("/")}"
+    s"${req.method.method} ${req.uri.path.mkString("/", "/", "")}"
 
   def convertTraceHeaders(in: TraceHeaders): Headers =
     Headers(in.values.map { case (k, v) => Header(k.toString, v) }.toList)
@@ -110,11 +110,14 @@ object SttpBackendTracer {
   ): List[(String, AttributeValue)] =
     headerFields(hs, "req", dropHeadersWhen)
 
-  private def responseFields(
-    hs: Headers,
+  private def responseFields[A](
+    res: Response[A],
     dropHeadersWhen: String => Boolean
   ): List[(String, AttributeValue)] =
-    headerFields(hs, "resp", dropHeadersWhen)
+    headerFields(Headers(res.headers), "resp", dropHeadersWhen) ++
+      List(
+        "resp.status.code" -> res.code.code
+      )
 
   private def headerFields(
     hs: Headers,

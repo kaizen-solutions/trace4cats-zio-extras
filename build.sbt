@@ -271,7 +271,7 @@ lazy val sttp =
       // Prevents org.scala-lang.modules:scala-collection-compat _3, _2.13 conflicting cross-version suffixes
       excludeDependencies += "org.scala-lang.modules" % "scala-collection-compat_2.13"
     )
-    .dependsOn(core)
+    .dependsOn(core  % "compile->compile;test->test")
 
 lazy val sttpExample =
   project
