@@ -30,9 +30,8 @@ object SttpBackendTracer {
         errorHandler = { case HttpError(body, statusCode) => toSpanStatus(body.toString, statusCode) }
       ) { span =>
         val traceHeaders = span.extractHeaders(toHeaders)
-        val requestWithTraceHeaders = {
+        val requestWithTraceHeaders =
           request.headers(convertTraceHeaders(traceHeaders).headers*)
-        }
         val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
 
         val reqHeaderAttributes = requestFields(Headers(request.headers), dropHeadersWhen)
@@ -42,7 +41,7 @@ object SttpBackendTracer {
           else Map.empty
 
         val logTraceContext =
-          if (enrichLogs) ZIOAspect.annotated(traceHeaders.values.map{ case (k, v) => k.toString -> v }.toSeq*)
+          if (enrichLogs) ZIOAspect.annotated(traceHeaders.values.map { case (k, v) => k.toString -> v }.toSeq*)
           else ZIOAspect.identity
 
         val tracedRequest =
@@ -57,9 +56,7 @@ object SttpBackendTracer {
           } yield response
 
         tracedRequest
-          .tapError(e =>
-            span.put("error.message", AttributeValue.StringValue(e.getLocalizedMessage)).when(isSampled)
-          )
+          .tapError(e => span.put("error.message", AttributeValue.StringValue(e.getLocalizedMessage)).when(isSampled))
           .tapDefect(cause =>
             span.put("error.cause", AttributeValue.StringValue(cause.prettyPrint)).when(cause.isDie && isSampled)
           ) @@ logTraceContext
