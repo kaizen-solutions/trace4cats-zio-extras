@@ -6,11 +6,12 @@ import org.http4s.syntax.all.*
 import org.typelevel.ci.CIString
 import sttp.model.StatusCode
 import sttp.tapir.server.http4s.{Http4sServerInterpreter, Http4sServerOptions}
+import sttp.tapir.server.interceptor.log.DefaultServerLog
 import sttp.tapir.ztapir.{path as pathParam, *}
 import trace4cats.{ToHeaders, TraceProcess}
 import zio.interop.catz.*
 import zio.test.*
-import zio.{Scope, Task}
+import zio.{Cause, Scope, Task, ZIO}
 
 object TraceInterceptorSpec extends ZIOSpecDefault {
   final class TestEndpoint(tracer: ZTracer) {
@@ -39,18 +40,33 @@ object TraceInterceptorSpec extends ZIOSpecDefault {
         endpoint    = new TestEndpoint(tracer)
         httpApp = Http4sServerInterpreter[Task](
                     Http4sServerOptions
-                      .default[Task]
+                      .customiseInterceptors[Task]
                       .prependInterceptor(interceptor)
+                      .serverLog(
+                        DefaultServerLog[Task](
+                            doLogWhenReceived = ZIO.logInfo(_),
+                            doLogWhenHandled = (msg, ex) => ex.fold(ZIO.logInfo(msg)) { ex => ZIO.logErrorCause(msg, Cause.fail(ex)) },
+                            doLogAllDecodeFailures = (msg, ex) => ex.fold(ZIO.logWarning(msg)) { ex => ZIO.logWarningCause(msg, Cause.fail(ex)) },
+                            doLogExceptions = (msg, ex) => ZIO.logErrorCause(msg, Cause.fail(ex)),
+                            noLog = ZIO.unit
+                        )
+                      )
+                      .options
                   ).toRoutes(endpoint.serverLogic).orNotFound
         response <- httpApp.run(Request(uri = uri"/hello/cal/greeting"))
         spans    <- sc.retrieveCollected
+        logs <- ZTestLogger.logOutput
       } yield assertTrue(
         response.headers.get(CIString("traceparent")).isDefined,
         response.status == Status.Ok,
         spans.exists(_.name == "GET /hello/{name}/greeting"),
         spans.find(_.name == "moshi").exists(_.context.parent.isDefined),
         spans.exists(_.attributes.contains("hello")),
-        spans.flatMap(_.attributes.get("resp.status.code")).exists(_.value.value == 200)
+        spans.flatMap(_.attributes.get("resp.status.code")).exists(_.value.value == 200),
+        logs.exists(e =>
+          e.message().startsWith("Request: GET /hello/cal/greeting") &&
+            e.annotations.contains("traceparent")
+        )
       )
     }
   )
