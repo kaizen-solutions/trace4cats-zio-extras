@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import org.apache.kafka.clients.producer.{ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.header.internals.RecordHeader
-import org.apache.kafka.common.{Metric, MetricName}
+import org.apache.kafka.common.{Metric, MetricName, PartitionInfo}
 import trace4cats.{AttributeValue, ToHeaders, TraceHeaders}
 import trace4cats.model.SpanKind
 import zio.{Chunk, IO, RIO, Task, UIO, ZIO, ZLayer}
@@ -85,6 +85,26 @@ object KafkaProducerTracer {
       valueSerializer: Serializer[R, V]
     ): RIO[R, Chunk[RecordMetadata]] =
       produceChunkAsync(records, keySerializer, valueSerializer).flatten
+
+    override def partitionsFor(topic: String): Task[Chunk[PartitionInfo]] =
+      tracer.withSpan("partitionsFor") { span =>
+        underlying
+          .partitionsFor(topic)
+          .tapBoth(
+            error =>
+              span
+                .putAll(
+                  "error.message" -> AttributeValue.StringValue(error.getLocalizedMessage),
+                  "topic"         -> AttributeValue.StringValue(topic)
+                )
+                .when(span.isSampled),
+            { _ =>
+              span
+                .put("topic", AttributeValue.StringValue(topic))
+                .when(span.isSampled)
+            }
+          )
+      }
 
     def flush: Task[Unit] = underlying.flush
 
