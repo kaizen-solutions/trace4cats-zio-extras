@@ -36,7 +36,7 @@ Kafka records that are consumed will automatically continue the trace given that
 for the Kafka record. The following example shows how to consume a Kafka record with tracing headers:
 
 ```scala mdoc:compile-only
-import io.kaizensolutions.trace4cats.zio.extras.ZTracer
+import io.kaizensolutions.trace4cats.zio.extras.*
 import io.kaizensolutions.trace4cats.zio.extras.ziokafka.*
 import zio.kafka.consumer.{Consumer, ConsumerSettings, Subscription}
 import zio.kafka.serde.Serde
