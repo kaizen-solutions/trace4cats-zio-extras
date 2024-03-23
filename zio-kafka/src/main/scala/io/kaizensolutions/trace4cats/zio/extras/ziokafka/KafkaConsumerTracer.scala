@@ -55,7 +55,7 @@ object KafkaConsumerTracer {
                     kind = SpanKind.Consumer
                   ) { span =>
                     span.putAll(coreAttributes) *> comm.offset.commit
-                  // this should be fine, since the commit applies to the same topicPartition as the original record
+                    // this should be fine, since the commit applies to the same topicPartition as the original record
                   }
               )
             )
