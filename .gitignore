@@ -10,3 +10,4 @@ local.*
 **/.DS_store
 project/.bloop/
 project/metals.sbt
+.direnv
