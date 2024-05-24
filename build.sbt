@@ -8,8 +8,11 @@ inThisBuild {
     scalaVersion       := scala213,
     crossScalaVersions := Seq(scala213, scala3),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    versionScheme              := Some("early-semver"),
-    githubWorkflowJavaVersions := List(JavaSpec.temurin("11")),
+    versionScheme := Some("early-semver"),
+    githubWorkflowJavaVersions := List(
+      JavaSpec.temurin("17"),
+      JavaSpec.temurin("21")
+    ),
     githubWorkflowTargetTags ++= Seq("v*"),
     githubWorkflowPublishTargetBranches := Seq(
       RefPredicate.StartsWith(Ref.Tag("v")),
