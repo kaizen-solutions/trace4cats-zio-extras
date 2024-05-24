@@ -36,10 +36,10 @@ val http =
     Method.GET / "bad_gateway" -> handler(ZIO.succeed(Response.status(Status.BadGateway)))
   )
 
-val app: HttpApp[ZTracer] =
-  http.handleError(error => Response.text(error.getMessage).status(Status.InternalServerError)).toHttpApp
+val app: Routes[ZTracer, Nothing] =
+  http.handleError(error => Response.text(error.getMessage).status(Status.InternalServerError))
 
-val tracedApp: HttpApp[ZTracer] = app @@ trace(enrichLogs = true) // the tracing middleware
+val tracedApp: Routes[ZTracer, Nothing] = app @@ trace(enrichLogs = true) // the tracing middleware
 ```
 
 Notice how `enrichLogs` is set to true, this will start augmenting the log context with trace header information. You 
