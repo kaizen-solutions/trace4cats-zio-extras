@@ -44,18 +44,20 @@ object TraceInterceptorSpec extends ZIOSpecDefault {
                       .prependInterceptor(interceptor)
                       .serverLog(
                         DefaultServerLog[Task](
-                            doLogWhenReceived = ZIO.logInfo(_),
-                            doLogWhenHandled = (msg, ex) => ex.fold(ZIO.logInfo(msg)) { ex => ZIO.logErrorCause(msg, Cause.fail(ex)) },
-                            doLogAllDecodeFailures = (msg, ex) => ex.fold(ZIO.logWarning(msg)) { ex => ZIO.logWarningCause(msg, Cause.fail(ex)) },
-                            doLogExceptions = (msg, ex) => ZIO.logErrorCause(msg, Cause.fail(ex)),
-                            noLog = ZIO.unit
+                          doLogWhenReceived = ZIO.logInfo(_),
+                          doLogWhenHandled =
+                            (msg, ex) => ex.fold(ZIO.logInfo(msg))(ex => ZIO.logErrorCause(msg, Cause.fail(ex))),
+                          doLogAllDecodeFailures = (msg, ex) =>
+                            ex.fold(ZIO.logWarning(msg))(ex => ZIO.logWarningCause(msg, Cause.fail(ex))),
+                          doLogExceptions = (msg, ex) => ZIO.logErrorCause(msg, Cause.fail(ex)),
+                          noLog = ZIO.unit
                         )
                       )
                       .options
                   ).toRoutes(endpoint.serverLogic).orNotFound
         response <- httpApp.run(Request(uri = uri"/hello/cal/greeting"))
         spans    <- sc.retrieveCollected
-        logs <- ZTestLogger.logOutput
+        logs     <- ZTestLogger.logOutput
       } yield assertTrue(
         response.headers.get(CIString("traceparent")).isDefined,
         response.status == Status.Ok,

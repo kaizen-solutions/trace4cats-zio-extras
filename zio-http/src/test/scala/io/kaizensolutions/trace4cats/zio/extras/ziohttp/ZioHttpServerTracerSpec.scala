@@ -10,7 +10,7 @@ import zio.test.*
 
 object ZioHttpServerTracerSpec extends ZIOSpecDefault {
   val customHeaderName = "custom-header"
-  val testApp: HttpApp[ZTracer] =
+  val testApp =
     Routes(
       Method.GET / "plaintext" -> handler(
         ZTracer.withSpan("plaintext-fetch") { _ =>
@@ -29,7 +29,7 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
           .json(s"{ 'userId': '$userId', 'name': 'Bob' }")
           .status(Status.Ok)
       )
-    ).toHttpApp
+    )
 
   val spec: Spec[TestEnvironment & Scope, Any] =
     suite("ZIO HTTP Server Tracer Specification")(
@@ -42,7 +42,7 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
                   .provideEnvironment(ZEnvironment.empty.add(tracer))
               )
             (completer, app)     = result
-            response            <- app.runZIO(Request.get(URL(Root / "plaintext")))
+            response            <- app.runZIO(Request.get(URL(Path("plaintext"))))
             spans               <- completer.retrieveCollected
             httpSpan            <- ZIO.from(spans.find(_.name == "GET /plaintext"))
             fetchSpan           <- ZIO.from(spans.find(_.name == "plaintext-fetch"))
@@ -64,8 +64,8 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
                   (testApp @@ ZioHttpServerTracer.trace()).provideEnvironment(ZEnvironment.empty.add(tracer))
                 )
               (completer, app) = result
-              _               <- app.runZIO(Request.get(URL(Root / "user" / "1234")))
-              _               <- app.runZIO(Request.get(URL(Root / "plaintext")))
+              _               <- app.runZIO(Request.get(URL(Path("user") / "1234")))
+              _               <- app.runZIO(Request.get(URL(Path("plaintext"))))
               spans           <- completer.retrieveCollected
               _ <- ZIO
                      .from(spans.find(_.name == "GET /user/{userId}"))
@@ -82,14 +82,14 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
         val app = Routes(
           Method.GET / ""       -> handler(ZIO.succeed(Response.ok)),
           (Method.GET / "fail") -> handler(ZIO.fail(new RuntimeException("fail")))
-        ).handleError(_ => Response.internalServerError).toHttpApp
+        ).handleError(_ => Response.internalServerError)
 
-        val wrappedApp: HttpApp[ZTracer] =
+        val wrappedApp =
           app @@ ZioHttpServerTracer.injectHeaders() @@ ZioHttpServerTracer.trace()
 
         test("Succeeds on a successful response") {
           for {
-            res                <- wrappedApp.runZIO(Request.get(URL(Root)))
+            res                <- wrappedApp.runZIO(Request.get(URL.empty))
             spans              <- InMemorySpanCompleter.retrieveCollected
             httpHeadersFromSpan = toHttpHeaders(spans.head, ToHeaders.standard)
             // This is done because assertTrue gets confused res.headers and res.headers(...)
@@ -97,7 +97,7 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
           } yield assertTrue(responseHeaders.toSeq.diff(httpHeadersFromSpan.toSeq).isEmpty)
         } + test("Succeeds on a failing response")(
           for {
-            resActual <- wrappedApp.runZIO(Request.get(URL(Root / "fail")))
+            resActual <- wrappedApp.runZIO(Request.get(URL(Path("fail"))))
             spans     <- InMemorySpanCompleter.retrieveCollected
             expected   = toHttpHeaders(spans.head, ToHeaders.standard)
           } yield assertTrue(expected.toSet.subsetOf(resActual.headers.toSet))

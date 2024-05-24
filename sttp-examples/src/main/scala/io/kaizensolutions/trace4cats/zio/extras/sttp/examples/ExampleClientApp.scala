@@ -2,15 +2,13 @@ package io.kaizensolutions.trace4cats.zio.extras.sttp.examples
 
 import io.kaizensolutions.trace4cats.zio.extras.{ZEntryPoint, ZTracer}
 import io.kaizensolutions.trace4cats.zio.extras.sttp.SttpBackendTracer
-import sttp.capabilities
-import sttp.capabilities.zio.ZioStreams
 import sttp.client3.*
 import sttp.client3.httpclient.zio.HttpClientZioBackend
 import zio.*
 
 // Spin up the HTTP4S Server Example and then this one
 object ExampleClientApp extends ZIOAppDefault {
-  type SttpClient = SttpBackend[Task, ZioStreams & capabilities.WebSockets]
+  type SttpClient = SttpBackend[Task, Any]
 
   val tracedBackend: URIO[Scope & ZTracer, SttpClient] =
     (for {

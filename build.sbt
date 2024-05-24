@@ -1,7 +1,7 @@
 import org.typelevel.scalacoptions.ScalacOptions
 
 inThisBuild {
-  val scala213 = "2.13.13"
+  val scala213 = "2.13.14"
   val scala3   = "3.3.3"
 
   Seq(
@@ -64,7 +64,7 @@ lazy val kindProjectorSettings = {
 
 def mkModule(projectName: String) =
   Project(projectName, file(projectName))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(name := s"trace4cats-zio-extras-$projectName")
 
 lazy val root =
@@ -99,7 +99,7 @@ lazy val root =
 
 lazy val core = project
   .in(file("core"))
-  .settings(kindProjectorSettings*)
+  .settings(kindProjectorSettings *)
   .settings(
     name             := "trace4cats-zio-extras-core",
     organization     := "io.kaizen-solutions",
@@ -127,7 +127,7 @@ lazy val core = project
 
 lazy val coreExample = project
   .in(file("core-examples"))
-  .settings(kindProjectorSettings*)
+  .settings(kindProjectorSettings *)
   .settings(
     name           := "trace4cats-zio-extras-core-examples",
     publish / skip := true,
@@ -140,7 +140,7 @@ lazy val coreExample = project
 
 lazy val fs2 = project
   .in(file("fs2"))
-  .settings(kindProjectorSettings*)
+  .settings(kindProjectorSettings *)
   .settings(
     name                            := "trace4cats-zio-extras-fs2",
     libraryDependencies += "co.fs2" %% "fs2-core" % Versions.fs2
@@ -149,7 +149,7 @@ lazy val fs2 = project
 
 lazy val fs2Example = project
   .in(file("fs2-examples"))
-  .settings(kindProjectorSettings*)
+  .settings(kindProjectorSettings *)
   .settings(
     name           := "trace4cats-zio-extras-fs2-examples",
     publish / skip := true,
@@ -163,7 +163,7 @@ lazy val fs2Example = project
 lazy val fs2Kafka =
   project
     .in(file("fs2-kafka"))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(
       name                                     := "trace4cats-zio-extras-fs2-kafka",
       libraryDependencies += "com.github.fd4s" %% "fs2-kafka" % Versions.fs2Kafka
@@ -173,7 +173,7 @@ lazy val fs2Kafka =
 lazy val fs2KafkaExample =
   project
     .in(file("fs2-kafka-examples"))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(
       name           := "trace4cats-zio-extras-fs2-kafka-examples",
       publish / skip := true,
@@ -191,7 +191,7 @@ lazy val fs2KafkaExample =
 
 lazy val http4s = project
   .in(file("http4s"))
-  .settings(kindProjectorSettings*)
+  .settings(kindProjectorSettings *)
   .settings(
     name := "trace4cats-zio-extras-http4s",
     libraryDependencies ++= {
@@ -209,7 +209,7 @@ lazy val http4s = project
 lazy val http4sExample =
   project
     .in(file("http4s-examples"))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(
       name           := "trace4cats-zio-extras-http4s-examples",
       publish / skip := true,
@@ -229,7 +229,7 @@ lazy val http4sExample =
 lazy val zioHttp =
   project
     .in(file("zio-http"))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(
       tpolecatExcludeOptions += ScalacOptions.lintInferAny
     ) // zio-http's @@ causes this (Scala 2.13) unless explicitly typed
@@ -242,7 +242,7 @@ lazy val zioHttp =
 lazy val zioHttpExample =
   project
     .in(file("zio-http-examples"))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(
       tpolecatExcludeOptions += ScalacOptions.lintInferAny
     ) // zio-http's @@ causes this (Scala 2.13) unless explicitly typed
@@ -264,7 +264,7 @@ lazy val zioHttpExample =
 lazy val sttp =
   project
     .in(file("sttp"))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(
       name                                                   := "trace4cats-zio-extras-sttp",
       libraryDependencies += "com.softwaremill.sttp.client3" %% "zio" % Versions.sttp,
@@ -276,7 +276,7 @@ lazy val sttp =
 lazy val sttpExample =
   project
     .in(file("sttp-examples"))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(
       name           := "trace4cats-zio-extras-zio-sttp-examples",
       publish / skip := true,
@@ -291,7 +291,7 @@ lazy val sttpExample =
 lazy val tapir =
   project
     .in(file("tapir"))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(
       name := "trace4cats-zio-extras-tapir",
       libraryDependencies ++=
@@ -324,7 +324,7 @@ lazy val tapirExample =
 lazy val virgil =
   project
     .in(file("virgil"))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(
       name                                         := "trace4cats-zio-extras-virgil",
       libraryDependencies += "io.kaizen-solutions" %% "virgil-zio" % Versions.virgil
@@ -334,7 +334,7 @@ lazy val virgil =
 lazy val virgilExample =
   project
     .in(file("virgil-examples"))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(
       name                                      := "trace4cats-zio-extras-virgil-examples",
       libraryDependencies += "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
@@ -345,7 +345,7 @@ lazy val virgilExample =
 lazy val doobie =
   project
     .in(file("doobie"))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(
       name := "trace4cats-zio-extras-doobie",
       libraryDependencies ++=
@@ -360,7 +360,7 @@ lazy val doobie =
 lazy val doobieExample =
   project
     .in(file("doobie-examples"))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(
       name           := "doobie-examples",
       publish / skip := true,
@@ -375,7 +375,7 @@ lazy val doobieExample =
 lazy val skunk =
   project
     .in(file("skunk"))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(
       name := "trace4cats-zio-extras-skunk",
       libraryDependencies ++=
@@ -394,7 +394,7 @@ lazy val skunk =
 lazy val skunkExample =
   project
     .in(file("skunk-examples"))
-    .settings(kindProjectorSettings*)
+    .settings(kindProjectorSettings *)
     .settings(
       name           := "skunk-examples",
       publish / skip := true,

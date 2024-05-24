@@ -11,14 +11,13 @@ import zio.*
 
 object SttpBackendTracerSpec extends ZIOSpecDefault {
 
-  private val successBackend = SttpBackendStub(new RIOMonadAsyncError[Any])
-    .whenAnyRequest
+  private val successBackend = SttpBackendStub(new RIOMonadAsyncError[Any]).whenAnyRequest
     .thenRespondOk()
 
   private val ztracerEnv: ZIO[Scope, Nothing, ZEnvironment[InMemorySpanCompleter & ZTracer]] = for {
-    result <- InMemorySpanCompleter.entryPoint(TraceProcess("tapir-trace-interceptor-test"))
+    result  <- InMemorySpanCompleter.entryPoint(TraceProcess("tapir-trace-interceptor-test"))
     (sc, ep) = result
-    tracer <- InMemorySpanCompleter.toZTracer(ep)
+    tracer  <- InMemorySpanCompleter.toZTracer(ep)
   } yield ZEnvironment(sc).add(tracer)
 
   val zioLogger = new Logger[Task] {
@@ -30,17 +29,15 @@ object SttpBackendTracerSpec extends ZIOSpecDefault {
   }
 
   def spec: Spec[TestEnvironment & Scope, Any] = suite("Sttp backend tracer")(
-    test("Traces requests"){
+    test("Traces requests") {
       for {
-        tracer <- ZIO.service[ZTracer]
+        tracer    <- ZIO.service[ZTracer]
         completer <- ZIO.service[InMemorySpanCompleter]
-        backend = SttpBackendTracer(tracer,
-          LoggingBackend(successBackend, zioLogger)
-        )
+        backend    = SttpBackendTracer(tracer, LoggingBackend(successBackend, zioLogger))
         _ <- basicRequest
-          .get(uri"http://host/foo/bar")
-          .send(backend)
-        logs <- ZTestLogger.logOutput
+               .get(uri"http://host/foo/bar")
+               .send(backend)
+        logs  <- ZTestLogger.logOutput
         spans <- completer.retrieveCollected
       } yield assertTrue(
         logs.filter(_.message().contains("GET /foo/bar")).forall(_.annotations.contains("X-B3-TraceId")),
@@ -54,6 +51,6 @@ object SttpBackendTracerSpec extends ZIOSpecDefault {
   ).provide(
     ZLayer.scopedEnvironment(
       ztracerEnv
-    ),
+    )
   )
 }

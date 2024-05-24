@@ -28,8 +28,12 @@ object ExampleServerApp extends ZIOAppDefault {
       Method.GET / "bad_gateway" -> handler(ZIO.succeed(Response.status(Status.BadGateway)))
     )
 
-  val app: HttpApp[Db & ZTracer] =
-    http.handleError(error => Response.text(error.getMessage).status(Status.InternalServerError)).toHttpApp
+  val app: Routes[Db with ZTracer, Nothing] =
+    http.handleError(error =>
+      Response
+        .text(error.getMessage)
+        .status(Status.InternalServerError)
+    )
 
   override val run: ZIO[ZIOAppArgs & Scope, Any, Any] =
     Server
