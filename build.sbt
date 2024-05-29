@@ -257,7 +257,6 @@ lazy val zioHttpExample =
         Seq(
           trace4cats      %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
           "dev.zio"       %% "zio-logging-slf4j"                 % Versions.zioLogging,
-          "dev.zio"       %% "zio-logging-slf4j-bridge"          % Versions.zioLogging,
           "ch.qos.logback" % "logback-classic"                   % Versions.logback
         )
       }

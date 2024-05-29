@@ -47,8 +47,8 @@ object TraceInterceptorSpec extends ZIOSpecDefault {
                           doLogWhenReceived = ZIO.logInfo(_),
                           doLogWhenHandled =
                             (msg, ex) => ex.fold(ZIO.logInfo(msg))(ex => ZIO.logErrorCause(msg, Cause.fail(ex))),
-                          doLogAllDecodeFailures = (msg, ex) =>
-                            ex.fold(ZIO.logWarning(msg))(ex => ZIO.logWarningCause(msg, Cause.fail(ex))),
+                          doLogAllDecodeFailures =
+                            (msg, ex) => ex.fold(ZIO.logWarning(msg))(ex => ZIO.logWarningCause(msg, Cause.fail(ex))),
                           doLogExceptions = (msg, ex) => ZIO.logErrorCause(msg, Cause.fail(ex)),
                           noLog = ZIO.unit
                         )

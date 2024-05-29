@@ -1,2 +1,2 @@
 addCommandAlias("lint", "; scalafmtAll")
-addCommandAlias("lintEnforce", "; scalafmtCheckAll")
+addCommandAlias("lintEnforce", "; scalafmtCheckAll; mdoc")
