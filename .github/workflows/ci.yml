@@ -58,7 +58,7 @@ jobs:
         run: sbt '++ ${{ matrix.scala }}' test
 
       - name: Compress target directories
-        run: tar cf targets.tar sttp/target core-examples/target sttp-examples/target http4s/target fs2/target tapir/target target zio-http/target doobie/target trace4cats-zio-extras-docs/target skunk/target fs2-examples/target fs2-kafka/target skunk-examples/target virgil-examples/target fs2-kafka-examples/target zio-http-examples/target http4s-examples/target doobie-examples/target tapir-examples/target zio-kafka-examples/target core/target zio-kafka/target virgil/target project/target
+        run: tar cf targets.tar sttp/target core-examples/target sttp-examples/target caliban/target http4s/target fs2/target tapir/target target zio-http/target doobie/target trace4cats-zio-extras-docs/target skunk/target fs2-examples/target fs2-kafka/target skunk-examples/target virgil-examples/target fs2-kafka-examples/target zio-http-examples/target http4s-examples/target doobie-examples/target tapir-examples/target zio-kafka-examples/target core/target zquery/target zio-kafka/target virgil/target project/target
 
       - name: Upload target directories
         uses: actions/upload-artifact@v4
