@@ -141,6 +141,19 @@ lazy val coreExample = project
   )
   .dependsOn(core)
 
+lazy val zquery = project
+  .in(file("zquery"))
+  .settings(kindProjectorSettings *)
+  .settings(
+    name             := "trace4cats-zio-extras-zquery",
+    organization     := "io.kaizen-solutions",
+    organizationName := "kaizen-solutions",
+    libraryDependencies ++= Seq(
+      "dev.zio" %% "zio-query" % Versions.zquery
+    )
+  )
+  .dependsOn(core % "compile->compile;test->test")
+
 lazy val fs2 = project
   .in(file("fs2"))
   .settings(kindProjectorSettings *)
@@ -262,6 +275,22 @@ lazy val zioHttpExample =
       }
     )
     .dependsOn(zioHttp)
+
+lazy val caliban =
+  project
+    .in(file("caliban"))
+    .settings(kindProjectorSettings *)
+    .settings(
+      tpolecatExcludeOptions += ScalacOptions.lintInferAny
+    )
+    .settings(
+      name := "trace4cats-zio-extras-caliban",
+      libraryDependencies ++= Seq(
+        "com.github.ghostdogpr" %% "caliban"       % Versions.caliban,
+        "com.github.ghostdogpr" %% "caliban-tools" % Versions.caliban
+      )
+    )
+    .dependsOn(zquery % "compile->compile;test->test")
 
 lazy val sttp =
   project
@@ -455,11 +484,13 @@ lazy val docs =
     )
     .dependsOn(
       core,
+      zquery,
       fs2,
       fs2Kafka,
       http4s,
       http4sExample,
       zioHttp,
+      caliban,
       sttp,
       sttpExample,
       tapir,
