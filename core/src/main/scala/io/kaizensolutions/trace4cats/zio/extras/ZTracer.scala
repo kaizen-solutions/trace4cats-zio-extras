@@ -15,7 +15,7 @@ import zio.stream.ZStream
  *   is the entrypoint into the tracing system
  */
 final class ZTracer private (
-  private val current: FiberRef[ZSpan],
+  private[extras] val current: FiberRef[ZSpan],
   private[extras] val entryPoint: ZEntryPoint
 ) { self =>
   def context: UIO[SpanContext] =
