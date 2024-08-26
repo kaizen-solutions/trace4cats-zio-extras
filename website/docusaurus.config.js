@@ -2,8 +2,8 @@
 // Note: type annotations allow type checking and IDEs autocompletion
 
 const {themes} = require('prism-react-renderer');
-const lightTheme = themes.github;
-const darkTheme = themes.dracula;
+const lightCodeTheme = themes.github;
+const darkCodeTheme = themes.dracula;
 
 const organization = "kaizen-solutions";
 const project = "trace4cats-zio-extras";
