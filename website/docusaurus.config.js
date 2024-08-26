@@ -1,7 +1,7 @@
 // @ts-check
 // Note: type annotations allow type checking and IDEs autocompletion
 
-const {themes} = require('prism-react-renderer');
+const { themes } = require('prism-react-renderer');
 const lightCodeTheme = themes.github;
 const darkCodeTheme = themes.dracula;
 
@@ -58,9 +58,7 @@ const config = {
     ],
   ],
 
-  plugins: [
-    require.resolve("@cmfcmf/docusaurus-search-local")
-  ],
+  plugins: [],
 
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
@@ -131,6 +129,9 @@ const config = {
         additionalLanguages: ['java', 'scala']
       },
     }),
+  themes: [
+    require.resolve("@easyops-cn/docusaurus-search-local")
+  ]
 };
 
 module.exports = config;
