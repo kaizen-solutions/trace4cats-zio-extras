@@ -32,7 +32,7 @@ object ZioHttpClientTracer {
         span.putAll(toAttributes(request)).when(span.context.traceFlags.sampled == SampleDecision.Include)
 
       enrichWithAttributes *>
-        Client.request(requestWithTraceHeaders).tap { response =>
+        Client.streaming(requestWithTraceHeaders).tap { response =>
           val spanStatus     = toSpanStatus(response.status)
           val respAttributes = toAttributes(response)
           span.setStatus(spanStatus) *> span.putAll(respAttributes)
