@@ -49,7 +49,7 @@ object SttpBackendTracerSpec extends ZIOSpecDefault {
       )
     }
   ).provide(
-    ZLayer.scopedEnvironment(
+    ZLayer.scopedEnvironment[Any](
       ztracerEnv
     )
   )
