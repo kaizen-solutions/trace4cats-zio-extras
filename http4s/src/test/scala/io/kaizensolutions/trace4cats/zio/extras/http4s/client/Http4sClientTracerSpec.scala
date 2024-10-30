@@ -21,7 +21,7 @@ object Http4sClientTracerSpec extends ZIOSpecDefault {
           (sc, client) = result
           // NOTE: define a scope here otherwise the results won't show up as it uses this Scope which is held open for
           // the entire duration of this test
-          response <- ZIO.scoped(client.run(exampleRequest).toScopedZIO)
+          response <- ZIO.scoped[Any](client.run(exampleRequest).toScopedZIO)
           spans    <- sc.retrieveCollected
         } yield assertTrue(response.status == Ok, spans.length == 1) && {
           val span = spans.head
@@ -36,7 +36,7 @@ object Http4sClientTracerSpec extends ZIOSpecDefault {
           for {
             result      <- setup(_ => Resource.eval(ZIO.fail(new Exception("An error has occurred"))))
             (sc, client) = result
-            response    <- ZIO.scoped(client.run(exampleRequest).toScopedZIO).exit
+            response    <- ZIO.scoped[Any](client.run(exampleRequest).toScopedZIO).exit
             spans       <- sc.retrieveCollected
           } yield assertTrue(response.isFailure: Boolean, spans.length == 1) && {
             val span = spans.head
@@ -61,7 +61,7 @@ object Http4sClientTracerSpec extends ZIOSpecDefault {
                 )
               )
             (sc, client) = result
-            response    <- ZIO.scoped(client.run(exampleRequest).toScopedZIO).exit
+            response    <- ZIO.scoped[Any](client.run(exampleRequest).toScopedZIO).exit
             spans       <- sc.retrieveCollected
           } yield assertTrue(response.isFailure, spans.length == 1) && {
             val span = spans.head
