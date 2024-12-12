@@ -373,4 +373,10 @@ object ZTracer {
         tracer   = ZTracer.make(spanRef, ep)
       } yield tracer
     )
+
+  val noop: ZIO[Scope, Nothing, ZTracer] =
+    FiberRef.make[ZSpan](initial = ZSpan.noop).map(ref => ZTracer.make(ref, ZEntryPoint.noop))
+
+  val noopLayer: ULayer[ZTracer] =
+    ZLayer.scoped(noop)
 }

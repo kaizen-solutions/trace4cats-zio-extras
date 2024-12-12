@@ -35,3 +35,7 @@ final class ZEntryPoint(private val underlying: EntryPoint[Task]) extends AnyVal
       .orDie
       .map(ZSpan.make)
 }
+
+object ZEntryPoint {
+  val noop = new ZEntryPoint(EntryPoint.noop)
+}
