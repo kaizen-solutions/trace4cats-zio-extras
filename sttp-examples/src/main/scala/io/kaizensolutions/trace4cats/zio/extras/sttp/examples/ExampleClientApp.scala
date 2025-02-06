@@ -16,7 +16,8 @@ object ExampleClientApp extends ZIOAppDefault {
       backend <- HttpClientZioBackend.scoped()
     } yield SttpBackendTracer(tracer, backend)).orDie
 
-  val tracerLayer: URLayer[ZEntryPoint, ZTracer] = JaegarEntrypoint.live >>> ZTracer.layer
+  val tracerLayer: URLayer[ZEntryPoint, ZTracer] =
+    OltpGrpcEntrypoint.live >>> ZTracer.layer
 
   val run: ZIO[ZIOAppArgs & Scope, Any, Any] =
     ZIO
@@ -46,7 +47,7 @@ object ExampleClientApp extends ZIOAppDefault {
           }
       }
       .provide(
-        JaegarEntrypoint.live,
+        OltpGrpcEntrypoint.live,
         tracerLayer,
         ZLayer.scoped[ZTracer](tracedBackend)
       )

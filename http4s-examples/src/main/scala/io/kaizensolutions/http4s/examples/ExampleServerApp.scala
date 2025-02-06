@@ -54,7 +54,7 @@ object ExampleServerApp extends ZIOAppDefault {
       }
       .provide(
         ZLayer.fromZIO(Scope.make),
-        JaegerEntrypoint.live,
+        OltpGrpcEntrypoint.live,
         ZTracer.layer,
         Db.live
       )

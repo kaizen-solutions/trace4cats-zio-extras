@@ -38,5 +38,5 @@ object ExampleApp extends ZIOAppDefault {
           .runDrain
           .exitCode
       }
-      .provide(JaegerEntrypoint.live, ZTracer.layer)
+      .provide(OltpGrpcEntrypoint.live, ZTracer.layer)
 }

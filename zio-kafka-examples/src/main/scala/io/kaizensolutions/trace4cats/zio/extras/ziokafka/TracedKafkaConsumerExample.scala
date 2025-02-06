@@ -34,7 +34,7 @@ object TracedKafkaConsumerExample extends ZIOAppDefault {
       )
       .provide(
         ZLayer.scoped[Any](Consumer.make(consumerSettings)),
-        ZLayer.scoped[Any](JaegarEntrypoint.entryPoint(TraceProcess("traced-zio-kafka-consumer"))),
+        ZLayer.scoped[Any](OltpGrpcEntrypoint.entryPoint(TraceProcess("traced-zio-kafka-consumer"))),
         ZTracer.layer
       )
   }

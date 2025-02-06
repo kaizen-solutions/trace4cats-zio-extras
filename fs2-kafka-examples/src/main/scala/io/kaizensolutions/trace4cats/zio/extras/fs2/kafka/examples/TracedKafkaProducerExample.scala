@@ -40,7 +40,7 @@ object TracedKafkaProducerExample extends ZIOAppDefault {
         }
       )
       .provide(
-        ZLayer.scoped[Any](JaegarEntrypoint.entryPoint(TraceProcess("traced-fs2-kafka-producer"))).orDie,
+        ZLayer.scoped[Any](OltpGrpcEntrypoint.entryPoint(TraceProcess("traced-fs2-kafka-producer"))).orDie,
         ZTracer.layer
       )
   }

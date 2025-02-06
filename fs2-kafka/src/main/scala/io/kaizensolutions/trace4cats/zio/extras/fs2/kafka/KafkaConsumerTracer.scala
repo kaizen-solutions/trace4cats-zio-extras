@@ -9,6 +9,7 @@ import trace4cats.model.{AttributeValue, SpanKind, TraceHeaders}
 import trace4cats.{ErrorHandler, ToHeaders}
 import zio.interop.catz.*
 import zio.{RIO, URIO}
+import fs2.kafka.ConsumerRecord
 
 object KafkaConsumerTracer {
   def traceConsumerStream[R, K, V](
@@ -74,6 +75,46 @@ object KafkaConsumerTracer {
             )
         }
       }
+
+  /**
+   * Wraps a function that processes a ConsumerRecord with a span. This is meant
+   * for the FS2 Kafka consumeChunks API
+   *
+   * @param tracer
+   * @param spanName
+   * @param process
+   * @return
+   */
+  def processSpannedConsumerRecord[R, K, V, Out](
+    tracer: ZTracer,
+    spanName: String
+  )(process: (ConsumerRecord[K, V], ZSpan) => RIO[R, Out]): ConsumerRecord[K, V] => RIO[R, Out] = {
+    (record: ConsumerRecord[K, V]) =>
+      val traceHeaders = extractTraceHeaders(record.headers)
+      val topic        = record.topic
+      val partition    = record.partition
+      val offset       = record.offset
+      val timestamp    = record.timestamp
+
+      val attributes =
+        Map(
+          "topic"           -> AttributeValue.StringValue(topic),
+          "partition"       -> AttributeValue.LongValue(partition.toLong),
+          "offset"          -> AttributeValue.LongValue(offset),
+          "create.time"     -> AttributeValue.LongValue(timestamp.createTime.getOrElse(0L)),
+          "log.append.time" -> AttributeValue.LongValue(timestamp.logAppendTime.getOrElse(0L))
+        )
+
+      tracer.fromHeaders(headers = traceHeaders, name = spanName, kind = SpanKind.Consumer) { span =>
+        span.putAll(attributes) *> process(record, span)
+      }
+  }
+
+  def processConsumerRecord[R, K, V, Out](
+    tracer: ZTracer,
+    spanName: String
+  )(process: ConsumerRecord[K, V] => RIO[R, Out]): ConsumerRecord[K, V] => RIO[R, Out] =
+    processSpannedConsumerRecord(tracer, spanName)((record, _) => process(record))
 
   private def extractTraceHeaders(in: Headers): TraceHeaders =
     in.toChain.foldMap(header => TraceHeaders.of(header.key() -> header.as[String]))

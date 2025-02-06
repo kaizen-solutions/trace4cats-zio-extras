@@ -1,20 +1,16 @@
-package io.kaizensolutions.trace4cats.zio.extras.fs2
+package io.kaizensolutions.trace4cats.zio.extras.fs2.kafka.examples
 
 import trace4cats.EntryPoint
-import trace4cats.jaeger.JaegerSpanCompleter
+import trace4cats.opentelemetry.otlp.OpenTelemetryOtlpGrpcSpanCompleter
 import trace4cats.kernel.SpanSampler
 import trace4cats.model.TraceProcess
 import io.kaizensolutions.trace4cats.zio.extras.*
 import zio.interop.catz.*
-import zio.{RIO, Scope, Task, ULayer, ZLayer}
+import zio.{RIO, Scope, Task}
 
-object JaegarEntrypoint {
-  val live: ULayer[ZEntryPoint] =
-    ZLayer.scoped[Any](entryPoint(TraceProcess("fs2-example-app"))).orDie
-
+object OltpGrpcEntrypoint {
   def entryPoint(process: TraceProcess): RIO[Scope, ZEntryPoint] =
-    JaegerSpanCompleter[Task](process, "localhost")
+    OpenTelemetryOtlpGrpcSpanCompleter[Task](process, "localhost")
       .map(completer => EntryPoint[Task](SpanSampler.always[Task], completer))
       .scoped
-
 }

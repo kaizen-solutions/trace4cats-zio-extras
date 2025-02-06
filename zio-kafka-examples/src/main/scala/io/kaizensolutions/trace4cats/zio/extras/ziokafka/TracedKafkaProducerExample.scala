@@ -16,7 +16,7 @@ object TracedKafkaProducerExample extends ZIOAppDefault {
         .produce("test-topic", s"key-$i", s"value-$i", Serde.string, Serde.string)
         .provide(
           ZLayer.scoped[Any](Producer.make(producerSettings)) >>> KafkaProducerTracer.layer,
-          ZLayer.scoped[Any](JaegarEntrypoint.entryPoint(TraceProcess("traced-zio-kafka-producer"))).orDie,
+          ZLayer.scoped[Any](OltpGrpcEntrypoint.entryPoint(TraceProcess("traced-zio-kafka-producer"))).orDie,
           ZTracer.layer
         )
     )

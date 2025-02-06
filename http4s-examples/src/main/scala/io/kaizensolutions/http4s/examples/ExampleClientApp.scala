@@ -65,7 +65,7 @@ object ExampleClientApp extends ZIOAppDefault {
         }
       }
     }.provide(
-      ZLayer.scoped[Any](JaegerEntrypoint.entryPoint(TraceProcess("http4s-client-example"))),
+      ZLayer.scoped[Any](OltpGrpcEntrypoint.entryPoint(TraceProcess("http4s-client-example"))),
       ZTracer.layer
     )
   }

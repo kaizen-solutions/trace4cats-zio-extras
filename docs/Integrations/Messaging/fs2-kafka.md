@@ -94,3 +94,35 @@ This produces the following traces:
 
 Notice how the trace is continued for each Kafka record that is consumed and Jaegar is able to show the full trace 
 (from the producer all the way to the consumer).
+
+## FS2 Kafka `consumeChunk` API 
+
+Instead of using streaming traces which can be considered less ergonomic, there is a `tracedConsumeChunk` method
+that is similar to the `consumeChunk` method in the `fs2-kafka` library. This method gives you a way to handle
+each record individually and takes care of automatically reading the trace headers from the Kafka record. It uses
+the `consumeChunk` method under the hood for efficiency.
+
+```scala mdoc:compile-only
+import fs2.kafka.{AutoOffsetReset, ConsumerSettings, KafkaConsumer}
+import io.kaizensolutions.trace4cats.zio.extras.ZTracer
+import io.kaizensolutions.trace4cats.zio.extras.fs2.kafka.*
+import zio.*
+import zio.interop.catz.*
+
+type Effect[A] = RIO[ZTracer, A]
+
+val consumerSettings = ConsumerSettings[Effect, String, String]
+  .withBootstrapServers("localhost:9092")
+  .withGroupId("example-consumer-group-10")
+  .withAutoOffsetReset(AutoOffsetReset.Earliest)
+
+// Note: This runs indefinitely
+val process: Effect[Unit] = KafkaConsumer
+  .stream(consumerSettings)
+  .subscribeTo("test-topic")
+  .tracedConsumeChunk { record =>
+    ZTracer.span(s"${record.topic}-${record.key}-${record.value}")(
+      ZIO.succeed(println((record.key, record.value)))
+    )
+  }
+```

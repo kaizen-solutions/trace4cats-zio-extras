@@ -1,8 +1,8 @@
 import org.typelevel.scalacoptions.ScalacOptions
 
 inThisBuild {
-  val scala213 = "2.13.15"
-  val scala3   = "3.3.4"
+  val scala213 = "2.13.16"
+  val scala3   = "3.3.5"
 
   Seq(
     scalaVersion       := scala213,
@@ -136,7 +136,7 @@ lazy val coreExample = project
     publish / skip := true,
     libraryDependencies ++= {
       val trace4cats = "io.janstenpickle"
-      Seq(trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter)
+      Seq(trace4cats %% "trace4cats-opentelemetry-otlp-grpc-exporter" % Versions.trace4CatsGRPCExporter)
     }
   )
   .dependsOn(core)
@@ -171,7 +171,7 @@ lazy val fs2Example = project
     publish / skip := true,
     libraryDependencies ++= {
       val trace4cats = "io.janstenpickle"
-      Seq(trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter)
+      Seq(trace4cats %% "trace4cats-opentelemetry-otlp-grpc-exporter" % Versions.trace4CatsGRPCExporter)
     }
   )
   .dependsOn(fs2)
@@ -198,8 +198,8 @@ lazy val fs2KafkaExample =
         val trace4cats = "io.janstenpickle"
 
         Seq(
-          http4s     %% "http4s-ember-client"               % Versions.http4s,
-          trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter
+          http4s     %% "http4s-ember-client"                         % Versions.http4s,
+          trace4cats %% "trace4cats-opentelemetry-otlp-grpc-exporter" % Versions.trace4CatsGRPCExporter
         )
       }
     )
@@ -234,9 +234,9 @@ lazy val http4sExample =
         val trace4cats = "io.janstenpickle"
 
         Seq(
-          http4s     %% "http4s-ember-server"               % Versions.http4s,
-          http4s     %% "http4s-ember-client"               % Versions.http4s,
-          trace4cats %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter
+          http4s     %% "http4s-ember-server"                         % Versions.http4s,
+          http4s     %% "http4s-ember-client"                         % Versions.http4s,
+          trace4cats %% "trace4cats-opentelemetry-otlp-grpc-exporter" % Versions.trace4CatsGRPCExporter
         )
       }
     )
@@ -268,9 +268,9 @@ lazy val zioHttpExample =
       libraryDependencies ++= {
         val trace4cats = "io.janstenpickle"
         Seq(
-          trace4cats      %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
-          "dev.zio"       %% "zio-logging-slf4j"                 % Versions.zioLogging,
-          "ch.qos.logback" % "logback-classic"                   % Versions.logback
+          trace4cats      %% "trace4cats-opentelemetry-otlp-grpc-exporter" % Versions.trace4CatsGRPCExporter,
+          "dev.zio"       %% "zio-logging-slf4j"                           % Versions.zioLogging,
+          "ch.qos.logback" % "logback-classic"                             % Versions.logback
         )
       }
     )
@@ -312,7 +312,7 @@ lazy val sttpExample =
       name           := "trace4cats-zio-extras-zio-sttp-examples",
       publish / skip := true,
       libraryDependencies ++= Seq(
-        "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter
+        "io.janstenpickle" %% "trace4cats-opentelemetry-otlp-grpc-exporter" % Versions.trace4CatsGRPCExporter
       ),
       // Prevents org.scala-lang.modules:scala-collection-compat _3, _2.13 conflicting cross-version suffixes
       excludeDependencies += "org.scala-lang.modules" % "scala-collection-compat_2.13"
@@ -342,11 +342,11 @@ lazy val tapirExample =
       publish / skip := true,
       libraryDependencies ++=
         Seq(
-          "io.janstenpickle"            %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
-          "com.softwaremill.sttp.tapir" %% "tapir-json-circe"                  % Versions.tapir,
-          "com.softwaremill.sttp.tapir" %% "tapir-zio"                         % Versions.tapir,
-          "com.softwaremill.sttp.tapir" %% "tapir-http4s-server"               % Versions.tapir,
-          "org.http4s"                  %% "http4s-ember-server"               % Versions.http4s
+          "io.janstenpickle"            %% "trace4cats-opentelemetry-otlp-grpc-exporter" % Versions.trace4CatsGRPCExporter,
+          "com.softwaremill.sttp.tapir" %% "tapir-json-circe"                            % Versions.tapir,
+          "com.softwaremill.sttp.tapir" %% "tapir-zio"                                   % Versions.tapir,
+          "com.softwaremill.sttp.tapir" %% "tapir-http4s-server"                         % Versions.tapir,
+          "org.http4s"                  %% "http4s-ember-server"                         % Versions.http4s
         ),
       publish / skip := true
     )
@@ -368,7 +368,7 @@ lazy val virgilExample =
     .settings(kindProjectorSettings *)
     .settings(
       name                                      := "trace4cats-zio-extras-virgil-examples",
-      libraryDependencies += "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
+      libraryDependencies += "io.janstenpickle" %% "trace4cats-opentelemetry-otlp-grpc-exporter" % Versions.trace4CatsGRPCExporter,
       publish / skip                            := true
     )
     .dependsOn(core, virgil)
@@ -381,9 +381,10 @@ lazy val doobie =
       name := "trace4cats-zio-extras-doobie",
       libraryDependencies ++=
         Seq(
-          "org.tpolecat" %% "doobie-core"       % Versions.doobie,
-          "org.tpolecat" %% "doobie-postgres"   % Versions.doobie           % Test,
-          "io.zonky.test" % "embedded-postgres" % Versions.embeddedPostgres % Test
+          "org.tpolecat"          %% "doobie-core"                    % Versions.doobie,
+          "org.tpolecat"          %% "doobie-postgres"                % Versions.doobie           % Test,
+          "io.zonky.test"          % "embedded-postgres"              % Versions.embeddedPostgres % Test,
+          "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.2.0"                  % Test
         )
     )
     .dependsOn(core % "compile->compile;test->test")
@@ -396,8 +397,8 @@ lazy val doobieExample =
       name           := "doobie-examples",
       publish / skip := true,
       libraryDependencies ++= Seq(
-        "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
-        "org.tpolecat"     %% "doobie-postgres"                   % Versions.doobie
+        "io.janstenpickle" %% "trace4cats-opentelemetry-otlp-grpc-exporter" % Versions.trace4CatsGRPCExporter,
+        "org.tpolecat"     %% "doobie-postgres"                             % Versions.doobie
       ),
       publish / skip := true
     )
@@ -430,7 +431,7 @@ lazy val skunkExample =
       name           := "skunk-examples",
       publish / skip := true,
       libraryDependencies ++= Seq(
-        "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter
+        "io.janstenpickle" %% "trace4cats-opentelemetry-otlp-grpc-exporter" % Versions.trace4CatsGRPCExporter
       )
     )
     .dependsOn(skunk)
@@ -461,9 +462,9 @@ lazy val zioKafkaExamples = {
     .settings(
       publish / skip := true,
       libraryDependencies ++= Seq(
-        "io.janstenpickle" %% "trace4cats-jaeger-thrift-exporter" % Versions.trace4CatsJaegarExporter,
-        "dev.zio"          %% "zio-logging-slf4j"                 % Versions.zioLogging,
-        "ch.qos.logback"    % "logback-classic"                   % Versions.logback
+        "io.janstenpickle" %% "trace4cats-opentelemetry-otlp-grpc-exporter" % Versions.trace4CatsGRPCExporter,
+        "dev.zio"          %% "zio-logging-slf4j"                           % Versions.zioLogging,
+        "ch.qos.logback"    % "logback-classic"                             % Versions.logback
       )
     )
     .dependsOn(

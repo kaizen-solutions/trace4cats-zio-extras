@@ -40,7 +40,7 @@ object PostgresExampleApp extends ZIOAppDefault {
              .transact(xa)
     } yield ()
 
-    program.provide(tracedXaLayer, JaegerEntrypoint.live, ZTracer.layer)
+    program.provide(tracedXaLayer, OltpGrpcEntrypoint.live, ZTracer.layer)
   }
 
   // https://raw.githubusercontent.com/tpolecat/doobie/series/0.7.x/world.sql

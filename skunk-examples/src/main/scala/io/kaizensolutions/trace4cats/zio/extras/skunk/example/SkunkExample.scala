@@ -37,7 +37,7 @@ object SkunkExample extends ZIOAppDefault {
       }
 
     program.provide(
-      JaegerEntrypoint.live,
+      OltpGrpcEntrypoint.live,
       ZTracer.layer,
       Skunk.layer
     )

@@ -1,4 +1,4 @@
-package io.kaizensolutions.trace4cats.zio.extras.ziohttp.examples
+package io.kaizensolutions.trace4cats.zio.extras.sttp.examples
 
 import trace4cats.EntryPoint
 import trace4cats.opentelemetry.otlp.OpenTelemetryOtlpGrpcSpanCompleter
@@ -8,12 +8,12 @@ import io.kaizensolutions.trace4cats.zio.extras.*
 import zio.interop.catz.*
 import zio.{RIO, Scope, Task, ULayer, ZLayer}
 
-object JaegerEntrypoint {
-  val live: ULayer[ZEntryPoint] =
-    ZLayer.scoped[Any](entryPoint(TraceProcess("zio-http-example-app"))).orDie
+object OltpGrpcEntrypoint {
+  val live: ULayer[ZEntryPoint] = ZLayer.scoped[Any](entryPoint(TraceProcess("sttp-example-client-app"))).orDie
 
   def entryPoint(process: TraceProcess): RIO[Scope, ZEntryPoint] =
     OpenTelemetryOtlpGrpcSpanCompleter[Task](process, "localhost")
       .map(completer => EntryPoint[Task](SpanSampler.always[Task], completer))
       .scoped
+
 }
