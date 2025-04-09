@@ -2,14 +2,13 @@ package io.kaizensolutions.trace4cats.zio.extras.fs2.kafka
 
 import cats.syntax.foldable.*
 import fs2.Stream
-import fs2.kafka.{CommittableConsumerRecord, CommittableOffset, Headers}
+import fs2.kafka.{CommittableConsumerRecord, CommittableOffset, ConsumerRecord, Headers}
 import io.kaizensolutions.trace4cats.zio.extras.fs2.*
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
+import trace4cats.ErrorHandler
 import trace4cats.model.{AttributeValue, SpanKind, TraceHeaders}
-import trace4cats.{ErrorHandler, ToHeaders}
 import zio.interop.catz.*
 import zio.{RIO, URIO}
-import fs2.kafka.ConsumerRecord
 
 object KafkaConsumerTracer {
   def traceConsumerStream[R, K, V](
@@ -60,16 +59,7 @@ object KafkaConsumerTracer {
                   topicPartition = comm.offset.topicPartition,
                   offsetAndMetadata = comm.offset.offsetAndMetadata,
                   consumerGroupId = comm.offset.consumerGroupId,
-                  commit = _ =>
-                    // The outer span may be closed so to be safe, we extract the ID and use it to create a sub-span for the commit
-                    // NOTE: If you used batched commits (and you should) - all Kafka element traces won't have a corresponding commit
-                    tracer.fromHeaders(
-                      headers = ToHeaders.standard.fromContext(span.context),
-                      name = s"${spanNameForElement(comm)}-commit",
-                      kind = SpanKind.Consumer
-                    ) { span =>
-                      span.putAll(coreAttributes) *> comm.offset.commit
-                    }
+                  commit = _ => comm.offset.commit
                 )
               )
             )
