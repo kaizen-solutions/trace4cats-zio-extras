@@ -80,7 +80,7 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
           }
       ) + suite("Header injection middleware") {
         val app = Routes(
-          Method.GET / ""       -> handler(ZIO.succeed(Response.ok)),
+          Method.GET / ""       -> handler(Response.ok),
           (Method.GET / "fail") -> handler(ZIO.fail(new RuntimeException("fail")))
         ).handleError(_ => Response.internalServerError)
 
@@ -88,19 +88,23 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
           app @@ ZioHttpServerTracer.injectHeaders() @@ ZioHttpServerTracer.trace()
 
         test("Succeeds on a successful response") {
-          for {
-            res                <- wrappedApp.runZIO(Request.get(URL.empty))
-            spans              <- InMemorySpanCompleter.retrieveCollected
-            httpHeadersFromSpan = toHttpHeaders(spans.head, ToHeaders.standard)
-            // This is done because assertTrue gets confused res.headers and res.headers(...)
-            responseHeaders = res.headers
-          } yield assertTrue(responseHeaders.toSeq.diff(httpHeadersFromSpan.toSeq).isEmpty)
+          ZIO.scoped(
+            for {
+              res                <- wrappedApp.runZIO(Request.get(URL.empty))
+              spans              <- InMemorySpanCompleter.retrieveCollected
+              httpHeadersFromSpan = toHttpHeaders(spans.head, ToHeaders.standard)
+              // This is done because assertTrue gets confused res.headers and res.headers(...)
+              responseHeaders = res.headers
+            } yield assertTrue(responseHeaders.toSeq.diff(httpHeadersFromSpan.toSeq).isEmpty)
+          )
         } + test("Succeeds on a failing response")(
-          for {
-            resActual <- wrappedApp.runZIO(Request.get(URL(Path("fail"))))
-            spans     <- InMemorySpanCompleter.retrieveCollected
-            expected   = toHttpHeaders(spans.head, ToHeaders.standard)
-          } yield assertTrue(expected.toSet.subsetOf(resActual.headers.toSet))
+          ZIO.scoped(
+            for {
+              resActual <- wrappedApp.runZIO(Request.get(URL(Path("fail"))))
+              spans     <- InMemorySpanCompleter.retrieveCollected
+              expected   = toHttpHeaders(spans.head, ToHeaders.standard)
+            } yield assertTrue(expected.toSet.subsetOf(resActual.headers.toSet))
+          )
         )
       }.provide(InMemorySpanCompleter.layer("foo-app"))
     )

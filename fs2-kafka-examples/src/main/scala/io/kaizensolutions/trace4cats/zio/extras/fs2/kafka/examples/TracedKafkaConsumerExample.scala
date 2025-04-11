@@ -3,12 +3,9 @@ package io.kaizensolutions.trace4cats.zio.extras.fs2.kafka.examples
 import fs2.kafka.{AutoOffsetReset, ConsumerSettings, KafkaConsumer}
 import trace4cats.model.TraceProcess
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
-import io.kaizensolutions.trace4cats.zio.extras.fs2.*
 import io.kaizensolutions.trace4cats.zio.extras.fs2.kafka.*
 import zio.{RIO, Scope, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer}
 import zio.interop.catz.*
-
-import scala.concurrent.duration.*
 
 object TracedKafkaConsumerExample extends ZIOAppDefault {
   type Effect[A] = RIO[ZTracer, A]
@@ -22,18 +19,11 @@ object TracedKafkaConsumerExample extends ZIOAppDefault {
     KafkaConsumer
       .stream(consumerSettings)
       .subscribeTo("test-topic")
-      .flatMap(_.stream)
-      .traceConsumerStream()
-      .evalMapTraced("kafka-consumer-print")(e =>
-        ZTracer.span(s"${e.record.topic}-${e.record.key}-${e.record.value}")(
-          ZIO.succeed(println((e.record.key, e.record.value))).as(e)
+      .tracedConsumeChunk(e =>
+        ZTracer.span(s"${e.topic}-${e.key}-${e.value}")(
+          ZIO.succeed(println((e.key, e.value))).as(e)
         )
       )
-      .endTracingEachElement
-      .map(_.offset)
-      .through(fs2.kafka.commitBatchWithin(10, 10.seconds))
-      .compile
-      .drain
       .provide(
         ZLayer.scoped[Any](OltpGrpcEntrypoint.entryPoint(TraceProcess("traced-fs2-kafka-consumer"))).orDie,
         ZTracer.layer

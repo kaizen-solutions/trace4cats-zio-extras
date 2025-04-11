@@ -182,7 +182,12 @@ lazy val fs2Kafka =
     .settings(kindProjectorSettings *)
     .settings(
       name                                     := "trace4cats-zio-extras-fs2-kafka",
-      libraryDependencies += "com.github.fd4s" %% "fs2-kafka" % Versions.fs2Kafka
+      libraryDependencies ++= Seq(
+        "com.github.fd4s" %% "fs2-kafka" % Versions.fs2Kafka,
+        "io.github.embeddedkafka" %% "embedded-kafka"    % Versions.kafkaEmbedded % Test,
+        "dev.zio"                 %% "zio-logging-slf4j" % Versions.zioLogging    % Test,
+        "ch.qos.logback"           % "logback-classic"   % Versions.logback       % Test
+      )
     )
     .dependsOn(core % "compile->compile;test->test", fs2)
 
@@ -384,7 +389,7 @@ lazy val doobie =
           "org.tpolecat"          %% "doobie-core"                    % Versions.doobie,
           "org.tpolecat"          %% "doobie-postgres"                % Versions.doobie           % Test,
           "io.zonky.test"          % "embedded-postgres"              % Versions.embeddedPostgres % Test,
-          "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.2.0"                  % Test
+          "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.4.0"                  % Test
         )
     )
     .dependsOn(core % "compile->compile;test->test")

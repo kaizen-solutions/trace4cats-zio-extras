@@ -1,15 +1,15 @@
 import cats.data.NonEmptyList
 import cats.implicits.toShow
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
-import io.kaizensolutions.trace4cats.zio.extras.ziokafka.{KafkaConsumerTracer, KafkaProducerTracer}
 import io.kaizensolutions.trace4cats.zio.extras.*
+import io.kaizensolutions.trace4cats.zio.extras.ziokafka.{KafkaConsumerTracer, KafkaProducerTracer}
 import trace4cats.model.SpanKind
 import zio.*
 import zio.kafka.consumer.{Consumer, ConsumerSettings, Subscription}
 import zio.kafka.producer.{Producer, ProducerSettings}
 import zio.kafka.serde.Serde
-import zio.test.*
 import zio.logging.backend.SLF4J
+import zio.test.*
 
 import java.util.UUID
 
@@ -20,7 +20,16 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
 
   val embeddedKafka: ZLayer[Any, Throwable, EmbeddedKafkaConfig] = ZLayer.scoped(
     ZIO
-      .acquireRelease(ZIO.attempt(EmbeddedKafka.start()))(k => ZIO.attempt(k.stop(true)).orDie)
+      .acquireRelease(
+        ZIO.attempt(
+          EmbeddedKafka.start()(
+            EmbeddedKafkaConfig(
+              kafkaPort = scala.util.Random.between(1000, 65000),
+              zooKeeperPort = scala.util.Random.between(1000, 65000)
+            )
+          )
+        )
+      )(k => ZIO.attempt(k.stop(true)).orDie)
       .map(_.config)
   )
 
@@ -45,7 +54,7 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
       test("Produces traces") {
         val topic = UUID.randomUUID().toString
         for {
-          _     <- Producer.produce(topic, "key", "value", Serde.string, Serde.string)
+          _     <- ZIO.serviceWithZIO[Producer](_.produce(topic, "key", "value", Serde.string, Serde.string))
           spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
         } yield assertTrue(
           spans.exists(span =>
@@ -64,13 +73,14 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
       test("Continues traces from producer") {
         val topic = UUID.randomUUID().toString
         for {
-          tracer <- ZIO.service[ZTracer]
-          p      <- Promise.make[Nothing, Unit]
+          tracer   <- ZIO.service[ZTracer]
+          p        <- Promise.make[Nothing, Unit]
+          consumer <- ZIO.service[Consumer]
+          producer <- ZIO.service[Producer]
           _ <- KafkaConsumerTracer
                  .traceConsumerStream(
                    tracer,
-                   Consumer
-                     .plainStream(Subscription.topics(topic), Serde.string, Serde.string)
+                   consumer.plainStream(Subscription.topics(topic), Serde.string, Serde.string)
                  )
                  .endTracingEachElement
                  .tap(_.offset.commit)
@@ -78,7 +88,7 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
                  .runDrain
                  .forkScoped
 
-          _     <- Producer.produce(topic, "key", "value", Serde.string, Serde.string)
+          _     <- producer.produce(topic, "key", "value", Serde.string, Serde.string)
           _     <- p.await
           spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
         } yield assertTrue(

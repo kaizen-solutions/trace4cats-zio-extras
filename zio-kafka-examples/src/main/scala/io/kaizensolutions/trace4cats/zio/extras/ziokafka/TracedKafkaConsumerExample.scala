@@ -4,6 +4,7 @@ import io.kaizensolutions.trace4cats.zio.extras.*
 import trace4cats.model.TraceProcess
 import zio.kafka.consumer.{Consumer, ConsumerSettings, Subscription}
 import zio.kafka.serde.Serde
+import zio.stream.ZStream
 import zio.{Scope, ZIO, ZIOAppArgs, ZIOAppDefault, ZLayer}
 
 import java.util.UUID
@@ -19,8 +20,9 @@ object TracedKafkaConsumerExample extends ZIOAppDefault {
         KafkaConsumerTracer
           .traceConsumerStream(
             tracer,
-            Consumer
-              .plainStream(Subscription.topics("test-topic"), Serde.string, Serde.string)
+            ZStream.serviceWithStream[Consumer](
+              _.plainStream(Subscription.topics("test-topic"), Serde.string, Serde.string)
+            )
           )
           .tapWithTracer(tracer, "internal") { record =>
             val event = s"${record.record.topic}-${record.record.key}-${record.record.value}"

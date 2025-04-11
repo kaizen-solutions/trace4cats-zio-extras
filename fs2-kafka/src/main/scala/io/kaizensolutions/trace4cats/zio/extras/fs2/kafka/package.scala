@@ -1,26 +1,14 @@
 package io.kaizensolutions.trace4cats.zio.extras.fs2
 
+import cats.syntax.all.*
 import fs2.Stream
 import fs2.kafka.*
-import cats.syntax.all.*
-import zio.interop.catz.*
-import io.kaizensolutions.trace4cats.zio.extras.ZTracer
-import zio.{RIO, ZIO}
 import fs2.kafka.consumer.KafkaConsumeChunk.CommitNow
+import io.kaizensolutions.trace4cats.zio.extras.ZTracer
+import zio.interop.catz.*
+import zio.{RIO, ZIO}
 
 package object kafka {
-  implicit class Fs2KafkaTracerConsumerOps[R <: ZTracer, K, V](
-    val stream: Stream[RIO[R, *], CommittableConsumerRecord[RIO[R, *], K, V]]
-  ) extends AnyVal {
-    def traceConsumerStream(
-      spanNameForElement: CommittableConsumerRecord[RIO[R, *], K, V] => String =
-        (_: CommittableConsumerRecord[RIO[R, *], K, V]) => s"kafka-receive"
-    ): TracedStream[R, CommittableConsumerRecord[RIO[R, *], K, V]] =
-      Stream
-        .eval(ZIO.service[ZTracer])
-        .flatMap(tracer => KafkaConsumerTracer.traceConsumerStream(tracer, stream, spanNameForElement))
-  }
-
   implicit class Fs2KafkaConsumerChunksOps[R <: ZTracer, K, V](val consumer: KafkaConsumer[RIO[R, *], K, V])
       extends AnyVal {
     def tracedConsumeChunk(process: ConsumerRecord[K, V] => RIO[R, Any]) =
@@ -38,5 +26,14 @@ package object kafka {
         val tracedProcess = KafkaConsumerTracer.processConsumerRecord(tracer, "kafka-consume-chunk")(process)
         consumer.consumeChunk(_.traverse_(tracedProcess).as(CommitNow))
       }
+  }
+
+  implicit class Fs2KafkaConsumerOps[R, K, V](val self: KafkaConsumer[RIO[R, *], K, V]) extends AnyVal {
+    def consumeChunkTraced(ztracer: ZTracer, spanName: String)(
+      process: ConsumerRecord[K, V] => RIO[R, Unit]
+    ): RIO[R, Nothing] = {
+      val tracedProcess = KafkaConsumerTracer.processConsumerRecord(ztracer, spanName)(process)
+      self.consumeChunk(_.traverse(tracedProcess).as(CommitNow))
+    }
   }
 }

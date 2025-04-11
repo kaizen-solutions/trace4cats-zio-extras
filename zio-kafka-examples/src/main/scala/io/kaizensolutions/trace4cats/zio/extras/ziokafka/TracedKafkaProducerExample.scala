@@ -12,8 +12,8 @@ object TracedKafkaProducerExample extends ZIOAppDefault {
     val producerSettings = ProducerSettings(List("localhost:9092"))
 
     ZIO.foreachDiscard(1 to 10)(i =>
-      Producer
-        .produce("test-topic", s"key-$i", s"value-$i", Serde.string, Serde.string)
+      ZIO
+        .serviceWithZIO[Producer](_.produce("test-topic", s"key-$i", s"value-$i", Serde.string, Serde.string))
         .provide(
           ZLayer.scoped[Any](Producer.make(producerSettings)) >>> KafkaProducerTracer.layer,
           ZLayer.scoped[Any](OltpGrpcEntrypoint.entryPoint(TraceProcess("traced-zio-kafka-producer"))).orDie,

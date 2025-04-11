@@ -36,26 +36,29 @@ object ZioHttpServerTracer {
     override def apply[Env <: ZTracer, Err](routes: Routes[Env, Err]): Routes[Env, Err] =
       Routes.fromIterable(
         routes.routes.map(route =>
-          route.transform(handler =>
-            Handler.fromFunctionZIO[Request] { request =>
-              val traceHeaders = extractTraceHeaders(request.headers)
-              val nameOfSpan   = route.routePattern.render
+          route.transform(h =>
+            Handler.scoped[Env](
+              handler { (request: Request) =>
+                val traceHeaders = extractTraceHeaders(request.headers)
+                val nameOfSpan   = route.routePattern.render
 
-              ZIO.serviceWithZIO[ZTracer](
-                _.fromHeaders(traceHeaders, nameOfSpan, SpanKind.Server, errorHandler) { span =>
-                  val logTraceContext =
-                    if (enrichLogs) ZIOAspect.annotated(annotations = extractKVHeaders(span, logHeaders).toList*)
-                    else ZIOAspect.identity
+                ZIO.serviceWithZIO[ZTracer](
+                  _.fromHeaders(traceHeaders, nameOfSpan, SpanKind.Server, errorHandler) { span =>
+                    val logTraceContext =
+                      if (enrichLogs) ZIOAspect.annotated(annotations = extractKVHeaders(span, logHeaders).toList*)
+                      else ZIOAspect.identity
 
-                  enrichSpanFromRequest(request, dropHeadersWhen, span) *>
-                    // NOTE: We need to call handler.runZIO and have the code executed within our span for propagation to take place
-                    (handler.runZIO(request) @@ logTraceContext).onExit {
-                      case Exit.Success(response) => enrichSpanFromResponse(response, dropHeadersWhen, span)
-                      case Exit.Failure(cause)    => span.setStatus(SpanStatus.Internal(cause.prettyPrint))
-                    }
-                }
-              )
-            }
+                    enrichSpanFromRequest(request, dropHeadersWhen, span) *>
+                      // NOTE: We need to call handler.runZIO and have the code executed within our span for propagation to take place
+                      (h.runZIO(request) @@ logTraceContext).onExit {
+                        case Exit.Success(response) => enrichSpanFromResponse(response, dropHeadersWhen, span)
+                        case Exit.Failure(cause)    => span.setStatus(SpanStatus.Internal(cause.prettyPrint))
+                      }
+
+                  }
+                )
+              }
+            )
           )
         )
       )
@@ -71,16 +74,18 @@ object ZioHttpServerTracer {
   def injectHeaders(whichHeaders: ToHeaders = ToHeaders.standard): Middleware[ZTracer] =
     new Middleware[ZTracer] {
       override def apply[Env <: ZTracer, Err](routes: Routes[Env, Err]): Routes[Env, Err] = {
-        routes.transform(handler =>
-          Handler.fromFunctionZIO[Request] { request =>
-            ZTracer.retrieveCurrentSpan.flatMap { span =>
-              val headers = toHttpHeaders(span, whichHeaders)
-              handler(request).fold(
-                _.addHeaders(headers),
-                _.addHeaders(headers)
-              )
+        routes.transform(h =>
+          Handler.scoped[Env](
+            handler { (request: Request) =>
+              ZTracer.retrieveCurrentSpan.flatMap { span =>
+                val headers = toHttpHeaders(span, whichHeaders)
+                h(request).fold(
+                  _.addHeaders(headers),
+                  _.addHeaders(headers)
+                )
+              }
             }
-          }
+          )
         )
       }
     }

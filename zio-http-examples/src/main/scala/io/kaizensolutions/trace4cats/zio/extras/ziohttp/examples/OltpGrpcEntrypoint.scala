@@ -16,4 +16,4 @@ object OltpGrpcEntrypoint {
     OpenTelemetryOtlpGrpcSpanCompleter[Task](process, "localhost")
       .map(completer => EntryPoint[Task](SpanSampler.always[Task], completer))
       .scoped
-} 
+}
