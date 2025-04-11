@@ -187,7 +187,9 @@ lazy val fs2Kafka =
         "io.github.embeddedkafka" %% "embedded-kafka"    % Versions.kafkaEmbedded % Test,
         "dev.zio"                 %% "zio-logging-slf4j" % Versions.zioLogging    % Test,
         "ch.qos.logback"           % "logback-classic"   % Versions.logback       % Test
-      )
+      ),
+      // Prevents org.scala-lang.modules:scala-collection-compat _3, _2.13 conflicting cross-version suffixes
+      excludeDependencies += "org.scala-lang.modules" % "scala-collection-compat_2.13"
     )
     .dependsOn(core % "compile->compile;test->test", fs2)
 

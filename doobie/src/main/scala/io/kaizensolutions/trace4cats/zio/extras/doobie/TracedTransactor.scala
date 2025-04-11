@@ -38,7 +38,7 @@ object TracedTransactor {
         def attributes = {
           val parameters = logEvent.params match {
             case Parameters.NonBatch(paramsAsList) => paramsAsList.map(_.toString)
-            case Parameters.Batch(paramsAsLists)   => paramsAsLists().flatMap(_.map(_.toString))
+            case Parameters.Batch(paramsAsLists)   => paramsAsLists().map(_.map(_.toString).mkString("[", ",", "]"))
           }
           NonEmptyList
             .fromList(parameters)
