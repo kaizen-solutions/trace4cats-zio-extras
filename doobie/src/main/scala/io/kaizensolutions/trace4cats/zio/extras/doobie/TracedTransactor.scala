@@ -3,6 +3,7 @@ package io.kaizensolutions.trace4cats.zio.extras.doobie
 import cats.data.NonEmptyList
 import doobie.*
 import doobie.util.log
+import doobie.util.log.Parameters
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import trace4cats.model.{AttributeValue, SpanStatus}
 import zio.*
@@ -34,9 +35,13 @@ object TracedTransactor {
 
     def trace(execution: FiniteDuration, processing: Option[FiniteDuration], failure: Option[Throwable]) = {
       tracer.withSpan(logEvent.sql.linesIterator.map(_.trim).mkString) { span =>
-        def attributes =
+        def attributes = {
+          val parameters = logEvent.params match {
+            case Parameters.NonBatch(paramsAsList) => paramsAsList.map(_.toString)
+            case Parameters.Batch(paramsAsLists)   => paramsAsLists().map(_.map(_.toString).mkString("[", ",", "]"))
+          }
           NonEmptyList
-            .fromList(logEvent.args.map(_.toString))
+            .fromList(parameters)
             .map(nel => "query.arguments" -> AttributeValue.StringList(nel))
             .toMap ++
             Map(
@@ -45,6 +50,7 @@ object TracedTransactor {
               "query.sql"        -> AttributeValue.StringValue(logEvent.sql)
             ) ++
             processing.map(p => "query.processingMillis" -> AttributeValue.LongValue(p.toMillis))
+        }
 
         ZIO
           .when(span.isSampled)(
