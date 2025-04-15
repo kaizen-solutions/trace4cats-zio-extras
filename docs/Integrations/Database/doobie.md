@@ -11,7 +11,7 @@ Here is an example of how to set it up:
 
 ```scala mdoc:compile-only
 import doobie.*
-import doobie.syntax.all.*
+import doobie.implicits.*
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.doobie.TracedTransactor
 import zio.*

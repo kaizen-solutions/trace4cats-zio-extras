@@ -56,46 +56,7 @@ This generates the following for each message produced:
 Kafka records that are consumed will automatically continue the trace given that the associated trace header is present 
 for the Kafka record. The following example shows how to consume a Kafka record with tracing headers:
 
-```scala mdoc:compile-only
-import fs2.Stream
-import fs2.kafka.*
-import io.kaizensolutions.trace4cats.zio.extras.*
-import io.kaizensolutions.trace4cats.zio.extras.fs2.*
-import io.kaizensolutions.trace4cats.zio.extras.fs2.kafka.*
-import zio.{durationInt => _, *}
-import zio.interop.catz.*
-
-import scala.concurrent.duration.*
-
-type Effect[A] = RIO[ZTracer, A]
-
-val consumerSettings = ConsumerSettings[Effect, String, String]
-  .withBootstrapServers("localhost:9092")
-  .withGroupId("example-consumer-group-10")
-  .withAutoOffsetReset(AutoOffsetReset.Earliest)
-
-val consumerStream: Stream[Effect, Unit] = 
-  KafkaConsumer.stream(consumerSettings)
-  .evalTap(_.subscribeTo("test-topic"))
-  .flatMap(_.stream)
-  .traceConsumerStream()
-  .evalMapTraced("kafka-consumer-print")(e =>
-    ZTracer.span(s"${e.record.topic}-${e.record.key}-${e.record.value}")(
-      ZIO.succeed(println((e.record.key, e.record.value))).as(e)
-    )
-  )
-  .endTracingEachElement
-  .map(_.offset)
-  .through(commitBatchWithin(10, 10.seconds))
-```
-
-This produces the following traces:
-<img width="801" alt="image" src="https://github.com/kaizen-solutions/trace4cats-zio-extras/assets/14280155/377fa2d3-d1fc-4b6e-8508-857f855e97c9"></img>
-
-Notice how the trace is continued for each Kafka record that is consumed and Jaegar is able to show the full trace 
-(from the producer all the way to the consumer).
-
-## FS2 Kafka `consumeChunk` API 
+## FS2 Kafka `consumeChunk` API
 
 Instead of using streaming traces which can be considered less ergonomic, there is a `tracedConsumeChunk` method
 that is similar to the `consumeChunk` method in the `fs2-kafka` library. This method gives you a way to handle

@@ -13,16 +13,15 @@ Kafka records that are produced are augmented with tracing headers. The followin
 import io.kaizensolutions.trace4cats.zio.extras.*
 import io.kaizensolutions.trace4cats.zio.extras.ziokafka.*
 import zio.*
-import zio.kafka.producer.{Producer, ProducerSettings}
-import zio.kafka.serde.Serde
+import zio.kafka.producer.*
+import zio.kafka.serde.*
 
 val producerSettings = ProducerSettings(List("localhost:9092"))
 val tracedProducerLayer = ZLayer.scoped[Any](Producer.make(producerSettings)) >>> KafkaProducerTracer.layer
 
 val program: ZIO[ZTracer, Throwable, Unit] = 
   ZIO.foreachDiscard(1 to 10)(i =>
-  Producer
-    .produce("test-topic", s"key-$i", s"value-$i", Serde.string, Serde.string)
+  ZIO.serviceWithZIO[Producer](_.produce("test-topic", s"key-$i", s"value-$i", Serde.string, Serde.string))
     .provideSome[ZTracer](tracedProducerLayer)
 )
 ```
@@ -38,9 +37,10 @@ for the Kafka record. The following example shows how to consume a Kafka record 
 ```scala mdoc:compile-only
 import io.kaizensolutions.trace4cats.zio.extras.*
 import io.kaizensolutions.trace4cats.zio.extras.ziokafka.*
-import zio.kafka.consumer.{Consumer, ConsumerSettings, Subscription}
-import zio.kafka.serde.Serde
+import zio.kafka.consumer.*
+import zio.kafka.serde.*
 import zio.*
+import zio.stream.*
 
 val consumerSettings = ConsumerSettings(List(s"localhost:9092"))
   .withGroupId("example-traced-group")
@@ -51,8 +51,7 @@ val consume: ZIO[ZTracer & Consumer, Throwable, Unit] =
     KafkaConsumerTracer
       .traceConsumerStream(
         tracer,
-        Consumer
-          .plainStream(Subscription.topics("test-topic"), Serde.string, Serde.string)
+        ZStream.serviceWithStream[Consumer](_.plainStream(Subscription.topics("test-topic"), Serde.string, Serde.string))
       )
       .tapWithTracer(tracer, "internal") { record =>
         val event = s"${record.record.topic}-${record.record.key}-${record.record.value}"
