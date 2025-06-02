@@ -34,14 +34,10 @@ inThisBuild {
       Developer("calvinlfer", "Calvin Fernandes", "cal@kaizen-solutions.io", url("https://www.kaizen-solutions.io")),
       Developer("soujiro32167", "Eli Kasik", "soujiro32167@gmail.com", url("https://trampolinelab.com"))
     ),
-    licenses               := List("MIT" -> url("https://opensource.org/licenses/MIT")),
-    organization           := "io.kaizen-solutions",
-    organizationName       := "kaizen-solutions",
-    homepage               := Some(url("https://www.kaizen-solutions.io")),
-    sonatypeCredentialHost := "s01.oss.sonatype.org",
-    sonatypeProfileName    := "io.kaizen-solutions",
-    sonatypeRepository     := "https://s01.oss.sonatype.org/service/local",
-    sonatypeCredentialHost := "s01.oss.sonatype.org"
+    licenses         := List("MIT" -> url("https://opensource.org/licenses/MIT")),
+    organization     := "io.kaizen-solutions",
+    organizationName := "kaizen-solutions",
+    homepage         := Some(url("https://www.kaizen-solutions.io"))
   )
 }
 
@@ -181,9 +177,9 @@ lazy val fs2Kafka =
     .in(file("fs2-kafka"))
     .settings(kindProjectorSettings *)
     .settings(
-      name                                     := "trace4cats-zio-extras-fs2-kafka",
+      name := "trace4cats-zio-extras-fs2-kafka",
       libraryDependencies ++= Seq(
-        "com.github.fd4s" %% "fs2-kafka" % Versions.fs2Kafka,
+        "com.github.fd4s"         %% "fs2-kafka"         % Versions.fs2Kafka,
         "io.github.embeddedkafka" %% "embedded-kafka"    % Versions.kafkaEmbedded % Test,
         "dev.zio"                 %% "zio-logging-slf4j" % Versions.zioLogging    % Test,
         "ch.qos.logback"           % "logback-classic"   % Versions.logback       % Test

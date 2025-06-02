@@ -1,6 +1,5 @@
 package doobie
 
-
 import doobie.implicits.*
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.doobie.TracedTransactor
