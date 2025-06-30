@@ -12,6 +12,7 @@ object Versions {
   val skunk                  = "0.6.4"
   val sourceCode             = "0.4.2"
   val sttp                   = "3.11.0"
+  val sttp4                  = "4.0.9"
   val tapir                  = "1.11.33"
   val trace4Cats             = "0.14.7"
   val trace4CatsHttp4sCommon = "0.14.1"

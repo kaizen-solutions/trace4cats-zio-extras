@@ -28,6 +28,7 @@ libraryDependencies ++= {
     // http
     org %% "trace4cats-zio-extras-http4s"     % version,  // http4s
     org %% "trace4cats-zio-extras-sttp"       % version,  // sttp
+    org %% "trace4cats-zio-extras-sttp4"      % version,  // sttp4
     org %% "trace4cats-zio-extras-tapir"      % version,  // tapir
     org %% "trace4cats-zio-extras-zio-http"   % version,  // zio-http
 
@@ -58,7 +59,8 @@ __HTTP__
 - [http4s](https://http4s.org/)
 - [zio-http](https://zio.dev/zio-http/)
 - [tapir](https://tapir.softwaremill.com/en/latest/)
-- [sttp](https://sttp.softwaremill.com/en/latest/)
+- [sttp](https://sttp.softwaremill.com/en/v3.11.0/)
+- [sttp4](https://sttp.softwaremill.com/en/latest/)
 
 __Database__
 - [doobie](https://tpolecat.github.io/doobie/)
