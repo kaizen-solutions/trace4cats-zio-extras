@@ -32,7 +32,7 @@ object BackendTracer {
         val traceHeaders = span.extractHeaders(toHeaders)
         val requestWithTraceHeaders =
           request.headers(convertTraceHeaders(traceHeaders).headers*)
-        val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
+        val isSampled = span.isSampled
 
         val reqHeaderAttributes = requestFields(Headers(request.headers), dropHeadersWhen)
         // only extract request attributes if the span is sampled as the host parsing is quite expensive
