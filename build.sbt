@@ -83,6 +83,8 @@ lazy val root =
       zioHttpExample,
       sttp,
       sttpExample,
+      sttp4,
+      sttp4Example,
       tapir,
       tapirExample,
       virgil,
@@ -322,6 +324,33 @@ lazy val sttpExample =
     )
     .dependsOn(sttp)
 
+lazy val sttp4 =
+  project
+    .in(file("sttp4"))
+    .settings(kindProjectorSettings *)
+    .settings(
+      name                                                   := "trace4cats-zio-extras-sttp4",
+      libraryDependencies += "com.softwaremill.sttp.client4" %% "zio" % Versions.sttp4,
+      // Prevents org.scala-lang.modules:scala-collection-compat _3, _2.13 conflicting cross-version suffixes
+      excludeDependencies += "org.scala-lang.modules" % "scala-collection-compat_2.13"
+    )
+    .dependsOn(core % "compile->compile;test->test")
+
+lazy val sttp4Example =
+  project
+    .in(file("sttp4-examples"))
+    .settings(kindProjectorSettings *)
+    .settings(
+      name           := "trace4cats-zio-extras-zio-sttp4-examples",
+      publish / skip := true,
+      libraryDependencies ++= Seq(
+        "io.janstenpickle" %% "trace4cats-opentelemetry-otlp-grpc-exporter" % Versions.trace4CatsGRPCExporter
+      ),
+      // Prevents org.scala-lang.modules:scala-collection-compat _3, _2.13 conflicting cross-version suffixes
+      excludeDependencies += "org.scala-lang.modules" % "scala-collection-compat_2.13"
+    )
+    .dependsOn(sttp4)
+
 lazy val tapir =
   project
     .in(file("tapir"))
@@ -497,6 +526,8 @@ lazy val docs =
       caliban,
       sttp,
       sttpExample,
+      sttp4,
+      sttp4Example,
       tapir,
       tapirExample,
       virgil,

@@ -1,5 +1,6 @@
 target/
 .idea
+.vscode/
 .swp
 local.*
 .bsb/
@@ -8,6 +9,6 @@ local.*
 .metals/
 .java-version
 **/.DS_store
-project/.bloop/
-project/metals.sbt
+**/.bloop/
+**/metals.sbt
 .direnv
