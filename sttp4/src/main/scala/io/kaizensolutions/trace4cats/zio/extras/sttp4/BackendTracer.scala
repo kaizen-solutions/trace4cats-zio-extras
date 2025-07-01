@@ -22,12 +22,14 @@ object BackendTracer {
     extractResponseAttributes: Response[?] => Map[String, AttributeValue] = _ => Map.empty,
     enrichLogs: Boolean = true
   ): Backend[Task] = new Backend[Task] {
-    override def send[T](request: GenericRequest[T,Any with Effect[Task]]): Task[Response[T]] = {
+    override def send[T](request: GenericRequest[T, Any with Effect[Task]]): Task[Response[T]] = {
       val nameOfRequest = spanNamer(request)
       tracer.withSpan(
         name = nameOfRequest,
         kind = SpanKind.Client,
-        errorHandler = { case ResponseException.UnexpectedStatusCode(body, responseMetadata) => toSpanStatus(body.toString, responseMetadata.code) }
+        errorHandler = { case ResponseException.UnexpectedStatusCode(body, responseMetadata) =>
+          toSpanStatus(body.toString, responseMetadata.code)
+        }
       ) { span =>
         val traceHeaders = span.extractHeaders(toHeaders)
         val requestWithTraceHeaders =

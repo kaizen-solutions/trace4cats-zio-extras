@@ -23,7 +23,12 @@ object BackendTracerSpec extends ZIOSpecDefault {
 
   val zioLogger = new Logger[Task] {
 
-    override def apply(level: logging.LogLevel, message: => String, exception: Option[Throwable], context: Map[String,Any]): Task[Unit] = 
+    override def apply(
+      level: logging.LogLevel,
+      message: => String,
+      exception: Option[Throwable],
+      context: Map[String, Any]
+    ): Task[Unit] =
       ZIO.log(message)
 
   }
