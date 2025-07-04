@@ -2,7 +2,7 @@ import org.typelevel.scalacoptions.ScalacOptions
 
 inThisBuild {
   val scala213 = "2.13.16"
-  val scala3   = "3.3.5"
+  val scala3   = "3.3.6"
 
   Seq(
     scalaVersion       := scala213,
@@ -416,7 +416,7 @@ lazy val doobie =
           "org.tpolecat"          %% "doobie-core"                    % Versions.doobie,
           "org.tpolecat"          %% "doobie-postgres"                % Versions.doobie           % Test,
           "io.zonky.test"          % "embedded-postgres"              % Versions.embeddedPostgres % Test,
-          "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.4.0"                  % Test
+          "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.5.0"                  % Test
         )
     )
     .dependsOn(core % "compile->compile;test->test")
