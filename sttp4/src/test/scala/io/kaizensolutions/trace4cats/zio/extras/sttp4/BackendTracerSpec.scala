@@ -8,7 +8,6 @@ import zio.test.*
 import sttp.client4.*
 import sttp.client4.logging.{Logger, LoggingBackend}
 import zio.*
-import io.kaizensolutions.trace4cats.zio.extras.sttp4.BackendTracer
 
 object BackendTracerSpec extends ZIOSpecDefault {
 
