@@ -24,7 +24,8 @@ object Fs2KafkaTracedSpec extends ZIOSpecDefault {
         ZIO.attempt(
           EmbeddedKafka.start()(
             EmbeddedKafkaConfig(
-              kafkaPort = scala.util.Random.between(1000, 65000)
+              kafkaPort = scala.util.Random.between(54001, 55000),
+              controllerPort = scala.util.Random.between(53000, 54000)
             )
           )
         )
