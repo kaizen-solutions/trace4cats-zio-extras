@@ -3,8 +3,12 @@ package io.kaizensolutions.trace4cats.zio.extras.ziokafka
 import io.kaizensolutions.trace4cats.zio.extras.*
 import trace4cats.model.AttributeValue
 import trace4cats.{SpanKind, ToHeaders}
-import zio.kafka.consumer.CommittableRecord
+import zio.kafka.consumer.*
+import org.apache.kafka.clients.consumer.ConsumerRecord as KafkaConsumerRecord
+import zio.kafka.serde.Deserializer
 import zio.stream.ZStream
+import izumi.reflect.Tag
+import zio.*
 
 object KafkaConsumerTracer {
   type SpanNamer[K, V] = CommittableRecord[K, V] => String
@@ -61,4 +65,34 @@ object KafkaConsumerTracer {
             )
         }
       }
+
+  def tracedConsumeWith[R: Tag, R1: Tag, K, V](
+    tracer: ZTracer,
+    consumer: Consumer,
+    subscription: Subscription,
+    keyDeserializer: Deserializer[R, K],
+    valueDeserializer: Deserializer[R, V],
+    commitRetryPolicy: Schedule[Any, Any, Any] = Schedule.exponential(1.second) && Schedule.recurs(3),
+    enrichLogs: Boolean = true
+  )(f: KafkaConsumerRecord[K, V] => URIO[R1, Unit]): RIO[R & R1, Unit] =
+    consumer.consumeWith[R, R1, K, V](subscription, keyDeserializer, valueDeserializer, commitRetryPolicy) {
+      consumerRecord =>
+        val traceHeaders = extractConsumerRecordTraceHeaders(consumerRecord)
+        val coreAttributes: Map[String, AttributeValue] =
+          Map(
+            "kafka.topic"           -> consumerRecord.topic(),
+            "kafka.partition"       -> consumerRecord.partition(),
+            "kafka.offset"          -> consumerRecord.offset(),
+            "kafka.create.time"     -> consumerRecord.timestamp(),
+            "kafka.log.append.time" -> consumerRecord.timestamp(),
+            "kafka.key"             -> consumerRecord.key().toString()
+          )
+        val logAspect =
+          if (enrichLogs) ZIOAspect.annotated(coreAttributes.map { case (k, v) => (k, v.toString) }.toSeq*)
+          else ZIOAspect.identity
+
+        tracer.fromHeaders(headers = traceHeaders, name = "kafka-consume-with", kind = SpanKind.Consumer) { span =>
+          span.putAll(coreAttributes) *> f(consumerRecord) @@ logAspect
+        }
+    }
 }
