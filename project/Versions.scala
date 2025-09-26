@@ -1,7 +1,7 @@
 object Versions {
   val caliban                = "2.8.1"
-  val catsEffect             = "3.6.1"
-  val doobie                 = "1.0.0-RC9"
+  val catsEffect             = "3.6.2"
+  val doobie                 = "1.0.0-RC10"
   val embeddedPostgres       = "2.1.0"
   val fs2                    = "3.12.0"
   val fs2Kafka               = "3.8.0"
@@ -13,7 +13,7 @@ object Versions {
   val sourceCode             = "0.4.2"
   val sttp                   = "3.11.0"
   val sttp4                  = "4.0.9"
-  val tapir                  = "1.11.35"
+  val tapir                  = "1.11.36"
   val trace4Cats             = "0.14.7"
   val trace4CatsHttp4sCommon = "0.14.1"
   val trace4CatsGRPCExporter = "0.14.4"
@@ -22,6 +22,6 @@ object Versions {
   val zioHttp                = "3.3.3"
   val zioInteropCats         = "23.1.0.5"
   val zioKafka               = "3.0.0"
-  val zioLogging             = "2.5.0"
+  val zioLogging             = "2.5.1"
   val zquery                 = "0.7.5"
 }

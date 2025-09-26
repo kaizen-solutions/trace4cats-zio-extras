@@ -1,5 +1,5 @@
 import cats.data.NonEmptyList
-import cats.implicits.toShow
+import cats.syntax.show.*
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
 import io.kaizensolutions.trace4cats.zio.extras.*
 import io.kaizensolutions.trace4cats.zio.extras.ziokafka.{KafkaConsumerTracer, KafkaProducerTracer}
@@ -94,6 +94,33 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
         } yield assertTrue(
           spans.exists(consumerSpan =>
             consumerSpan.name == "kafka-receive" &&
+              spans.exists(parent =>
+                parent.kind == SpanKind.Producer &&
+                  consumerSpan.context.parent.map(_.spanId.show).contains(parent.context.spanId.show)
+              )
+          )
+        )
+      },
+      test("Consume chunks reports traces") {
+        val topic = UUID.randomUUID().toString
+        for {
+          tracer   <- ZIO.service[ZTracer]
+          p        <- Promise.make[Nothing, Unit]
+          consumer <- ZIO.service[Consumer]
+          producer <- ZIO.service[Producer]
+          fiber <-
+            KafkaConsumerTracer
+              .tracedConsumeWith(tracer, consumer, Subscription.topics(topic), Serde.string, Serde.string)(_ =>
+                p.succeed(()).unit
+              )
+              .forkScoped
+          _     <- producer.produce(topic, "key", "value", Serde.string, Serde.string)
+          _     <- p.await
+          _     <- fiber.interrupt
+          spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
+        } yield assertTrue(
+          spans.exists(consumerSpan =>
+            consumerSpan.name == "kafka-consume-with" &&
               spans.exists(parent =>
                 parent.kind == SpanKind.Producer &&
                   consumerSpan.context.parent.map(_.spanId.show).contains(parent.context.spanId.show)

@@ -209,7 +209,7 @@ final class ZTracer private (
           errorHandler = errorHandler
         )(span =>
           // extract the child's span header so that all stream transformations are traced under the element
-          ZIO.succeed(Spanned(span.extractHeaders(ToHeaders.all), o, enrichLogs))
+          Exit.succeed(Spanned(span.extractHeaders(ToHeaders.all), o, enrichLogs))
         )
       )
     )
@@ -243,7 +243,7 @@ final class ZTracer private (
   )(stream: ZStream[R, E, O]): ZStream[R, E, O] =
     ZStream.unwrap(
       withSpan(name, kind, errorHandler)(span =>
-        enrich(span) *> ZIO.succeed(
+        enrich(span) *> Exit.succeed(
           stream.tapError {
             case e: Throwable if span.isSampled => span.put("error.message", e.getLocalizedMessage)
             case error if span.isSampled        => span.put("error.message", error.toString)
