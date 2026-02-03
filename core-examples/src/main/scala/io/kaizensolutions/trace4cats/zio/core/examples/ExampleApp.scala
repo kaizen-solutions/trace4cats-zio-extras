@@ -36,7 +36,6 @@ object ExampleApp extends ZIOAppDefault {
           )
           .endTracingEachElement
           .runDrain
-          .exitCode
       }
       .provide(OltpGrpcEntrypoint.live, ZTracer.layer)
 }
