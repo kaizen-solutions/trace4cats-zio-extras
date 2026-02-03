@@ -18,7 +18,7 @@ object Versions {
   val trace4CatsHttp4sCommon = "0.14.1"
   val trace4CatsGRPCExporter = "0.14.4"
   val virgil                 = "1.2.3"
-  val zio                    = "2.1.19"
+  val zio                    = "2.1.23"
   val zioHttp                = "3.3.3"
   val zioInteropCats         = "23.1.0.13"
   val zioKafka               = "3.0.0"
