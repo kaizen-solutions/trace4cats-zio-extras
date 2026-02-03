@@ -1,8 +1,8 @@
 import org.typelevel.scalacoptions.ScalacOptions
 
 inThisBuild {
-  val scala213 = "2.13.16"
-  val scala3   = "3.3.6"
+  val scala213 = "2.13.17"
+  val scala3   = "3.3.7"
 
   Seq(
     scalaVersion       := scala213,
@@ -56,7 +56,7 @@ lazy val kindProjectorSettings = {
   Seq(
     libraryDependencies ++= {
       if (isScala3.value) Nil
-      else Seq(compilerPlugin(("org.typelevel" %% "kind-projector" % "0.13.3").cross(CrossVersion.full)))
+      else Seq(compilerPlugin(("org.typelevel" %% "kind-projector" % "0.13.4").cross(CrossVersion.full)))
     }
   )
 }
