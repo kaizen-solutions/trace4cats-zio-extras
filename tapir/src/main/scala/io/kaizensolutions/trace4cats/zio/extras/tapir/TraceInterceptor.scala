@@ -159,12 +159,12 @@ private class TraceEndpointInterceptor[Env, Err](
           if (enrichLogs) ZIOAspect.annotated(annotations = extractKVHeaders(span, headerFormat).toList*)
           else ZIOAspect.identity
 
-        enrichSpanFromRequest(request, dropHeadersWhen, span) *>
-          (zio @@ logTraceContext)
-            .foldZIO(
-              error => span.setStatus(SpanStatus.Internal(error.toString)) *> ZIO.fail(error),
-              a => EnrichSpanFromResponse[A].apply(a, span)
-            )
+        for {
+          _ <- enrichSpanFromRequest(request, dropHeadersWhen, span)
+          response <- (zio @@ logTraceContext)
+                        .tapErrorCause(cause => span.setStatus(SpanStatus.Internal(cause.prettyPrint)))
+          enriched <- EnrichSpanFromResponse[A].apply(response, span)
+        } yield enriched
       }
     }
   }
