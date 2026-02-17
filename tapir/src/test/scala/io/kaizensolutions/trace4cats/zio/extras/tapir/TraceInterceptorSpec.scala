@@ -4,43 +4,15 @@ import fs2.Chunk
 import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, ZTracer}
 import org.http4s.*
 import org.http4s.syntax.all.*
-import org.typelevel.ci.{CIString, CIStringSyntax}
-import sttp.model.StatusCode
+import org.typelevel.ci.CIStringSyntax
 import sttp.tapir.server.http4s.{Http4sServerInterpreter, Http4sServerOptions}
 import sttp.tapir.server.interceptor.log.DefaultServerLog
-import sttp.tapir.ztapir.{path as pathParam, *}
 import trace4cats.{ToHeaders, TraceProcess}
 import zio.interop.catz.*
 import zio.test.*
 import zio.{Cause, Scope, Task, ZIO}
-import sttp.tapir.DecodeResult
 
 object TraceInterceptorSpec extends ZIOSpecDefault {
-  final class TestEndpoint(tracer: ZTracer) {
-    val testEndpoint: ZServerEndpoint[Any, Any] =
-      endpoint.get
-        .securityIn(header[Option[String]]("auth"))
-        .errorOut(stringBody)
-        .zServerSecurityLogic{
-          case None => ZIO.unit
-          case Some(v) => ZIO.whenDiscard(v == "invalid")(ZIO.fail("invalid"))
-        }
-        .errorOutVariantsFromCurrent(auth =>
-          List(oneOfVariant(auth.and(statusCode(StatusCode.Unauthorized))))
-        )
-        .in("hello")
-        .in(pathParam[String]("name"))
-        .in("greeting")
-        .in(stringBody.mapDecode(s => if (s != "invalid") DecodeResult.Value(s) else DecodeResult.Error(s"$s was invalid", new Exception("nope")))(identity))
-        .out(statusCode(StatusCode.Ok))
-        .serverLogic {  _ => {
-          case (name, _) =>
-              tracer.withSpan("moshi") { span =>
-                span.put("hello", name).unit
-              }
-          }
-        }
-  }
 
   case class TestContext(spanCompleter: InMemorySpanCompleter, httpApp: HttpApp[Task], tracer: ZTracer)
 
@@ -48,8 +20,8 @@ object TraceInterceptorSpec extends ZIOSpecDefault {
     result     <- InMemorySpanCompleter.entryPoint(TraceProcess("tapir-trace-interceptor-test"))
     (sc, ep)    = result
     tracer     <- InMemorySpanCompleter.toZTracer(ep)
-    interceptor = TraceInterceptor[Any, Throwable](tracer, headerFormat = ToHeaders.w3c)
-    endpoint    = new TestEndpoint(tracer)
+    interceptor = TraceInterceptor.task(tracer, headerFormat = ToHeaders.w3c)
+    endpoint    = TestEndpoint(tracer)
     httpApp = Http4sServerInterpreter[Task](
       Http4sServerOptions
         .customiseInterceptors[Task]
@@ -77,7 +49,7 @@ object TraceInterceptorSpec extends ZIOSpecDefault {
         spans    <- context.spanCompleter.retrieveCollected
         logs     <- ZTestLogger.logOutput
       } yield assertTrue(
-        response.headers.get(CIString("traceparent")).isDefined,
+        response.headers.get(ci"traceparent").isDefined,
         response.status == Status.Ok,
         spans.exists(_.name == "GET /hello/{name}/greeting"),
         spans.find(_.name == "moshi").exists(_.context.parent.isDefined),
