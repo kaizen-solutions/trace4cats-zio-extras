@@ -3,6 +3,7 @@ package io.kaizensolutions.trace4cats.zio.extras.tapir
 import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
 import sttp.model.{Header, HeaderNames, StatusCode}
 import sttp.monad.MonadError
+import sttp.tapir.AnyEndpoint
 import sttp.tapir.model.ServerRequest
 import sttp.tapir.server.ServerEndpoint
 import sttp.tapir.server.interceptor.*
@@ -105,27 +106,8 @@ private class TraceEndpointInterceptor[Env, Err](
     )(implicit
       monad: MonadError[ZIO[Env, Err, *]],
       bodyListener: BodyListener[ZIO[Env, Err, *], B]
-    ): ZIO[Env, Err, ServerResponse[B]] = {
-      val spanName     = ctx.endpoint.showShort
-      val request      = ctx.request
-      val traceHeaders = TraceHeaders.of(request.headers.map(h => (h.name, h.value))*)
-      tracer.fromHeaders(traceHeaders, name = spanName, kind = SpanKind.Server) { span =>
-        val logTraceContext =
-          if (enrichLogs) ZIOAspect.annotated(annotations = extractKVHeaders(span, headerFormat).toList*)
-          else ZIOAspect.identity
-
-        enrichSpanFromRequest(request, dropHeadersWhen, span) *>
-          (endpointHandler.onDecodeSuccess(ctx) @@ logTraceContext)
-            .foldZIO(
-              error => span.setStatus(SpanStatus.Internal(error.toString)) *> ZIO.fail(error),
-              serverResponse =>
-                enrichSpanFromResponse(serverResponse, dropHeadersWhen, span).as(
-                  if (enrichResponseHeadersWithTraceIds) serverResponse.addHeaders(toHttpHeaders(span, headerFormat))
-                  else serverResponse
-                )
-            )
-      }
-    }
+    ): ZIO[Env, Err, ServerResponse[B]] =
+      onRequestHandled(AnyContext(ctx.endpoint, ctx.request))(endpointHandler.onDecodeSuccess(ctx))
 
     override def onSecurityFailure[A](
       ctx: SecurityFailureContext[ZIO[Env, Err, *], A]
@@ -133,7 +115,7 @@ private class TraceEndpointInterceptor[Env, Err](
       monad: MonadError[ZIO[Env, Err, *]],
       bodyListener: BodyListener[ZIO[Env, Err, *], B]
     ): ZIO[Env, Err, ServerResponse[B]] =
-      endpointHandler.onSecurityFailure(ctx)
+      onRequestHandled(AnyContext(ctx.endpoint, ctx.request))(endpointHandler.onSecurityFailure(ctx))
 
     override def onDecodeFailure(
       ctx: DecodeFailureContext
@@ -141,7 +123,50 @@ private class TraceEndpointInterceptor[Env, Err](
       monad: MonadError[ZIO[Env, Err, *]],
       bodyListener: BodyListener[ZIO[Env, Err, *], B]
     ): ZIO[Env, Err, Option[ServerResponse[B]]] =
-      endpointHandler.onDecodeFailure(ctx)
+      onRequestHandled(AnyContext(ctx.endpoint, ctx.request))(endpointHandler.onDecodeFailure(ctx))
+
+    case class AnyContext(endpoint: AnyEndpoint, request: ServerRequest)
+
+    private[tapir] trait EnrichSpanFromResponse[A] {
+      def apply(a: A, span: ZSpan): UIO[A]
+    }
+    object EnrichSpanFromResponse {
+      private[tapir] def apply[A](implicit tc: EnrichSpanFromResponse[A]): EnrichSpanFromResponse[A] = tc
+
+      implicit val option: EnrichSpanFromResponse[Option[ServerResponse[B]]] =
+        new EnrichSpanFromResponse[Option[ServerResponse[B]]] {
+          def apply(a: Option[ServerResponse[B]], span: ZSpan): UIO[Option[ServerResponse[B]]] = a match {
+            case Some(res) => enrichSpanFromResponse(res, dropHeadersWhen, span).asSome
+            case None      => ZIO.none
+          }
+        }
+
+      implicit val concrete: EnrichSpanFromResponse[ServerResponse[B]] = new EnrichSpanFromResponse[ServerResponse[B]] {
+        def apply(a: ServerResponse[B], span: ZSpan): UIO[ServerResponse[B]] =
+          enrichSpanFromResponse(a, dropHeadersWhen, span)
+      }
+    }
+
+    def onRequestHandled[R, E, A: EnrichSpanFromResponse](
+      ctx: AnyContext
+    )(zio: ZIO[R, E, A])(implicit trace: Trace): ZIO[R, E, A] = {
+      val spanName     = ctx.endpoint.showShort
+      val request      = ctx.request
+      val traceHeaders = TraceHeaders.of(request.headers.map(h => (h.name, h.value))*)
+
+      tracer.fromHeaders(traceHeaders, name = spanName, kind = SpanKind.Server) { span =>
+        val logTraceContext =
+          if (enrichLogs) ZIOAspect.annotated(annotations = extractKVHeaders(span, headerFormat).toList*)
+          else ZIOAspect.identity
+
+        for {
+          _ <- enrichSpanFromRequest(request, dropHeadersWhen, span)
+          response <- (zio @@ logTraceContext)
+                        .tapErrorCause(cause => span.setStatus(SpanStatus.Internal(cause.prettyPrint)))
+          enriched <- EnrichSpanFromResponse[A].apply(response, span)
+        } yield enriched
+      }
+    }
   }
 
   private def toHttpHeaders(span: ZSpan, whichHeaders: ToHeaders): Seq[Header] =
@@ -162,20 +187,23 @@ private class TraceEndpointInterceptor[Env, Err](
     dropHeadersWhen: String => Boolean,
     span: ZSpan
   ): UIO[Unit] =
-    if (span.isSampled) span.putAll(requestFields(request.headers, dropHeadersWhen)*)
-    else ZIO.unit
+    span.putAll(requestFields(request.headers, dropHeadersWhen)*).whenDiscard(span.isSampled)
 
   private def enrichSpanFromResponse[A](
     response: ServerResponse[A],
     dropHeadersWhen: String => Boolean,
     span: ZSpan
-  ): UIO[Unit] = {
+  ) = {
     val respFields = {
       val statusCodeField = "resp.status.code" -> AttributeValue.intToTraceValue(response.code.code)
       statusCodeField +: responseFields(response.headers, dropHeadersWhen)
     }
-    val spanRespAttrs = if (span.isSampled) span.putAll(respFields*) else ZIO.unit
-    spanRespAttrs *> span.setStatus(toSpanStatus(response.code))
+    for {
+      _ <- span.putAll(respFields*).whenDiscard(span.isSampled)
+      _ <- span.setStatus(toSpanStatus(response.code))
+    } yield
+      if (enrichResponseHeadersWithTraceIds) response.addHeaders(toHttpHeaders(span, headerFormat))
+      else response
   }
 
   private def toSpanStatus(value: StatusCode): SpanStatus =
