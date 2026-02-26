@@ -42,6 +42,5 @@ object ExampleApp extends ZIOAppDefault {
           .compile
           .drain
       )
-      .exitCode
       .provide(OltpGrpcEntrypoint.live, ZTracer.layer)
 }
