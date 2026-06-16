@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras.tapir
 
-import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZSpan, ZTracer}
 import sttp.model.{Header, HeaderNames, StatusCode}
 import sttp.monad.MonadError
 import sttp.tapir.AnyEndpoint
@@ -195,7 +195,7 @@ private class TraceEndpointInterceptor[Env, Err](
     span: ZSpan
   ) = {
     val respFields = {
-      val statusCodeField = "resp.status.code" -> AttributeValue.intToTraceValue(response.code.code)
+      val statusCodeField = OtelSemconv.HttpResponseStatusCode -> AttributeValue.LongValue(response.code.code.toLong)
       statusCodeField +: responseFields(response.headers, dropHeadersWhen)
     }
     for {
@@ -224,13 +224,13 @@ private class TraceEndpointInterceptor[Env, Err](
     hs: Seq[Header],
     dropHeadersWhen: String => Boolean
   ): Seq[(String, AttributeValue)] =
-    headerFields(hs, "req", dropHeadersWhen)
+    headerFields(hs, "request", dropHeadersWhen)
 
   private def responseFields(
     hs: Seq[Header],
     dropHeadersWhen: String => Boolean
   ): Seq[(String, AttributeValue)] =
-    headerFields(hs, "resp", dropHeadersWhen)
+    headerFields(hs, "response", dropHeadersWhen)
 
   private def headerFields(
     hs: Seq[Header],
@@ -238,6 +238,6 @@ private class TraceEndpointInterceptor[Env, Err](
     dropHeadersWhen: String => Boolean
   ): Seq[(String, AttributeValue)] =
     hs.filter(h => !dropHeadersWhen(h.name)).map { h =>
-      (s"${`type`}.header.${h.name}", h.value: AttributeValue)
+      (s"http.${`type`}.header.${h.name.toLowerCase}", h.value: AttributeValue)
     }
 }

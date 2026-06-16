@@ -53,7 +53,7 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
           } yield assertTrue(
             responseStatus == Status.Ok,
             spans.length == 2,
-            httpSpan.attributes.contains(s"resp.header.$customHeaderName"),
+            httpSpan.attributes.contains(s"http.response.header.${customHeaderName.toLowerCase}"),
             parentSpanIdOfFetch == spanIdOfHttp
           )
         } +

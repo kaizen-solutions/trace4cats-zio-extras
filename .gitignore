@@ -12,3 +12,5 @@ local.*
 **/.bloop/
 **/metals.sbt
 .direnv
+.kiro/
+.serena

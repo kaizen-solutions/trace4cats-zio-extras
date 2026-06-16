@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import fs2.kafka.*
 import trace4cats.ToHeaders
 import trace4cats.model.{AttributeValue, SpanKind}
-import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZSpan, ZTracer}
 import org.apache.kafka.common.{Metric, MetricName}
 import zio.ZIO
 
@@ -62,7 +62,13 @@ object KafkaProducerTracer {
           val enrichSpanWithTopics =
             NonEmptyList
               .fromList(records.map(_.topic).toList.distinct)
-              .fold(ifEmpty = ZIO.unit)(topics => span.put("topics", AttributeValue.StringList(topics)))
+              .fold(ifEmpty = ZIO.unit)(topics =>
+                span.putAll(
+                  OtelSemconv.MessagingSystem          -> AttributeValue.StringValue("kafka"),
+                  OtelSemconv.MessagingOperationType   -> AttributeValue.StringValue("send"),
+                  OtelSemconv.MessagingDestinationName -> AttributeValue.StringList(topics)
+                )
+              )
               .when(span.isSampled)
 
           val kafkaTraceHeaders =

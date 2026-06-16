@@ -64,7 +64,7 @@ object TracedTransactorSpec extends ZIOSpecDefault {
           spans.exists(span =>
             span.name == "SELECT ?, ?" &&
               span.attributes.exists { case (k, v) =>
-                k == "query.arguments" && v.value.value == NonEmptyList.of(p1.toString, p2.toString)
+                k == "db.query.parameter.values" && v.value.value == NonEmptyList.of(p1.toString, p2.toString)
               }
           )
         )

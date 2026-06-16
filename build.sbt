@@ -8,6 +8,9 @@ inThisBuild {
     scalaVersion       := scala213,
     crossScalaVersions := Seq(scala213, scala3),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
+    Test / fork := true,
+    Test / parallelExecution := true,
+    Test / testForkedParallel := true,
     versionScheme := Some("early-semver"),
     githubWorkflowJavaVersions := List(
       JavaSpec.temurin("17"),
@@ -411,6 +414,7 @@ lazy val doobie =
     .settings(kindProjectorSettings *)
     .settings(
       name := "trace4cats-zio-extras-doobie",
+      Test / javaOptions += s"-Dio.zonky.test.postgres.binary-dir=${target.value}/pg-binaries",
       libraryDependencies ++=
         Seq(
           "org.tpolecat"          %% "doobie-core"                    % Versions.doobie,
@@ -442,6 +446,7 @@ lazy val skunk =
     .settings(kindProjectorSettings *)
     .settings(
       name := "trace4cats-zio-extras-skunk",
+      Test / javaOptions += s"-Dio.zonky.test.postgres.binary-dir=${target.value}/pg-binaries",
       libraryDependencies ++=
         Seq(
           "org.tpolecat"  %% "skunk-core"        % Versions.skunk,

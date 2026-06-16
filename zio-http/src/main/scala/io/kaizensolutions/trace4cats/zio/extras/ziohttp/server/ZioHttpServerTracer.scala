@@ -1,9 +1,8 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziohttp.server
 
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.{extractTraceHeaders, toSpanStatus}
-import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZSpan, ZTracer}
 import trace4cats.model.AttributeValue.{LongValue, StringValue}
-import trace4cats.model.SemanticAttributeKeys.*
 import trace4cats.model.{AttributeValue, SpanKind, SpanStatus}
 import trace4cats.{ErrorHandler, ToHeaders}
 import zio.*
@@ -49,6 +48,7 @@ object ZioHttpServerTracer {
                       else ZIOAspect.identity
 
                     enrichSpanFromRequest(request, dropHeadersWhen, span) *>
+                      span.put(OtelSemconv.HttpRoute, AttributeValue.StringValue(nameOfSpan)).when(span.isSampled) *>
                       // NOTE: We need to call handler.runZIO and have the code executed within our span for propagation to take place
                       (h.runZIO(request) @@ logTraceContext).onExit {
                         case Exit.Success(response) => enrichSpanFromResponse(response, dropHeadersWhen, span)
@@ -121,20 +121,22 @@ object ZioHttpServerTracer {
     dropHeadersWhen: String => Boolean
   ): Chunk[(String, AttributeValue)] =
     Chunk[(String, AttributeValue)](
-      httpFlavor -> renderHttpVersion(req.version),
-      httpMethod -> req.method.toString(),
-      httpUrl    -> req.url.path.toString
-    ) ++ headerFields(headers = req.headers, `type` = "req", dropWhen = dropHeadersWhen) ++
-      req.url.host.map(host => serviceHostname -> StringValue(host)) ++
-      req.url.port.map(port => servicePort -> LongValue(port.toLong))
+      OtelSemconv.NetworkProtocolVersion -> renderHttpVersion(req.version),
+      OtelSemconv.HttpRequestMethod      -> req.method.toString,
+      OtelSemconv.UrlPath                -> req.url.path.toString
+    ) ++ 
+    req.url.scheme.map(scheme => OtelSemconv.UrlScheme  -> StringValue(scheme.encode)) ++
+    headerFields(headers = req.headers, `type` = "request", dropWhen = dropHeadersWhen) ++
+      req.url.host.map(host => OtelSemconv.ServerAddress -> StringValue(host)) ++
+      req.url.port.map(port => OtelSemconv.ServerPort -> LongValue(port.toLong))
 
   private def responseFields(
     resp: Response,
     dropHeadersWhen: String => Boolean
   ): List[(String, AttributeValue)] =
-    List[(String, AttributeValue)](httpStatusCode -> resp.status.code) ++ headerFields(
+    List[(String, AttributeValue)](OtelSemconv.HttpResponseStatusCode -> resp.status.code) ++ headerFields(
       resp.headers,
-      "resp",
+      "response",
       dropHeadersWhen
     )
 
@@ -145,7 +147,9 @@ object ZioHttpServerTracer {
   ): Chunk[(String, AttributeValue)] =
     Chunk.fromIterable(headers.collect {
       case header if !dropWhen(header.headerName) =>
-        s"${`type`}.header.${header.headerName}" -> AttributeValue.stringToTraceValue(header.renderedValue)
+        s"http.${`type`}.header.${header.headerName.toLowerCase}" -> AttributeValue.stringToTraceValue(
+          header.renderedValue
+        )
     })
 
   private val SensitiveHeaders: Set[String] = Set(
@@ -154,14 +158,10 @@ object ZioHttpServerTracer {
     Header.SetCookie
   ).map(_.name)
 
-  private def renderHttpVersion(in: Version): String = {
-    val http = "HTTP"
-    val version =
-      in match {
-        case Version.Default  => "Default"
-        case Version.Http_1_0 => "1.0"
-        case Version.Http_1_1 => "1.1"
-      }
-    s"$http/$version"
-  }
+  private def renderHttpVersion(in: Version): String =
+    in match {
+      case Version.Default  => "1.1"
+      case Version.Http_1_0 => "1.0"
+      case Version.Http_1_1 => "1.1"
+    }
 }

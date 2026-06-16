@@ -3,7 +3,7 @@ package io.kaizensolutions.trace4cats.zio.extras.fs2.kafka
 import cats.syntax.show.*
 import cats.syntax.foldable.*
 import fs2.kafka.{ConsumerRecord, Headers}
-import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZSpan, ZTracer}
 import trace4cats.model.{AttributeValue, SpanKind, TraceHeaders}
 import zio.{RIO, ZIOAspect}
 
@@ -27,17 +27,16 @@ object KafkaConsumerTracer {
       val topic        = record.topic
       val partition    = record.partition
       val offset       = record.offset
-      val timestamp    = record.timestamp
       val key          = record.key.toString
 
       val attributes: Map[String, AttributeValue] =
         Map(
-          "kafka.topic"           -> AttributeValue.StringValue(topic),
-          "kafka.partition"       -> AttributeValue.LongValue(partition.toLong),
-          "kafka.offset"          -> AttributeValue.LongValue(offset),
-          "kafka.create.time"     -> AttributeValue.LongValue(timestamp.createTime.getOrElse(0L)),
-          "kafka.log.append.time" -> AttributeValue.LongValue(timestamp.logAppendTime.getOrElse(0L)),
-          "kafka.key"             -> AttributeValue.StringValue(key)
+          OtelSemconv.MessagingSystem                 -> AttributeValue.StringValue("kafka"),
+          OtelSemconv.MessagingOperationType          -> AttributeValue.StringValue("process"),
+          OtelSemconv.MessagingDestinationName        -> AttributeValue.StringValue(topic),
+          OtelSemconv.MessagingDestinationPartitionId -> AttributeValue.StringValue(partition.toString),
+          OtelSemconv.MessagingKafkaOffset            -> AttributeValue.LongValue(offset),
+          OtelSemconv.MessagingKafkaMessageKey        -> AttributeValue.StringValue(key)
         )
 
       tracer.fromHeaders(headers = traceHeaders, name = spanName, kind = SpanKind.Consumer) { span =>

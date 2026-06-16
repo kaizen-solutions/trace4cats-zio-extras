@@ -3,7 +3,7 @@ package io.kaizensolutions.virgil.trace4cats.zio.extras
 import com.datastax.oss.driver.api.core.metrics.Metrics
 import com.datastax.oss.driver.api.core.{CqlSession, CqlSessionBuilder}
 import trace4cats.model.{AttributeValue, SampleDecision, SpanKind, SpanStatus}
-import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZSpan, ZTracer}
 import io.kaizensolutions.virgil.codecs.DecoderException
 import io.kaizensolutions.virgil.configuration.PageState
 import io.kaizensolutions.virgil.internal.CqlStatementRenderer
@@ -157,8 +157,9 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
         val attrMap      = mutable.Map.empty[String, AttributeValue]
         val (_, markers) = CqlStatementRenderer.render(q)
 
-        attrMap += ("virgil.query-type"       -> AttributeValue.StringValue("query"))
-        attrMap += ("virgil.elements-to-pull" -> AttributeValue.StringValue(pullMode.toString))
+        attrMap += (OtelSemconv.DbSystemName    -> AttributeValue.StringValue("cassandra"))
+        attrMap += (OtelSemconv.DbOperationName -> AttributeValue.StringValue("query"))
+        attrMap += ("virgil.elements-to-pull"   -> AttributeValue.StringValue(pullMode.toString))
         markers.underlying.foreach { m =>
           val (name, marker) = m
           if (dropMarkerFromSpan(name.name)) ()
@@ -170,7 +171,8 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
         val attrMap      = mutable.Map.empty[String, AttributeValue]
         val (_, markers) = CqlStatementRenderer.render(mutation)
 
-        attrMap += ("virgil.query-type" -> AttributeValue.StringValue("mutation"))
+        attrMap += (OtelSemconv.DbSystemName    -> AttributeValue.StringValue("cassandra"))
+        attrMap += (OtelSemconv.DbOperationName -> AttributeValue.StringValue("mutation"))
         markers.underlying.foreach { m =>
           val (name, marker) = m
           if (dropMarkerFromSpan(name.name)) ()
@@ -181,8 +183,9 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
       case CQLType.Batch(mutations, batchType: BatchType) =>
         var queryCounter = 0
         val attrMap      = mutable.Map.empty[String, AttributeValue]
-        attrMap += ("virgil.batch-type" -> AttributeValue.StringValue(batchType.toString))
-        attrMap += ("virgil.query-type" -> AttributeValue.StringValue("batch-mutation"))
+        attrMap += (OtelSemconv.DbSystemName    -> AttributeValue.StringValue("cassandra"))
+        attrMap += (OtelSemconv.DbOperationName -> AttributeValue.StringValue("batch-mutation"))
+        attrMap += ("virgil.batch-type"         -> AttributeValue.StringValue(batchType.toString))
 
         mutations.foreach { mut =>
           val (qs, markers) = CqlStatementRenderer.render(mut)

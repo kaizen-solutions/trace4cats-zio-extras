@@ -27,8 +27,8 @@ object Http4sClientTracerSpec extends ZIOSpecDefault {
           val span = spans.head
           assertTrue(
             span.name == "GET /hello",
-            span.attributes("http.status_code").value.value == 200,
-            span.attributes("http.url").value.value == "/hello"
+            span.attributes("http.response.status_code").value.value == 200,
+            span.attributes("url.full").value.value == "/hello"
           )
         }
       } +
@@ -42,7 +42,7 @@ object Http4sClientTracerSpec extends ZIOSpecDefault {
             val span = spans.head
             assertTrue(
               span.name == "GET /hello",
-              span.attributes("http.url").value.value == "/hello",
+              span.attributes("url.full").value.value == "/hello",
               span.attributes("error.message").value.value == "An error has occurred",
               span.status == SpanStatus.Internal("An error has occurred")
             )
@@ -67,7 +67,7 @@ object Http4sClientTracerSpec extends ZIOSpecDefault {
             val span = spans.head
             assertTrue(
               span.name == "GET /hello",
-              span.attributes("http.url").value.value == "/hello", {
+              span.attributes("url.full").value.value == "/hello", {
                 val cause = span.attributes("error.cause").value.value.toString
                 cause.contains("A defect has occurred") &&
                 cause.contains("Another defect has occurred")

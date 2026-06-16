@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import doobie.*
 import doobie.util.log
 import doobie.util.log.Parameters
-import io.kaizensolutions.trace4cats.zio.extras.ZTracer
+import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZTracer}
 import trace4cats.model.{AttributeValue, SpanStatus}
 import zio.*
 import zio.interop.catz.*
@@ -42,14 +42,15 @@ object TracedTransactor {
           }
           NonEmptyList
             .fromList(parameters)
-            .map(nel => "query.arguments" -> AttributeValue.StringList(nel))
+            .map(nel => "db.query.parameter.values" -> AttributeValue.StringList(nel))
             .toMap ++
             Map(
-              "query.label"      -> AttributeValue.StringValue(logEvent.label),
-              "query.execMillis" -> AttributeValue.LongValue(execution.toMillis),
-              "query.sql"        -> AttributeValue.StringValue(logEvent.sql)
+              OtelSemconv.DbSystemName    -> AttributeValue.StringValue("postgresql"),
+              OtelSemconv.DbOperationName -> AttributeValue.StringValue(logEvent.label),
+              OtelSemconv.DbQueryText     -> AttributeValue.StringValue(logEvent.sql),
+              "db.query.exec_millis"      -> AttributeValue.LongValue(execution.toMillis)
             ) ++
-            processing.map(p => "query.processingMillis" -> AttributeValue.LongValue(p.toMillis))
+            processing.map(p => "db.query.processing_millis" -> AttributeValue.LongValue(p.toMillis))
         }
 
         ZIO

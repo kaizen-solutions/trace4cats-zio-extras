@@ -2,7 +2,7 @@ package io.kaizensolutions.trace4cats.zio.extras.skunk
 
 import cats.effect.Resource
 import cats.effect.kernel.Resource.ExitCase
-import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZSpan, ZTracer}
 import fs2.*
 import fs2.concurrent.Signal
 import skunk.*
@@ -361,7 +361,7 @@ final class TracedSession(underlying: Session[Task], tracer: ZTracer) extends Se
         // WARNING: mutable (builder) state is used here as this is on the hot path
         var index   = 1
         val builder = Map.newBuilder[String, AttributeValue]
-        builder.sizeHint(values.size)
+        builder.sizeHint(values.size + 4)
 
         values.foreach { value =>
           val attr = AttributeValue.StringValue(value.getOrElse("<null>"))
@@ -369,6 +369,8 @@ final class TracedSession(underlying: Session[Task], tracer: ZTracer) extends Se
           index += 1
         }
 
+        builder += ((OtelSemconv.DbSystemName, AttributeValue.StringValue("postgresql")))
+        builder += ((OtelSemconv.DbQueryText, AttributeValue.StringValue(statement.sql)))
         builder += (("skunk.method", AttributeValue.StringValue(methodName)))
         builder += (("prepared", AttributeValue.BooleanValue(prepared)))
 

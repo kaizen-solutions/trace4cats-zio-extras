@@ -38,12 +38,14 @@ object KafkaConsumerTracer {
 
           val coreAttributes: Map[String, AttributeValue] =
             Map(
-              "consumer.group" -> group,
-              "topic"          -> topic,
-              "partition"      -> partition,
-              "offset"         -> offset,
-              "timestamp"      -> timestamp,
-              "timestamp.type" -> record.timestampType().name
+              OtelSemconv.MessagingSystem                 -> "kafka",
+              OtelSemconv.MessagingOperationType          -> "process",
+              OtelSemconv.MessagingDestinationName        -> topic,
+              OtelSemconv.MessagingConsumerGroupName      -> group,
+              OtelSemconv.MessagingDestinationPartitionId -> partition.toString,
+              OtelSemconv.MessagingKafkaOffset            -> offset,
+              "messaging.kafka.message.timestamp"         -> timestamp,
+              "messaging.kafka.message.timestamp.type"    -> record.timestampType().name
             )
 
           span
@@ -80,12 +82,12 @@ object KafkaConsumerTracer {
         val traceHeaders = extractConsumerRecordTraceHeaders(consumerRecord)
         val coreAttributes: Map[String, AttributeValue] =
           Map(
-            "kafka.topic"           -> consumerRecord.topic(),
-            "kafka.partition"       -> consumerRecord.partition(),
-            "kafka.offset"          -> consumerRecord.offset(),
-            "kafka.create.time"     -> consumerRecord.timestamp(),
-            "kafka.log.append.time" -> consumerRecord.timestamp(),
-            "kafka.key"             -> consumerRecord.key().toString()
+            OtelSemconv.MessagingSystem                 -> AttributeValue.StringValue("kafka"),
+            OtelSemconv.MessagingOperationType          -> AttributeValue.StringValue("process"),
+            OtelSemconv.MessagingDestinationName        -> consumerRecord.topic(),
+            OtelSemconv.MessagingDestinationPartitionId -> consumerRecord.partition().toString,
+            OtelSemconv.MessagingKafkaOffset            -> consumerRecord.offset(),
+            OtelSemconv.MessagingKafkaMessageKey        -> consumerRecord.key().toString
           )
         val logAspect =
           if (enrichLogs) ZIOAspect.annotated(coreAttributes.map { case (k, v) => (k, v.toString) }.toSeq*)
