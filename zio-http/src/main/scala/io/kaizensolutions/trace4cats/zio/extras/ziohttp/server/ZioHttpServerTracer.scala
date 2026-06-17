@@ -124,9 +124,9 @@ object ZioHttpServerTracer {
       OtelSemconv.NetworkProtocolVersion -> renderHttpVersion(req.version),
       OtelSemconv.HttpRequestMethod      -> req.method.toString,
       OtelSemconv.UrlPath                -> req.url.path.toString
-    ) ++ 
-    req.url.scheme.map(scheme => OtelSemconv.UrlScheme  -> StringValue(scheme.encode)) ++
-    headerFields(headers = req.headers, `type` = "request", dropWhen = dropHeadersWhen) ++
+    ) ++
+      req.url.scheme.map(scheme => OtelSemconv.UrlScheme -> StringValue(scheme.encode)) ++
+      headerFields(headers = req.headers, `type` = "request", dropWhen = dropHeadersWhen) ++
       req.url.host.map(host => OtelSemconv.ServerAddress -> StringValue(host)) ++
       req.url.port.map(port => OtelSemconv.ServerPort -> LongValue(port.toLong))
 

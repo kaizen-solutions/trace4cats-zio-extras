@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import doobie.Transactor
 import doobie.implicits.*
 import doobie.util.ExecutionContexts
-import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, OtelSemconv, ZTracer}
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
 import zio.interop.catz.*
 import zio.test.*
@@ -38,7 +38,12 @@ object TracedTransactorSpec extends ZIOSpecDefault {
           _     <- ZIO.serviceWithZIO[Transactor[Task]](xa => q.transact(xa))
           spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
         } yield assertTrue(
-          spans.exists(span => span.name == "SELECT 1")
+          spans.exists(span =>
+            span.name == "SELECT 1" &&
+              span.attributes.collectFirst { case (OtelSemconv.DbSystemName, v) =>
+                v.value.value.asInstanceOf[String].toLowerCase
+              }.contains("postgresql")
+          )
         )
       },
       test("Captures failures") {

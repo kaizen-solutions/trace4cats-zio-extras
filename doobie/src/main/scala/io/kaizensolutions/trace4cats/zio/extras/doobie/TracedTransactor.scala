@@ -25,13 +25,21 @@ object TracedTransactor {
         tracer    <- ZIO.service[ZTracer]
         xa        <- ZIO.service[Transactor[Task]]
         logHander <- ZIO.service[LogHandler[Task]]
-      } yield apply(xa, tracer, logHander)
+        dbSystem  <- detectDbSystem(xa)
+      } yield apply(xa, tracer, logHander, dbSystem)
     )
 
   val default: URLayer[Transactor[Task] & ZTracer, Transactor[Task]] =
     ZLayer.succeed(LogHandler.noop[Task]) >>> layer
 
-  private def tracingLogHandler(tracer: ZTracer): LogHandler[Task] = (logEvent: log.LogEvent) => {
+  private def detectDbSystem(xa: Transactor[Task]): UIO[String] = {
+    import doobie.implicits.*
+    FC.raw(_.getMetaData.getDatabaseProductName)
+      .transact(xa)
+      .orElseSucceed("unknown")
+  }
+
+  private def tracingLogHandler(tracer: ZTracer, dbSystem: String): LogHandler[Task] = (logEvent: log.LogEvent) => {
 
     def trace(execution: FiniteDuration, processing: Option[FiniteDuration], failure: Option[Throwable]) = {
       tracer.withSpan(logEvent.sql.linesIterator.map(_.trim).mkString) { span =>
@@ -45,7 +53,7 @@ object TracedTransactor {
             .map(nel => "db.query.parameter.values" -> AttributeValue.StringList(nel))
             .toMap ++
             Map(
-              OtelSemconv.DbSystemName    -> AttributeValue.StringValue("postgresql"),
+              OtelSemconv.DbSystemName    -> AttributeValue.StringValue(dbSystem),
               OtelSemconv.DbOperationName -> AttributeValue.StringValue(logEvent.label),
               OtelSemconv.DbQueryText     -> AttributeValue.StringValue(logEvent.sql),
               "db.query.exec_millis"      -> AttributeValue.LongValue(execution.toMillis)
@@ -74,8 +82,13 @@ object TracedTransactor {
       self.run(logEvent) *> other.run(logEvent)
   }
 
-  def apply(underlying: Transactor[Task], tracer: ZTracer, logHandler: LogHandler[Task]): Transactor[Task] =
+  def apply(
+    underlying: Transactor[Task],
+    tracer: ZTracer,
+    logHandler: LogHandler[Task],
+    dbSystem: String
+  ): Transactor[Task] =
     underlying.copy(interpret0 =
-      KleisliInterpreter(logHandler.andThen(tracingLogHandler(tracer))).ConnectionInterpreter
+      KleisliInterpreter(logHandler.andThen(tracingLogHandler(tracer, dbSystem))).ConnectionInterpreter
     )
 }
