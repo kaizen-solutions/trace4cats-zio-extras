@@ -67,7 +67,7 @@ object Fs2KafkaTracedSpec extends ZIOSpecDefault {
         val topic = UUID.randomUUID().toString
         for {
           producer <- ZIO.service[Producer]
-          _        <- producer.produceOne(topic, "key", "value")
+          _        <- producer.produceOne(topic, "key", "value").flatten
           spans    <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
         } yield assertTrue(
           spans.exists(span =>

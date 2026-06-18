@@ -180,7 +180,6 @@ object KafkaProducerTracer {
             OtelSemconv.MessagingOperationType   -> AttributeValue.StringValue("send"),
             OtelSemconv.MessagingDestinationName -> AttributeValue.StringList(topics.distinct)
           )
-          .ignoreLogged
       )
 
   private def enrichRecordsWithTraceHeaders[K, V](

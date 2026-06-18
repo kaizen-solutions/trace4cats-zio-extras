@@ -86,15 +86,18 @@ object KafkaConsumerTracer {
             OtelSemconv.MessagingOperationType          -> AttributeValue.StringValue("process"),
             OtelSemconv.MessagingDestinationName        -> consumerRecord.topic(),
             OtelSemconv.MessagingDestinationPartitionId -> consumerRecord.partition().toString,
-            OtelSemconv.MessagingKafkaOffset            -> consumerRecord.offset(),
-            OtelSemconv.MessagingKafkaMessageKey        -> consumerRecord.key().toString
+            OtelSemconv.MessagingKafkaOffset            -> consumerRecord.offset()
           )
+        val optionals: Map[String, AttributeValue] =
+          Option(consumerRecord.key)
+            .map(k => OtelSemconv.MessagingKafkaMessageKey -> AttributeValue.StringValue(k.toString)).toMap
+        val attributes = coreAttributes ++ optionals
         val logAspect =
-          if (enrichLogs) ZIOAspect.annotated(coreAttributes.map { case (k, v) => (k, v.toString) }.toSeq*)
+          if (enrichLogs) ZIOAspect.annotated(attributes.map { case (k, v) => (k, v.toString) }.toSeq*)
           else ZIOAspect.identity
 
         tracer.fromHeaders(headers = traceHeaders, name = "kafka-consume-with", kind = SpanKind.Consumer) { span =>
-          span.putAll(coreAttributes) *> f(consumerRecord) @@ logAspect
+          span.putAll(attributes) *> f(consumerRecord) @@ logAspect
         }
     }
 }
