@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras.sttp
 
-import io.kaizensolutions.trace4cats.zio.extras.ZTracer
+import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZTracer}
 import sttp.capabilities.Effect
 import sttp.client3.impl.zio.RIOMonadAsyncError
 import sttp.client3.{HttpError, Request, Response, SttpBackend}
@@ -87,36 +87,24 @@ object SttpBackendTracer {
     case _                                       => SpanStatus.Unknown
   }
 
-  private val ipv4Regex =
-    "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$".r
-
-  private val ipv6Regex =
-    "^(?:(?:(?:[A-F0-9]{1,4}:){6}|(?=(?:[A-F0-9]{0,4}:){0,6}(?:[0-9]{1,3}\\.){3}[0-9]{1,3}$)(([0-9A-F]{1,4}:){0,5}|:)((:[0-9A-F]{1,4}){1,5}:|:))(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|(?:[A-F0-9]{1,4}:){7}[A-F0-9]{1,4}|(?=(?:[A-F0-9]{0,4}:){0,7}[A-F0-9]{0,4}$)(([0-9A-F]{1,4}:){1,7}|:)((:[0-9A-F]{1,4}){1,7}|:))$".r
-
   private def toAttributes[T, R](req: Request[T, R]): Map[String, AttributeValue] =
     req.uri.host.map { host =>
-      val key = host.toUpperCase match {
-        case ipv4Regex(_*) => SemanticAttributeKeys.remoteServiceIpv4
-        case ipv6Regex(_*) => SemanticAttributeKeys.remoteServiceIpv6
-        case _             => SemanticAttributeKeys.remoteServiceHostname
-      }
-
-      key -> StringValue(host)
-    }.toMap ++ req.uri.port.map(port => SemanticAttributeKeys.remoteServicePort -> LongValue(port.toLong))
+      OtelSemconv.ServerAddress -> StringValue(host)
+    }.toMap ++ req.uri.port.map(port => OtelSemconv.ServerPort -> LongValue(port.toLong))
 
   private def requestFields(
     hs: Headers,
     dropHeadersWhen: String => Boolean
   ): List[(String, AttributeValue)] =
-    headerFields(hs, "req", dropHeadersWhen)
+    headerFields(hs, "request", dropHeadersWhen)
 
   private def responseFields[A](
     res: Response[A],
     dropHeadersWhen: String => Boolean
   ): List[(String, AttributeValue)] =
-    headerFields(Headers(res.headers), "resp", dropHeadersWhen) ++
+    headerFields(Headers(res.headers), "response", dropHeadersWhen) ++
       List(
-        "resp.status.code" -> res.code.code
+        OtelSemconv.HttpResponseStatusCode -> res.code.code
       )
 
   private def headerFields(
@@ -127,7 +115,7 @@ object SttpBackendTracer {
     hs.headers
       .filter(h => !dropHeadersWhen(h.name))
       .map { h =>
-        (s"${`type`}.header.${h.name}", h.value: AttributeValue)
+        (s"http.${`type`}.header.${h.name.toLowerCase}", h.value: AttributeValue)
       }
       .toList
 }

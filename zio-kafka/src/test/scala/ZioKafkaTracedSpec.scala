@@ -61,7 +61,7 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
             span.name == "kafka-producer-send-buffer" &&
               span.kind == SpanKind.Producer &&
               span.attributes.exists { case (k, v) =>
-                k == "topics" &&
+                k == "messaging.destination.name" &&
                 v.value.value == NonEmptyList.of(topic)
               }
           ),

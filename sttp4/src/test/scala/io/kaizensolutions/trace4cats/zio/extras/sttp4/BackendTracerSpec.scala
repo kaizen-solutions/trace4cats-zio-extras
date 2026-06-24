@@ -47,9 +47,9 @@ object BackendTracerSpec extends ZIOSpecDefault {
         logs.filter(_.message().contains("GET /foo/bar")).forall(_.annotations.contains("X-B3-TraceId")),
         spans.size == 1,
         spans.exists(_.name == "GET /foo/bar"),
-        spans.exists(_.attributes.get("remote.service.hostname").exists(_.value.value == "host")),
+        spans.exists(_.attributes.get("server.address").exists(_.value.value == "host")),
         spans.exists(_.status.isOk),
-        spans.exists(_.attributes.get("resp.status.code").exists(_.value.value == 200))
+        spans.exists(_.attributes.get("http.response.status_code").exists(_.value.value == 200))
       )
     }
   ).provide(

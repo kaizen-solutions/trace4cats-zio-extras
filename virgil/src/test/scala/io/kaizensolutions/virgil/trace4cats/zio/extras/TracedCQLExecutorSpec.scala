@@ -36,7 +36,7 @@ object TracedCQLExecutorSpec extends ZIOSpecDefault {
           assertTrue(
             span.name == "SELECT id, data FROM example_table WHERE id = :id_relation",
             span.attributes("virgil.bind-markers.id_relation").value.value == "1",
-            span.attributes("virgil.query-type").value.value == "query",
+            span.attributes("db.operation.name").value.value == "query",
             span.attributes("virgil.elements-to-pull").value.value == "All"
           )
         }
@@ -60,7 +60,7 @@ object TracedCQLExecutorSpec extends ZIOSpecDefault {
             val span = spans.head
             assertTrue(
               span.name == "BATCH(UPDATE cycling.popular_count SET popularity = popularity + :param0 WHERE id = :param1;UPDATE cycling.popular_count SET popularity = popularity + :param0 WHERE id = :param1;UPDATE cycling.popular_count SET popularity = popularity - :param0 WHERE id = :param1;)",
-              span.attributes("virgil.query-type").value.value == "batch-mutation",
+              span.attributes("db.operation.name").value.value == "batch-mutation",
               span
                 .attributes("virgil.query.0")
                 .value
@@ -101,7 +101,7 @@ object TracedCQLExecutorSpec extends ZIOSpecDefault {
             assertTrue(
               span.name == "page-begin: SELECT id, data FROM example_table WHERE id = :id_relation",
               span.attributes("virgil.bind-markers.id_relation").value.value == "1",
-              span.attributes("virgil.query-type").value.value == "query"
+              span.attributes("db.operation.name").value.value == "query"
             )
           }
         }

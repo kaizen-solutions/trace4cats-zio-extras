@@ -1,10 +1,9 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziohttp.client
 
-import io.kaizensolutions.trace4cats.zio.extras.ZTracer
+import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZTracer}
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.toSpanStatus
 import trace4cats.model.AttributeValue.{LongValue, StringValue}
-import trace4cats.model.SemanticAttributeKeys.{serviceHostname, servicePort}
-import trace4cats.model.{AttributeValue, SampleDecision, SemanticAttributeKeys, SpanKind}
+import trace4cats.model.{AttributeValue, SampleDecision, SpanKind}
 import trace4cats.{ErrorHandler, ToHeaders}
 import zio.*
 import zio.http.*
@@ -109,13 +108,13 @@ object ZioHttpClientTracer {
 
   private def toAttributes(req: Request): Map[String, AttributeValue] =
     Map[String, AttributeValue](
-      SemanticAttributeKeys.httpFlavor -> req.version.toString,
-      SemanticAttributeKeys.httpMethod -> req.method.toString(),
-      SemanticAttributeKeys.httpUrl    -> req.url.path.toString
+      OtelSemconv.NetworkProtocolVersion -> req.version.toString,
+      OtelSemconv.HttpRequestMethod      -> req.method.toString(),
+      OtelSemconv.UrlFull                -> req.url.encode
     ) ++
-      req.url.host.map(host => serviceHostname -> StringValue(host)) ++
-      req.url.port.map(port => servicePort -> LongValue(port.toLong))
+      req.url.host.map(host => OtelSemconv.ServerAddress -> StringValue(host)) ++
+      req.url.port.map(port => OtelSemconv.ServerPort -> LongValue(port.toLong))
 
   private def toAttributes(resp: Response): Map[String, AttributeValue] =
-    Map[String, AttributeValue](SemanticAttributeKeys.httpStatusCode -> resp.status.code)
+    Map[String, AttributeValue](OtelSemconv.HttpResponseStatusCode -> resp.status.code)
 }

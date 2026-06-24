@@ -1,7 +1,7 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziokafka
 
 import cats.data.NonEmptyList
-import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZSpan, ZTracer}
 import org.apache.kafka.clients.producer.{ProducerRecord, RecordMetadata}
 import org.apache.kafka.common.header.internals.RecordHeader
 import org.apache.kafka.common.{Metric, MetricName, PartitionInfo}
@@ -173,7 +173,14 @@ object KafkaProducerTracer {
   private def enrichSpanWithTopics[K, V](records: Chunk[ProducerRecord[K, V]], span: ZSpan): UIO[Unit] =
     NonEmptyList
       .fromList(records.map(_.topic()).toList)
-      .fold(ifEmpty = ZIO.unit)(topics => span.put("topics", AttributeValue.StringList(topics.distinct)).ignoreLogged)
+      .fold(ifEmpty = ZIO.unit)(topics =>
+        span
+          .putAll(
+            OtelSemconv.MessagingSystem          -> AttributeValue.StringValue("kafka"),
+            OtelSemconv.MessagingOperationType   -> AttributeValue.StringValue("send"),
+            OtelSemconv.MessagingDestinationName -> AttributeValue.StringList(topics.distinct)
+          )
+      )
 
   private def enrichRecordsWithTraceHeaders[K, V](
     headers: TraceHeaders,
