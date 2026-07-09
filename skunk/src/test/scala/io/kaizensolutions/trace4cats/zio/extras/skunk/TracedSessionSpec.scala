@@ -117,8 +117,12 @@ object TracedSessionSpec extends ZIOSpecDefault {
         }
       )
     )
-      .provideShared(Database.live, InMemorySpanCompleter.layer("skunk-test")) @@
-      TestAspect.sequential
+      .provideSome[EmbeddedPostgres](
+        Database.sessionPool,
+        InMemorySpanCompleter.layer("skunk-test")
+      )
+      .provideShared(Database.embeddedPostgres) @@ TestAspect.sequential
+
 }
 object Database {
   import cats.effect.std.Console
@@ -130,26 +134,28 @@ object Database {
   implicit val natchezTraceTask: NatchezTrace[Task] = NatchezTrace.Implicits.noop[Task]
   implicit val fs2NetworkTask: Network[Task]        = Network.forAsync[Task]
 
-  def sessionPool(ep: EmbeddedPostgres): URIO[Scope & ZTracer, TakeSession] = {
-    ZIO.serviceWithZIO[ZTracer](tracer =>
-      Session
-        .pooled[Task](
-          host = "localhost",
-          port = ep.getPort,
-          user = "postgres",
-          password = None,
-          database = "postgres",
-          max = 8
-        )
-        .toScopedZIO
-        .orDie
-        .map(_.toScopedZIO.map(TracedSession.make(_, tracer)))
-        .map(TakeSession(_))
+  val sessionPool: ZLayer[EmbeddedPostgres & ZTracer, Nothing, TakeSession] =
+    ZLayer.scoped(
+      for {
+        ep     <- ZIO.service[EmbeddedPostgres]
+        tracer <- ZIO.service[ZTracer]
+        sessionR <- Session
+                      .pooled[Task](
+                        host = "localhost",
+                        port = ep.getPort,
+                        user = "postgres",
+                        password = None,
+                        database = "postgres",
+                        max = 8
+                      )
+                      .toScopedZIO
+                      .orDie
+        session = sessionR.toScopedZIO.map(TracedSession.make(_, tracer))
+      } yield TakeSession(session)
     )
-  }
 
-  val live: RLayer[ZTracer, TakeSession] = {
-    val postgres: ZIO[Scope, Throwable, EmbeddedPostgres] =
+  val embeddedPostgres: ZLayer[Any, Throwable, EmbeddedPostgres] =
+    ZLayer.scoped(
       ZIO.acquireRelease(
         ZIO.attempt(
           EmbeddedPostgres
@@ -158,7 +164,5 @@ object Database {
             .start()
         )
       )(ep => ZIO.attempt(ep.close()).ignoreLogged)
-
-    ZLayer.scoped(postgres.flatMap(sessionPool))
-  }
+    )
 }

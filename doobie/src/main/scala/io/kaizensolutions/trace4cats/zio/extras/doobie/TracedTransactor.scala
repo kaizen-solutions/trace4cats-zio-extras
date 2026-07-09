@@ -64,7 +64,10 @@ object TracedTransactor {
         ZIO
           .when(span.isSampled)(
             span.putAll(attributes) *>
-              ZIO.foreachDiscard(failure)(f => span.setStatus(SpanStatus.Internal(f.getMessage)))
+              ZIO.foreachDiscard(failure)(f =>
+                span.setStatus(SpanStatus.Internal(f.getMessage)) *>
+                  span.put(OtelSemconv.ErrorType, AttributeValue.StringValue(f.getClass.getCanonicalName))
+              )
           )
           .unit
       }

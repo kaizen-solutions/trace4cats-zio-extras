@@ -56,9 +56,21 @@ object SttpBackendTracer {
           } yield response
 
         tracedRequest
-          .tapError(e => span.put("error.message", AttributeValue.StringValue(e.getLocalizedMessage)).when(isSampled))
+          .tapError(e =>
+            span
+              .putAll(
+                OtelSemconv.ErrorType -> AttributeValue.StringValue(e.getClass.getCanonicalName),
+                "error.message"       -> AttributeValue.StringValue(e.getLocalizedMessage)
+              )
+              .when(isSampled)
+          )
           .tapDefect(cause =>
-            span.put("error.cause", AttributeValue.StringValue(cause.prettyPrint)).when(cause.isDie && isSampled)
+            span
+              .putAll(
+                OtelSemconv.ErrorType -> AttributeValue.StringValue(cause.squash.getClass.getCanonicalName),
+                "error.cause"         -> AttributeValue.StringValue(cause.prettyPrint)
+              )
+              .when(cause.isDie && isSampled)
           ) @@ logTraceContext
       }
     }
@@ -88,9 +100,14 @@ object SttpBackendTracer {
   }
 
   private def toAttributes[T, R](req: Request[T, R]): Map[String, AttributeValue] =
-    req.uri.host.map { host =>
-      OtelSemconv.ServerAddress -> StringValue(host)
-    }.toMap ++ req.uri.port.map(port => OtelSemconv.ServerPort -> LongValue(port.toLong))
+    Map[String, AttributeValue](
+      OtelSemconv.HttpRequestMethod      -> StringValue(req.method.method),
+      OtelSemconv.UrlFull                -> StringValue(req.uri.toString),
+      OtelSemconv.NetworkProtocolVersion -> StringValue("1.1")
+    ) ++
+      req.uri.host.map { host =>
+        OtelSemconv.ServerAddress -> StringValue(host)
+      }.toMap ++ req.uri.port.map(port => OtelSemconv.ServerPort -> LongValue(port.toLong))
 
   private def requestFields(
     hs: Headers,
@@ -103,9 +120,12 @@ object SttpBackendTracer {
     dropHeadersWhen: String => Boolean
   ): List[(String, AttributeValue)] =
     headerFields(Headers(res.headers), "response", dropHeadersWhen) ++
-      List(
-        OtelSemconv.HttpResponseStatusCode -> res.code.code
-      )
+      List[(String, AttributeValue)](
+        OtelSemconv.HttpResponseStatusCode -> LongValue(res.code.code.toLong)
+      ) ++
+      (if (res.code.isClientError || res.code.isServerError)
+         List[(String, AttributeValue)](OtelSemconv.ErrorType -> StringValue(res.code.code.toString))
+       else Nil)
 
   private def headerFields(
     hs: Headers,

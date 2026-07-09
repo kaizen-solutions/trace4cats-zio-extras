@@ -128,17 +128,23 @@ object ZioHttpServerTracer {
       req.url.scheme.map(scheme => OtelSemconv.UrlScheme -> StringValue(scheme.encode)) ++
       headerFields(headers = req.headers, `type` = "request", dropWhen = dropHeadersWhen) ++
       req.url.host.map(host => OtelSemconv.ServerAddress -> StringValue(host)) ++
-      req.url.port.map(port => OtelSemconv.ServerPort -> LongValue(port.toLong))
+      req.url.port.map(port => OtelSemconv.ServerPort -> LongValue(port.toLong)) ++
+      Option(req.url.queryParams.encode).filter(_.nonEmpty).map(q => OtelSemconv.UrlQuery -> StringValue(q)) ++
+      req.headers
+        .get("X-Forwarded-For")
+        .orElse(req.remoteAddress.map(_.toString))
+        .map(addr => OtelSemconv.ClientAddress -> StringValue(addr)) ++
+      req.headers.get("User-Agent").map(ua => OtelSemconv.UserAgentOriginal -> StringValue(ua))
 
   private def responseFields(
     resp: Response,
     dropHeadersWhen: String => Boolean
   ): List[(String, AttributeValue)] =
-    List[(String, AttributeValue)](OtelSemconv.HttpResponseStatusCode -> resp.status.code) ++ headerFields(
-      resp.headers,
-      "response",
-      dropHeadersWhen
-    )
+    List[(String, AttributeValue)](OtelSemconv.HttpResponseStatusCode -> resp.status.code) ++
+      (if (resp.status.code >= 400)
+         List(OtelSemconv.ErrorType -> StringValue(resp.status.code.toString))
+       else Nil) ++
+      headerFields(resp.headers, "response", dropHeadersWhen)
 
   private def headerFields(
     headers: Headers,

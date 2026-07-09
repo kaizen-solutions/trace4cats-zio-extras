@@ -1,6 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras.caliban
 
-import io.kaizensolutions.trace4cats.zio.extras.ZTracer
+import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZTracer}
 import caliban.wrappers.Wrapper.ExecutionWrapper
 import caliban.*
 import caliban.execution.*
@@ -26,7 +26,7 @@ final class TracedExecutionWrapper(tracer: ZTracer) {
       if (parentField == "__schema") f(request)
       else {
         tracer.withSpan(spanName(request)) { span =>
-          span.putAll(attributes(request.field)) *>
+          span.putAll(attributes(request.field) ++ operationAttributes(request)) *>
             f(request)
         }
       }
@@ -43,7 +43,7 @@ object TracedExecutionWrapper {
       if (parentField == "__schema") f(request)
       else {
         ZTracer.withSpan(spanName(request)) { span =>
-          span.putAll(attributes(request.field)) *> f(request)
+          span.putAll(attributes(request.field) ++ operationAttributes(request)) *> f(request)
         }
       }
     }
@@ -63,9 +63,19 @@ object TracedExecutionWrapper {
     Seq(Option(operationTypeString), request.operationName).flatten.mkString(" ")
   }
 
+  private def operationAttributes(request: ExecutionRequest): Map[String, AttributeValue] = {
+    val operationType = request.operationType match {
+      case OperationType.Query        => "query"
+      case OperationType.Mutation     => "mutation"
+      case OperationType.Subscription => "subscription"
+    }
+    Map(OtelSemconv.GraphqlOperationType -> AttributeValue.StringValue(operationType)) ++
+      request.operationName.map(name => OtelSemconv.GraphqlOperationName -> AttributeValue.StringValue(name))
+  }
+
   private def attributes[T, R](
     field: Field
-  ) = Map("document" -> AttributeValue.StringValue(graphQLQuery(field)))
+  ) = Map(OtelSemconv.GraphqlDocument -> AttributeValue.StringValue(graphQLQuery(field)))
 
   private def graphQLQuery(field: Field): String =
     RemoteQuery.apply(maskField(field)).toGraphQLRequest.query.getOrElse("")

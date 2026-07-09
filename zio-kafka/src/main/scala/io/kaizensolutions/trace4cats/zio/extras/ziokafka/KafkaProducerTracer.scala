@@ -155,8 +155,10 @@ object KafkaProducerTracer {
     tracer: ZTracer,
     headers: ToHeaders,
     records: Chunk[ProducerRecord[K, V]]
-  )(underlyingCall: Chunk[ProducerRecord[K, V]] => ZIO[Env, Err, IO[Err, Out]]): ZIO[Env, Err, IO[Err, Out]] =
-    tracer.withSpan("kafka-producer-send-buffer", kind = SpanKind.Producer) { span =>
+  )(underlyingCall: Chunk[ProducerRecord[K, V]] => ZIO[Env, Err, IO[Err, Out]]): ZIO[Env, Err, IO[Err, Out]] = {
+    val topics   = records.map(_.topic()).distinct
+    val spanName = if (topics.nonEmpty) s"send ${topics.mkString(",")}" else "send"
+    tracer.withSpan(spanName, kind = SpanKind.Producer) { span =>
       tracer
         .extractHeaders(headers)
         .flatMap { traceHeaders =>
@@ -166,9 +168,10 @@ object KafkaProducerTracer {
             waitForAck         <- underlyingCall(recordsWithHeaders)
           } yield waitForAck
 
-          enrichSpanWithBufferSendAndBrokerAckInfo(tracer, span, headers)(sendToProducerBuffer)
+          enrichSpanWithBufferSendAndBrokerAckInfo(tracer, span, headers, spanName)(sendToProducerBuffer)
         }
     }
+  }
 
   private def enrichSpanWithTopics[K, V](records: Chunk[ProducerRecord[K, V]], span: ZSpan): UIO[Unit] =
     NonEmptyList
@@ -178,6 +181,7 @@ object KafkaProducerTracer {
           .putAll(
             OtelSemconv.MessagingSystem          -> AttributeValue.StringValue("kafka"),
             OtelSemconv.MessagingOperationType   -> AttributeValue.StringValue("send"),
+            OtelSemconv.MessagingOperationName   -> AttributeValue.StringValue("send"),
             OtelSemconv.MessagingDestinationName -> AttributeValue.StringList(topics.distinct)
           )
       )
@@ -195,7 +199,12 @@ object KafkaProducerTracer {
       }
     }
 
-  private def enrichSpanWithBufferSendAndBrokerAckInfo[R, E, B](tracer: ZTracer, span: ZSpan, headerFormat: ToHeaders)(
+  private def enrichSpanWithBufferSendAndBrokerAckInfo[R, E, B](
+    tracer: ZTracer,
+    span: ZSpan,
+    headerFormat: ToHeaders,
+    spanName: String
+  )(
     sendToKafka: ZIO[R, E, IO[E, B]]
   ): ZIO[R, E, IO[E, B]] =
     enrichSpanWithError(
@@ -208,7 +217,7 @@ object KafkaProducerTracer {
       tracer.fromHeaders(
         headers = headerFormat.fromContext(span.context),
         kind = SpanKind.Producer,
-        name = "kafka-producer-broker-ack"
+        name = spanName
       ) { span =>
         enrichSpanWithError("error.message-broker-ack", "error.cause-broker-ack", span, brokerAck)
       }

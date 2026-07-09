@@ -31,11 +31,20 @@ object ZioHttpClientTracer {
         span.putAll(toAttributes(request)).when(span.context.traceFlags.sampled == SampleDecision.Include)
 
       enrichWithAttributes *>
-        Client.streaming(requestWithTraceHeaders).tap { response =>
-          val spanStatus     = toSpanStatus(response.status)
-          val respAttributes = toAttributes(response)
-          span.setStatus(spanStatus) *> span.putAll(respAttributes)
-        }
+        Client
+          .streaming(requestWithTraceHeaders)
+          .tap { response =>
+            val spanStatus     = toSpanStatus(response.status)
+            val respAttributes = toAttributes(response)
+            span.setStatus(spanStatus) *> span.putAll(respAttributes)
+          }
+          .tapError { e =>
+            span
+              .putAll(
+                OtelSemconv.ErrorType -> AttributeValue.StringValue(e.getClass.getCanonicalName)
+              )
+              .when(span.context.traceFlags.sampled == SampleDecision.Include)
+          }
     }
   }
 
@@ -116,5 +125,8 @@ object ZioHttpClientTracer {
       req.url.port.map(port => OtelSemconv.ServerPort -> LongValue(port.toLong))
 
   private def toAttributes(resp: Response): Map[String, AttributeValue] =
-    Map[String, AttributeValue](OtelSemconv.HttpResponseStatusCode -> resp.status.code)
+    Map[String, AttributeValue](OtelSemconv.HttpResponseStatusCode -> resp.status.code) ++
+      (if (resp.status.code >= 400)
+         Map(OtelSemconv.ErrorType -> AttributeValue.StringValue(resp.status.code.toString))
+       else Map.empty)
 }

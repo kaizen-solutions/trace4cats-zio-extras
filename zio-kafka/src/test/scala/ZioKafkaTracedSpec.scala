@@ -58,19 +58,19 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
           spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
         } yield assertTrue(
           spans.exists(span =>
-            span.name == "kafka-producer-send-buffer" &&
+            span.name.startsWith("send ") &&
               span.kind == SpanKind.Producer &&
               span.attributes.exists { case (k, v) =>
                 k == "messaging.destination.name" &&
                 v.value.value == NonEmptyList.of(topic)
               }
           ),
-          spans.exists(span => span.name == "kafka-producer-broker-ack")
+          spans.exists(span => span.name.startsWith("send ") && span.kind == SpanKind.Producer)
         )
       }
     ),
     suite("Consumer")(
-      test("Continues traces from producer") {
+      test("Links to producer trace context") {
         val topic = UUID.randomUUID().toString
         for {
           tracer   <- ZIO.service[ZTracer]
@@ -90,18 +90,32 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
 
           _     <- producer.produce(topic, "key", "value", Serde.string, Serde.string)
           _     <- p.await
-          spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
+          spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.awaitCollected(_.exists(_.name == s"commit $topic")))
         } yield assertTrue(
+          // Consumer process span links to producer
           spans.exists(consumerSpan =>
-            consumerSpan.name == "kafka-receive" &&
-              spans.exists(parent =>
-                parent.kind == SpanKind.Producer &&
-                  consumerSpan.context.parent.map(_.spanId.show).contains(parent.context.spanId.show)
+            consumerSpan.name == s"process $topic" &&
+              consumerSpan.links.exists(links =>
+                links.exists(link =>
+                  spans.exists(producerSpan =>
+                    producerSpan.kind == SpanKind.Producer &&
+                      link.traceId.show == producerSpan.context.traceId.show &&
+                      link.spanId.show == producerSpan.context.spanId.show
+                  )
+                )
+              )
+          ),
+          // Commit span exists and is a child of the process span
+          spans.exists(commitSpan =>
+            commitSpan.name == s"commit $topic" &&
+              spans.exists(processSpan =>
+                processSpan.name == s"process $topic" &&
+                  commitSpan.context.parent.map(_.spanId.show).contains(processSpan.context.spanId.show)
               )
           )
         )
       },
-      test("Consume chunks reports traces") {
+      test("Consume chunks links to producer trace context") {
         val topic = UUID.randomUUID().toString
         for {
           tracer   <- ZIO.service[ZTracer]
@@ -120,10 +134,15 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
           spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
         } yield assertTrue(
           spans.exists(consumerSpan =>
-            consumerSpan.name == "kafka-consume-with" &&
-              spans.exists(parent =>
-                parent.kind == SpanKind.Producer &&
-                  consumerSpan.context.parent.map(_.spanId.show).contains(parent.context.spanId.show)
+            consumerSpan.name == s"process $topic" &&
+              consumerSpan.links.exists(links =>
+                links.exists(link =>
+                  spans.exists(producerSpan =>
+                    producerSpan.kind == SpanKind.Producer &&
+                      link.traceId.show == producerSpan.context.traceId.show &&
+                      link.spanId.show == producerSpan.context.spanId.show
+                  )
+                )
               )
           )
         )

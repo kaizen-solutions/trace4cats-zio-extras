@@ -78,7 +78,10 @@ final class TracedSession(underlying: Session[Task], tracer: ZTracer) extends Se
       enrichSpan(query, args, span, "execute") *>
         underlying
           .execute(query)(args)
-          .onError(e => span.setStatus(SpanStatus.Internal(e.squash.getMessage)))
+          .onError(e =>
+            span.setStatus(SpanStatus.Internal(e.squash.getMessage)) *>
+              span.put(OtelSemconv.ErrorType, AttributeValue.StringValue(e.squash.getClass.getCanonicalName))
+          )
     )
 
   override def unique[A](query: Query[Void, A]): Task[A] =
@@ -89,7 +92,10 @@ final class TracedSession(underlying: Session[Task], tracer: ZTracer) extends Se
       enrichSpan(query, args, span, "unique") *>
         underlying
           .unique(query)(args)
-          .onError(e => span.setStatus(SpanStatus.Internal(e.squash.getMessage)))
+          .onError(e =>
+            span.setStatus(SpanStatus.Internal(e.squash.getMessage)) *>
+              span.put(OtelSemconv.ErrorType, AttributeValue.StringValue(e.squash.getClass.getCanonicalName))
+          )
     )
 
   override def option[A](query: Query[Void, A]): Task[Option[A]] =
@@ -100,7 +106,10 @@ final class TracedSession(underlying: Session[Task], tracer: ZTracer) extends Se
       enrichSpan(query, args, span, "option") *>
         underlying
           .option(query)(args)
-          .onError(e => span.setStatus(SpanStatus.Internal(e.squash.getMessage)))
+          .onError(e =>
+            span.setStatus(SpanStatus.Internal(e.squash.getMessage)) *>
+              span.put(OtelSemconv.ErrorType, AttributeValue.StringValue(e.squash.getClass.getCanonicalName))
+          )
     )
 
   override def stream[A, B](command: Query[A, B])(args: A, chunkSize: Int): fs2.Stream[Task, B] =
@@ -137,7 +146,10 @@ final class TracedSession(underlying: Session[Task], tracer: ZTracer) extends Se
       enrichSpan(command, args, span, "execute") *>
         underlying
           .execute(command)(args)
-          .onError(e => span.setStatus(SpanStatus.Internal(e.squash.getMessage)))
+          .onError(e =>
+            span.setStatus(SpanStatus.Internal(e.squash.getMessage)) *>
+              span.put(OtelSemconv.ErrorType, AttributeValue.StringValue(e.squash.getClass.getCanonicalName))
+          )
     )
 
   override def prepare[A, B](query: Query[A, B]): Task[PreparedQuery[Task, A, B]] =
@@ -371,7 +383,7 @@ final class TracedSession(underlying: Session[Task], tracer: ZTracer) extends Se
 
         builder += ((OtelSemconv.DbSystemName, AttributeValue.StringValue("postgresql")))
         builder += ((OtelSemconv.DbQueryText, AttributeValue.StringValue(statement.sql)))
-        builder += (("skunk.method", AttributeValue.StringValue(methodName)))
+        builder += ((OtelSemconv.DbOperationName, AttributeValue.StringValue(methodName)))
         builder += (("prepared", AttributeValue.BooleanValue(prepared)))
 
         span.putAll(builder.result())

@@ -28,7 +28,7 @@ import scala.collection.mutable
 class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFromSpan: String => Boolean)
     extends CQLExecutor {
   override def execute[A](in: CQL[A])(implicit trace: Trace): Stream[Throwable, A] =
-    ZStream.unwrap(tracer.withSpan(extractQueryString(in), SpanKind.Internal) { span =>
+    ZStream.unwrap(tracer.withSpan(extractQueryString(in), SpanKind.Client) { span =>
       val enrichSpanWithBindMarkers =
         if (span.isSampled) enrichSpan(in, span, dropMarkerFromSpan)
         else ZIO.unit
@@ -44,7 +44,7 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
     })
 
   override def executeMutation(in: CQL[MutationResult])(implicit trace: Trace): Task[MutationResult] =
-    tracer.withSpan(extractQueryString(in), SpanKind.Internal) { span =>
+    tracer.withSpan(extractQueryString(in), SpanKind.Client) { span =>
       val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
       val enrichSpanWithBindMarkers =
         if (isSampled) enrichSpan(in, span, dropMarkerFromSpan)
@@ -64,7 +64,7 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
     val query  = extractQueryString(in)
     val pageNr = pageState.map(_.toString()).getOrElse("begin")
 
-    tracer.withSpan(s"page-$pageNr: $query", SpanKind.Internal) { span =>
+    tracer.withSpan(s"page-$pageNr: $query", SpanKind.Client) { span =>
       val isSampled = span.context.traceFlags.sampled == SampleDecision.Include
       val enrichSpanWithBindMarkers =
         if (isSampled) enrichSpan(in, span, dropMarkerFromSpan)
@@ -91,6 +91,7 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
       case e: DecoderException.PrimitiveReadFailure =>
         currentSpan.putAll(
           Map(
+            OtelSemconv.ErrorType  -> AttributeValue.StringValue(e.getClass.getCanonicalName),
             "virgil.error.message" -> AttributeValue.StringValue(e.message),
             "virgil.error.cause"   -> AttributeValue.StringValue(e.cause.getMessage)
           )
@@ -99,6 +100,7 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
       case e: DecoderException.StructureReadFailure =>
         currentSpan.putAll(
           Map(
+            OtelSemconv.ErrorType              -> AttributeValue.StringValue(e.getClass.getCanonicalName),
             "virgil.error.message"             -> AttributeValue.StringValue(e.message),
             "virgil.error.cause"               -> AttributeValue.StringValue(e.cause.getMessage),
             "virgil.error.actual-db-structure" -> AttributeValue.StringValue(e.debugStructure),
@@ -108,6 +110,8 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
         )
 
       case e =>
+        val errorType = Option(OtelSemconv.ErrorType -> AttributeValue.StringValue(e.getClass.getCanonicalName))
+
         val errorMessage =
           if (e != null && e.getMessage != null)
             Option("virgil.error.message" -> AttributeValue.StringValue(e.getMessage))
@@ -118,7 +122,7 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
             Option("virgil.error.cause" -> AttributeValue.StringValue(e.getCause.getMessage))
           else None
 
-        val attrMap: Map[String, AttributeValue] = (errorMessage ++ cause).toMap
+        val attrMap: Map[String, AttributeValue] = (errorType ++ errorMessage ++ cause).toMap
 
         if (attrMap.nonEmpty) currentSpan.putAll(attrMap)
         else ZIO.unit
@@ -154,11 +158,12 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
   private def enrichSpan[A](in: CQL[A], span: ZSpan, dropMarkerFromSpan: String => Boolean) =
     in.cqlType match {
       case q @ CQLType.Query(_, _, pullMode) =>
-        val attrMap      = mutable.Map.empty[String, AttributeValue]
-        val (_, markers) = CqlStatementRenderer.render(q)
+        val attrMap       = mutable.Map.empty[String, AttributeValue]
+        val (qs, markers) = CqlStatementRenderer.render(q)
 
         attrMap += (OtelSemconv.DbSystemName    -> AttributeValue.StringValue("cassandra"))
         attrMap += (OtelSemconv.DbOperationName -> AttributeValue.StringValue("query"))
+        attrMap += (OtelSemconv.DbQueryText     -> AttributeValue.StringValue(qs))
         attrMap += ("virgil.elements-to-pull"   -> AttributeValue.StringValue(pullMode.toString))
         markers.underlying.foreach { m =>
           val (name, marker) = m
@@ -168,11 +173,12 @@ class TracedCQLExecutor(underlying: CQLExecutor, tracer: ZTracer, dropMarkerFrom
         span.putAll(attrMap.toMap)
 
       case mutation: CQLType.Mutation =>
-        val attrMap      = mutable.Map.empty[String, AttributeValue]
-        val (_, markers) = CqlStatementRenderer.render(mutation)
+        val attrMap       = mutable.Map.empty[String, AttributeValue]
+        val (qs, markers) = CqlStatementRenderer.render(mutation)
 
         attrMap += (OtelSemconv.DbSystemName    -> AttributeValue.StringValue("cassandra"))
         attrMap += (OtelSemconv.DbOperationName -> AttributeValue.StringValue("mutation"))
+        attrMap += (OtelSemconv.DbQueryText     -> AttributeValue.StringValue(qs))
         markers.underlying.foreach { m =>
           val (name, marker) = m
           if (dropMarkerFromSpan(name.name)) ()
