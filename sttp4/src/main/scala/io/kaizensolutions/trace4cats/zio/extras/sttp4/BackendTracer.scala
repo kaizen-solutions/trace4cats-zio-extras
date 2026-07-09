@@ -83,7 +83,7 @@ object BackendTracer {
   }
 
   def methodWithPathSpanNamer(req: GenericRequest[?, Effect[Task]]): String =
-    s"${req.method.method} ${req.uri.path.mkString("/", "/", "")}"
+    s"${req.method.method} ${req.uri.pathSegments.toString}"
 
   def convertTraceHeaders(in: TraceHeaders): Headers =
     Headers(in.values.map { case (k, v) => Header(k.toString, v) }.toList)

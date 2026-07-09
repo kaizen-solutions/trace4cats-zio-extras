@@ -189,9 +189,9 @@ private class TraceEndpointInterceptor[Env, Err](
     span: ZSpan
   ): UIO[Unit] = {
     val coreFields = Seq[(String, AttributeValue)](
-      OtelSemconv.HttpRequestMethod -> AttributeValue.StringValue(request.method.method)
+      OtelSemconv.HttpRequestMethod -> AttributeValue.StringValue(request.method.method),
+      OtelSemconv.UrlPath           -> request.uri.pathSegments.toString
     ) ++
-      request.uri.path.map(p => OtelSemconv.UrlPath -> AttributeValue.StringValue(p.mkString("/", "/", ""))) ++
       request.uri.scheme.map(s => OtelSemconv.UrlScheme -> AttributeValue.StringValue(s)) ++
       request.uri.host.map(h => OtelSemconv.ServerAddress -> AttributeValue.StringValue(h)) ++
       request.uri.port.map(p => OtelSemconv.ServerPort -> AttributeValue.LongValue(p.toLong)) ++

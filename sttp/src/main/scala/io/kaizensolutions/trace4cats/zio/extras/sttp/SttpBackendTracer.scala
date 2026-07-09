@@ -4,7 +4,7 @@ import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZTracer}
 import sttp.capabilities.Effect
 import sttp.client3.impl.zio.RIOMonadAsyncError
 import sttp.client3.{HttpError, Request, Response, SttpBackend}
-import sttp.model.{Header, HeaderNames, Headers, StatusCode}
+import sttp.model.{Header, HeaderNames, Headers, HttpVersion, StatusCode}
 import sttp.monad.MonadError
 import trace4cats.ToHeaders
 import trace4cats.model.*
@@ -81,7 +81,7 @@ object SttpBackendTracer {
   }
 
   def methodWithPathSpanNamer(req: Request[?, ?]): String =
-    s"${req.method.method} ${req.uri.path.mkString("/", "/", "")}"
+    s"${req.method.method} ${req.uri.pathSegments.toString}"
 
   def convertTraceHeaders(in: TraceHeaders): Headers =
     Headers(in.values.map { case (k, v) => Header(k.toString, v) }.toList)
@@ -99,12 +99,19 @@ object SttpBackendTracer {
     case _                                       => SpanStatus.Unknown
   }
 
+  private def httpVersionString(v: HttpVersion): String = v match {
+    case HttpVersion.HTTP_1   => "1.0"
+    case HttpVersion.HTTP_1_1 => "1.1"
+    case HttpVersion.HTTP_2   => "2"
+    case HttpVersion.HTTP_3   => "3"
+  }
+
   private def toAttributes[T, R](req: Request[T, R]): Map[String, AttributeValue] =
     Map[String, AttributeValue](
-      OtelSemconv.HttpRequestMethod      -> StringValue(req.method.method),
-      OtelSemconv.UrlFull                -> StringValue(req.uri.toString),
-      OtelSemconv.NetworkProtocolVersion -> StringValue("1.1")
+      OtelSemconv.HttpRequestMethod -> StringValue(req.method.method),
+      OtelSemconv.UrlFull           -> StringValue(req.uri.toString)
     ) ++
+      req.httpVersion.map(v => OtelSemconv.NetworkProtocolVersion -> StringValue(httpVersionString(v))).toMap ++
       req.uri.host.map { host =>
         OtelSemconv.ServerAddress -> StringValue(host)
       }.toMap ++ req.uri.port.map(port => OtelSemconv.ServerPort -> LongValue(port.toLong))
