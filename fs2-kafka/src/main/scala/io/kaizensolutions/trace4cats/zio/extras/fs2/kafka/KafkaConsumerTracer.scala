@@ -22,6 +22,10 @@ object KafkaConsumerTracer {
    * Per the OTel messaging semconv, the consumer "Process" span uses a link to
    * the producer's creation context rather than a parent-child relationship.
    *
+   * Note: commits are not traced here because they happen externally (e.g. via
+   * CommitNow in consumeChunk, or commitBatchWithin). This function only
+   * instruments the processing of individual records.
+   *
    * @param tracer
    * @param spanNamer
    *   function to derive the span name from the record (default: "process
@@ -52,27 +56,13 @@ object KafkaConsumerTracer {
           OtelSemconv.MessagingKafkaMessageKey        -> AttributeValue.StringValue(key)
         )
 
-      val commitAttributes: Map[String, AttributeValue] =
-        Map(
-          OtelSemconv.MessagingSystem                 -> AttributeValue.StringValue("kafka"),
-          OtelSemconv.MessagingOperationType          -> AttributeValue.StringValue("settle"),
-          OtelSemconv.MessagingOperationName          -> AttributeValue.StringValue("commit"),
-          OtelSemconv.MessagingDestinationName        -> AttributeValue.StringValue(topic),
-          OtelSemconv.MessagingDestinationPartitionId -> AttributeValue.StringValue(partition.toString),
-          OtelSemconv.MessagingKafkaOffset            -> AttributeValue.LongValue(offset)
-        )
-
       // Per semconv: consumer "Process" span links to the producer's creation context
       // instead of using it as a parent. This preserves the consumer's own trace context.
       val producerLink = ToHeaders.standard.toContext(traceHeaders).map(ctx => Link(ctx.traceId, ctx.spanId))
 
       tracer.withSpan(name = spanName, kind = SpanKind.Consumer) { span =>
-        val addLink   = producerLink.fold(ZIO.unit)(span.addLink)
-        val doProcess = addLink *> span.putAll(attributes) *> process(record, span)
-        // Commit/settle span as child of the process span
-        doProcess <* tracer.withSpan(name = s"commit $topic", kind = SpanKind.Client) { commitSpan =>
-          commitSpan.putAll(commitAttributes)
-        }
+        val addLink = producerLink.fold(ZIO.unit)(span.addLink)
+        addLink *> span.putAll(attributes) *> process(record, span)
       } @@ ZIOAspect.annotated(attributes.view.mapValues(_.show).toSeq*)
   }
 

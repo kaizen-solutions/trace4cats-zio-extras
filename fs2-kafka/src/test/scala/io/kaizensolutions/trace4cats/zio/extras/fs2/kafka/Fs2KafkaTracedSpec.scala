@@ -95,11 +95,12 @@ object Fs2KafkaTracedSpec extends ZIOSpecDefault {
 
             _     <- producer.produceOne(topic, "key", "value")
             _     <- p.await
-            spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.awaitCollected(_.exists(_.name == s"commit $topic")))
+            spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.awaitCollected(_.exists(_.name == s"process $topic")))
           } yield assertTrue(
             // Consumer process span links to producer
             spans.exists(consumerSpan =>
               consumerSpan.name == s"process $topic" &&
+                consumerSpan.kind == SpanKind.Consumer &&
                 consumerSpan.links.exists(links =>
                   links.exists(link =>
                     spans.exists(producerSpan =>
@@ -108,14 +109,6 @@ object Fs2KafkaTracedSpec extends ZIOSpecDefault {
                         link.spanId.show == producerSpan.context.spanId.show
                     )
                   )
-                )
-            ),
-            // Commit span exists and is a child of the process span
-            spans.exists(commitSpan =>
-              commitSpan.name == s"commit $topic" &&
-                spans.exists(processSpan =>
-                  processSpan.name == s"process $topic" &&
-                    commitSpan.context.parent.map(_.spanId.show).contains(processSpan.context.spanId.show)
                 )
             )
           )
