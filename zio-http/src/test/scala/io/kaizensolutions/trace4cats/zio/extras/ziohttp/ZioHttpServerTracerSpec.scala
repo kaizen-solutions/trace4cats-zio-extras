@@ -1,7 +1,7 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziohttp
 
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.server.ZioHttpServerTracer
-import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, OtelSemconv, ZTracer}
 import trace4cats.model.CompletedSpan
 import trace4cats.{ToHeaders, TraceProcess}
 import zio.*
@@ -69,6 +69,11 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
               spans           <- completer.retrieveCollected
               _ <- ZIO
                      .from(spans.find(_.name == "GET /user/{userId}"))
+                     .orElseFail(new IllegalStateException("Expected userId span not found"))
+              _ <- ZIO
+                     .from(
+                       spans.find(_.attributes.get(OtelSemconv.HttpRoute).map(_.value.value).contains("/user/{userId}"))
+                     )
                      .orElseFail(new IllegalStateException("Expected userId span not found"))
               _ <- ZIO
                      .from(spans.find(_.name == "GET /plaintext"))

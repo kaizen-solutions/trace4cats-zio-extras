@@ -48,7 +48,9 @@ object ZioHttpServerTracer {
                       else ZIOAspect.identity
 
                     enrichSpanFromRequest(request, dropHeadersWhen, span) *>
-                      span.put(OtelSemconv.HttpRoute, AttributeValue.StringValue(nameOfSpan)).when(span.isSampled) *>
+                      span
+                        .put(OtelSemconv.HttpRoute, AttributeValue.StringValue(route.routePattern.pathCodec.render))
+                        .when(span.isSampled) *>
                       // NOTE: We need to call handler.runZIO and have the code executed within our span for propagation to take place
                       (h.runZIO(request) @@ logTraceContext).onExit {
                         case Exit.Success(response) => enrichSpanFromResponse(response, dropHeadersWhen, span)

@@ -1,7 +1,7 @@
 package io.kaizensolutions.trace4cats.zio.extras.tapir
 
 import fs2.Chunk
-import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, OtelSemconv, ZTracer}
 import org.http4s.*
 import org.http4s.syntax.all.*
 import org.typelevel.ci.CIStringSyntax
@@ -55,6 +55,7 @@ object TraceInterceptorSpec extends ZIOSpecDefault {
         response.headers.get(ci"traceparent").isDefined,
         response.status == Status.Ok,
         spans.exists(_.name == "GET /hello/{name}/greeting"),
+        spans.exists(_.attributes.get(OtelSemconv.HttpRoute).map(_.value.value).contains("/hello/{name}/greeting")),
         spans.find(_.name == "moshi").exists(_.context.parent.isDefined),
         spans.exists(_.attributes.contains("hello")),
         spans.flatMap(_.attributes.get("http.response.status_code")).exists(_.value.value == 200),

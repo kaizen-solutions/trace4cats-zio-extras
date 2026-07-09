@@ -160,7 +160,7 @@ private class TraceEndpointInterceptor[Env, Err](
           else ZIOAspect.identity
 
         for {
-          _ <- span.put(OtelSemconv.HttpRoute, ctx.endpoint.showPathTemplate())
+          _ <- span.put(OtelSemconv.HttpRoute, ctx.endpoint.showPathTemplate(showQueryParam = None))
           _ <- enrichSpanFromRequest(request, dropHeadersWhen, span)
           response <- (zio @@ logTraceContext)
                         .tapErrorCause(cause => span.setStatus(SpanStatus.Internal(cause.prettyPrint)))
