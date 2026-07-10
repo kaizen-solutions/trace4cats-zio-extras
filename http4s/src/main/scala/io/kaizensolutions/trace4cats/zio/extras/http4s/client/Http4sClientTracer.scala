@@ -54,12 +54,19 @@ object Http4sClientTracer {
                     span.putAll(respAttributes) *> span.setStatus(spanStatus).as(response)
                   }
                   .tapError(e =>
-                    if (spanSampled) span.put("error.message", AttributeValue.StringValue(e.getLocalizedMessage))
+                    if (spanSampled)
+                      span.putAll(
+                        OtelSemconv.ErrorType -> AttributeValue.StringValue(e.getClass.getCanonicalName),
+                        "error.message"       -> AttributeValue.StringValue(e.getLocalizedMessage)
+                      )
                     else ZIO.unit
                   )
                   .tapDefect(cause =>
                     if (cause.isDie && spanSampled)
-                      span.put("error.cause", AttributeValue.StringValue(cause.prettyPrint))
+                      span.putAll(
+                        OtelSemconv.ErrorType -> AttributeValue.StringValue(cause.squash.getClass.getCanonicalName),
+                        "error.cause"         -> AttributeValue.StringValue(cause.prettyPrint)
+                      )
                     else ZIO.unit
                   )
               }

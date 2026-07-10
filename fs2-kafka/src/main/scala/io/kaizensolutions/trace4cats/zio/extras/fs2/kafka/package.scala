@@ -13,7 +13,7 @@ package object kafka {
       extends AnyVal {
     def tracedConsumeChunk(process: ConsumerRecord[K, V] => RIO[R, Any]) =
       ZIO.service[ZTracer].flatMap { tracer =>
-        val tracedProcess = KafkaConsumerTracer.processConsumerRecord(tracer, "kafka-consume-chunk")(process)
+        val tracedProcess = KafkaConsumerTracer.processConsumerRecord(tracer)(process)
         consumer.consumeChunk(_.traverse_(tracedProcess).as(CommitNow))
       }
   }
@@ -23,16 +23,19 @@ package object kafka {
   ) extends AnyVal {
     def tracedConsumeChunk(process: ConsumerRecord[K, V] => RIO[R, Any]) =
       ZIO.service[ZTracer].flatMap { tracer =>
-        val tracedProcess = KafkaConsumerTracer.processConsumerRecord(tracer, "kafka-consume-chunk")(process)
+        val tracedProcess = KafkaConsumerTracer.processConsumerRecord(tracer)(process)
         consumer.consumeChunk(_.traverse_(tracedProcess).as(CommitNow))
       }
   }
 
   implicit class Fs2KafkaConsumerOps[R, K, V](val self: KafkaConsumer[RIO[R, *], K, V]) extends AnyVal {
-    def consumeChunkTraced(ztracer: ZTracer, spanName: String)(
+    def consumeChunkTraced(
+      ztracer: ZTracer,
+      spanNamer: KafkaConsumerTracer.SpanNamer[K, V] = KafkaConsumerTracer.SpanNamer.default[K, V]
+    )(
       process: ConsumerRecord[K, V] => RIO[R, Unit]
     ): RIO[R, Nothing] = {
-      val tracedProcess = KafkaConsumerTracer.processConsumerRecord(ztracer, spanName)(process)
+      val tracedProcess = KafkaConsumerTracer.processConsumerRecord(ztracer, spanNamer)(process)
       self.consumeChunk(_.traverse(tracedProcess).as(CommitNow))
     }
   }

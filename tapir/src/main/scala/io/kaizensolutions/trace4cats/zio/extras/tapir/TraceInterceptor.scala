@@ -160,6 +160,7 @@ private class TraceEndpointInterceptor[Env, Err](
           else ZIOAspect.identity
 
         for {
+          _ <- span.put(OtelSemconv.HttpRoute, ctx.endpoint.showPathTemplate(showQueryParam = None))
           _ <- enrichSpanFromRequest(request, dropHeadersWhen, span)
           response <- (zio @@ logTraceContext)
                         .tapErrorCause(cause => span.setStatus(SpanStatus.Internal(cause.prettyPrint)))
@@ -186,8 +187,28 @@ private class TraceEndpointInterceptor[Env, Err](
     request: ServerRequest,
     dropHeadersWhen: String => Boolean,
     span: ZSpan
-  ): UIO[Unit] =
-    span.putAll(requestFields(request.headers, dropHeadersWhen)*).whenDiscard(span.isSampled)
+  ): UIO[Unit] = {
+    val coreFields = Seq[(String, AttributeValue)](
+      OtelSemconv.HttpRequestMethod -> AttributeValue.StringValue(request.method.method),
+      OtelSemconv.UrlPath           -> request.uri.pathSegments.toString
+    ) ++
+      request.uri.scheme.map(s => OtelSemconv.UrlScheme -> AttributeValue.StringValue(s)) ++
+      request.uri.host.map(h => OtelSemconv.ServerAddress -> AttributeValue.StringValue(h)) ++
+      request.uri.port.map(p => OtelSemconv.ServerPort -> AttributeValue.LongValue(p.toLong)) ++
+      Option.when(request.uri.querySegments.nonEmpty)(
+        OtelSemconv.UrlQuery -> AttributeValue.StringValue(request.uri.queryToString)
+      ) ++
+      request
+        .headers(HeaderNames.UserAgent)
+        .headOption
+        .map(ua => OtelSemconv.UserAgentOriginal -> AttributeValue.StringValue(ua)) ++
+      request
+        .header(HeaderNames.XForwardedFor)
+        .orElse(request.connectionInfo.remote.map(_.toString))
+        .map(addr => OtelSemconv.ClientAddress -> AttributeValue.StringValue(addr))
+
+    span.putAll((coreFields ++ requestFields(request.headers, dropHeadersWhen))*).whenDiscard(span.isSampled)
+  }
 
   private def enrichSpanFromResponse[A](
     response: ServerResponse[A],
@@ -196,7 +217,11 @@ private class TraceEndpointInterceptor[Env, Err](
   ) = {
     val respFields = {
       val statusCodeField = OtelSemconv.HttpResponseStatusCode -> AttributeValue.LongValue(response.code.code.toLong)
-      statusCodeField +: responseFields(response.headers, dropHeadersWhen)
+      val errorTypeField =
+        if (response.code.isServerError || response.code.isClientError)
+          Seq(OtelSemconv.ErrorType -> AttributeValue.StringValue(response.code.code.toString))
+        else Seq.empty
+      statusCodeField +: (errorTypeField ++ responseFields(response.headers, dropHeadersWhen))
     }
     for {
       _ <- span.putAll(respFields*).whenDiscard(span.isSampled)

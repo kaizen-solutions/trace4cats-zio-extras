@@ -4,7 +4,7 @@ import cats.data.{Kleisli, OptionT}
 import trace4cats.ErrorHandler
 import trace4cats.http4s.common.{Http4sHeaders, Http4sSpanNamer, Http4sStatusMapping, Request_, Response_}
 import trace4cats.model.{AttributeValue, SampleDecision, SpanKind, SpanStatus}
-import io.kaizensolutions.trace4cats.zio.extras.{ZSpan, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZSpan, ZTracer}
 import org.http4s.{Headers, HttpApp, HttpRoutes, Request, Response}
 import org.typelevel.ci.CIString
 import zio.*
@@ -144,15 +144,21 @@ object Http4sServerTracer {
   private def enrichCause[E](cause: Cause[E], span: ZSpan): UIO[Unit] = {
     val spanSampled = span.context.traceFlags.sampled == SampleDecision.Include
     if (spanSampled) {
-      if (cause.isDie) span.put("error.cause", AttributeValue.StringValue(cause.prettyPrint))
-      else if (cause.isFailure) {
+      if (cause.isDie) {
+        val errorType = cause.defects.headOption.map(_.getClass.getCanonicalName).getOrElse("_OTHER")
+        span.putAll(
+          OtelSemconv.ErrorType -> AttributeValue.StringValue(errorType),
+          "error.cause"         -> AttributeValue.StringValue(cause.prettyPrint)
+        )
+      } else if (cause.isFailure) {
         val failure = cause.failureOption.get
-        span.put(
-          "error.message",
-          failure match {
-            case t: Throwable => AttributeValue.StringValue(t.getLocalizedMessage)
-            case other        => AttributeValue.StringValue(other.toString)
-          }
+        val (errorType, errorMessage) = failure match {
+          case t: Throwable => (t.getClass.getCanonicalName, t.getLocalizedMessage)
+          case other        => (other.getClass.getCanonicalName, other.toString)
+        }
+        span.putAll(
+          OtelSemconv.ErrorType -> AttributeValue.StringValue(errorType),
+          "error.message"       -> AttributeValue.StringValue(errorMessage)
         )
       } else ZIO.unit
     } else ZIO.unit

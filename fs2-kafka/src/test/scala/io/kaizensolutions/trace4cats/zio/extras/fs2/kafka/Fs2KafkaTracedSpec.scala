@@ -71,7 +71,7 @@ object Fs2KafkaTracedSpec extends ZIOSpecDefault {
           spans    <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
         } yield assertTrue(
           spans.exists(span =>
-            span.name == "kafka-producer-send-buffer" &&
+            span.name == s"send $topic" &&
               span.kind == SpanKind.Producer &&
               span.attributes.exists { case (k, v) =>
                 k == "messaging.destination.name" &&
@@ -82,7 +82,7 @@ object Fs2KafkaTracedSpec extends ZIOSpecDefault {
       }
     ),
     suite("Consumer")(
-      test("Continues traces from producer") {
+      test("Links to producer trace context") {
         val topic = UUID.randomUUID().toString
         ZIO.scoped(
           for {
@@ -91,17 +91,24 @@ object Fs2KafkaTracedSpec extends ZIOSpecDefault {
             consumer <- ZIO.service[Consumer]
             p        <- Promise.make[Nothing, Unit]
             _        <- consumer.subscribeTo(topic)
-            _        <- consumer.consumeChunkTraced(tracer, "kafka-receive")(_ => p.succeed(()).unit).forkScoped
+            _        <- consumer.consumeChunkTraced(tracer)(_ => p.succeed(()).unit).forkScoped
 
             _     <- producer.produceOne(topic, "key", "value")
             _     <- p.await
-            spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
+            spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.awaitCollected(_.exists(_.name == s"process $topic")))
           } yield assertTrue(
+            // Consumer process span links to producer
             spans.exists(consumerSpan =>
-              consumerSpan.name == "kafka-receive" &&
-                spans.exists(parent =>
-                  parent.kind == SpanKind.Producer &&
-                    consumerSpan.context.parent.map(_.spanId.show).contains(parent.context.spanId.show)
+              consumerSpan.name == s"process $topic" &&
+                consumerSpan.kind == SpanKind.Consumer &&
+                consumerSpan.links.exists(links =>
+                  links.exists(link =>
+                    spans.exists(producerSpan =>
+                      producerSpan.kind == SpanKind.Producer &&
+                        link.traceId.show == producerSpan.context.traceId.show &&
+                        link.spanId.show == producerSpan.context.spanId.show
+                    )
+                  )
                 )
             )
           )
@@ -120,7 +127,7 @@ object Fs2KafkaTracedSpec extends ZIOSpecDefault {
             p            <- Promise.make[Nothing, Unit]
             _            <- consumer.subscribeTo(topic)
             _ <- consumer
-                   .consumeChunkTraced(tracer, "kafka-receive")(_ =>
+                   .consumeChunkTraced(tracer)(_ =>
                      counter.updateAndGet(_ + 1).flatMap {
                        case i if i == totalElements - 1 => p.succeed(()).unit
                        case _                           => ZIO.unit

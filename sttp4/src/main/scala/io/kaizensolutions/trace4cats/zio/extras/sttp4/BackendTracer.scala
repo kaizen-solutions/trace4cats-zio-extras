@@ -4,7 +4,7 @@ import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZTracer}
 import sttp.capabilities.Effect
 import sttp.client4.impl.zio.RIOMonadAsyncError
 import sttp.client4.{Backend, GenericRequest, Response, ResponseException}
-import sttp.model.{Header, HeaderNames, Headers, StatusCode}
+import sttp.model.{Header, HeaderNames, Headers, HttpVersion, StatusCode}
 import sttp.monad.MonadError
 import trace4cats.ToHeaders
 import trace4cats.model.*
@@ -58,9 +58,21 @@ object BackendTracer {
           } yield response
 
         tracedRequest
-          .tapError(e => span.put("error.message", AttributeValue.StringValue(e.getLocalizedMessage)).when(isSampled))
+          .tapError(e =>
+            span
+              .putAll(
+                OtelSemconv.ErrorType -> AttributeValue.StringValue(e.getClass.getCanonicalName),
+                "error.message"       -> AttributeValue.StringValue(e.getLocalizedMessage)
+              )
+              .when(isSampled)
+          )
           .tapDefect(cause =>
-            span.put("error.cause", AttributeValue.StringValue(cause.prettyPrint)).when(cause.isDie && isSampled)
+            span
+              .putAll(
+                OtelSemconv.ErrorType -> AttributeValue.StringValue(cause.squash.getClass.getCanonicalName),
+                "error.cause"         -> AttributeValue.StringValue(cause.prettyPrint)
+              )
+              .when(cause.isDie && isSampled)
           ) @@ logTraceContext
       }
     }
@@ -71,7 +83,7 @@ object BackendTracer {
   }
 
   def methodWithPathSpanNamer(req: GenericRequest[?, Effect[Task]]): String =
-    s"${req.method.method} ${req.uri.path.mkString("/", "/", "")}"
+    s"${req.method.method} ${req.uri.pathSegments.toString}"
 
   def convertTraceHeaders(in: TraceHeaders): Headers =
     Headers(in.values.map { case (k, v) => Header(k.toString, v) }.toList)
@@ -89,10 +101,22 @@ object BackendTracer {
     case _                                       => SpanStatus.Unknown
   }
 
+  private def httpVersionString(v: HttpVersion): String = v match {
+    case HttpVersion.HTTP_1   => "1.0"
+    case HttpVersion.HTTP_1_1 => "1.1"
+    case HttpVersion.HTTP_2   => "2"
+    case HttpVersion.HTTP_3   => "3"
+  }
+
   private def toAttributes[T](req: GenericRequest[?, Effect[Task]]): Map[String, AttributeValue] =
-    req.uri.host.map { host =>
-      OtelSemconv.ServerAddress -> StringValue(host)
-    }.toMap ++ req.uri.port.map(port => OtelSemconv.ServerPort -> LongValue(port.toLong))
+    Map[String, AttributeValue](
+      OtelSemconv.HttpRequestMethod -> StringValue(req.method.method),
+      OtelSemconv.UrlFull           -> StringValue(req.uri.toString)
+    ) ++
+      req.httpVersion.map(v => OtelSemconv.NetworkProtocolVersion -> StringValue(httpVersionString(v))) ++
+      req.uri.host.map { host =>
+        OtelSemconv.ServerAddress -> StringValue(host)
+      }.toMap ++ req.uri.port.map(port => OtelSemconv.ServerPort -> LongValue(port.toLong))
 
   private def requestFields(
     hs: Headers,
@@ -106,8 +130,13 @@ object BackendTracer {
   ): List[(String, AttributeValue)] =
     headerFields(Headers(res.headers), "response", dropHeadersWhen) ++
       List(
-        OtelSemconv.HttpResponseStatusCode -> res.code.code
-      )
+        OtelSemconv.HttpResponseStatusCode -> LongValue(res.code.code.toLong)
+      ) ++
+      Option
+        .when(res.code.isClientError || res.code.isServerError)(
+          OtelSemconv.ErrorType -> StringValue(res.code.code.toString)
+        )
+        .toList
 
   private def headerFields(
     hs: Headers,
