@@ -1,9 +1,9 @@
 package io.kaizensolutions.trace4cats.zio.extras.doobie
 
 import cats.data.NonEmptyList
-import doobie.Transactor
-import doobie.implicits.*
-import doobie.util.ExecutionContexts
+import org.typelevel.doobie.Transactor
+import org.typelevel.doobie.implicits.*
+import org.typelevel.doobie.util.ExecutionContexts
 import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, OtelSemconv, ZTracer}
 import io.zonky.test.db.postgres.embedded.EmbeddedPostgres
 import zio.interop.catz.*
@@ -28,7 +28,7 @@ object TracedTransactorSpec extends ZIOSpecDefault {
     ZIO.fromAutoCloseable(ZIO.attempt(EmbeddedPostgres.start())).map(_.getPostgresDatabase)
   )
 
-  val tracedXa: ZLayer[DataSource & ZTracer, Throwable, doobie.Transactor[Task]] =
+  val tracedXa: ZLayer[DataSource & ZTracer, Throwable, Transactor[Task]] =
     xa >>> TracedTransactor.default
   def spec: Spec[TestEnvironment & Scope, Any] =
     suite("Traced Transactor")(
