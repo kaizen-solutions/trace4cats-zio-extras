@@ -1,9 +1,9 @@
 package io.kaizensolutions.trace4cats.zio.extras.doobie
 
 import cats.data.NonEmptyList
-import doobie.*
-import doobie.util.log
-import doobie.util.log.Parameters
+import org.typelevel.doobie.*
+import org.typelevel.doobie.util.log
+import org.typelevel.doobie.util.log.Parameters
 import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, ZTracer}
 import trace4cats.model.{AttributeValue, SpanStatus}
 import zio.*
@@ -33,7 +33,7 @@ object TracedTransactor {
     ZLayer.succeed(LogHandler.noop[Task]) >>> layer
 
   private def detectDbSystem(xa: Transactor[Task]): UIO[String] = {
-    import doobie.implicits.*
+    import org.typelevel.doobie.implicits.*
     FC.raw(_.getMetaData.getDatabaseProductName)
       .transact(xa)
       .orElseSucceed("unknown")

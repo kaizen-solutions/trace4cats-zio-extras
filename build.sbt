@@ -8,10 +8,10 @@ inThisBuild {
     scalaVersion       := scala213,
     crossScalaVersions := Seq(scala213, scala3),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework"),
-    Test / fork := true,
-    Test / parallelExecution := true,
+    Test / fork               := true,
+    Test / parallelExecution  := true,
     Test / testForkedParallel := true,
-    versionScheme := Some("early-semver"),
+    versionScheme             := Some("early-semver"),
     githubWorkflowJavaVersions := List(
       JavaSpec.temurin("17"),
       JavaSpec.temurin("21")
@@ -417,8 +417,8 @@ lazy val doobie =
       Test / javaOptions += s"-Dio.zonky.test.postgres.binary-dir=${target.value}/pg-binaries",
       libraryDependencies ++=
         Seq(
-          "org.tpolecat"          %% "doobie-core"                    % Versions.doobie,
-          "org.tpolecat"          %% "doobie-postgres"                % Versions.doobie           % Test,
+          "org.typelevel"         %% "doobie-core"                    % Versions.doobie,
+          "org.typelevel"         %% "doobie-postgres"                % Versions.doobie           % Test,
           "io.zonky.test"          % "embedded-postgres"              % Versions.embeddedPostgres % Test,
           "io.zonky.test.postgres" % "embedded-postgres-binaries-bom" % "17.5.0"                  % Test
         )
@@ -434,7 +434,7 @@ lazy val doobieExample =
       publish / skip := true,
       libraryDependencies ++= Seq(
         "io.janstenpickle" %% "trace4cats-opentelemetry-otlp-grpc-exporter" % Versions.trace4CatsGRPCExporter,
-        "org.tpolecat"     %% "doobie-postgres"                             % Versions.doobie
+        "org.typelevel"    %% "doobie-postgres"                             % Versions.doobie
       ),
       publish / skip := true
     )
