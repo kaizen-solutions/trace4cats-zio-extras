@@ -10,8 +10,8 @@ the underlying `PreparedStatement` in order to provide detailed debugging inform
 Here is an example of how to set it up:
 
 ```scala mdoc:compile-only
-import doobie.*
-import doobie.implicits.*
+import org.typelevel.doobie.*
+import org.typelevel.doobie.implicits.*
 import io.kaizensolutions.trace4cats.zio.extras.ZTracer
 import io.kaizensolutions.trace4cats.zio.extras.doobie.TracedTransactor
 import zio.*
