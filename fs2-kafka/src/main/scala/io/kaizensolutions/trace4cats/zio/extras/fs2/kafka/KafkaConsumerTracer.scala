@@ -20,7 +20,7 @@ object KafkaConsumerTracer {
    * for the FS2 Kafka consumeChunks API.
    *
    * A link to the producer's creation context is always added to the consumer
-   * span regardless of the chosen [[SpanRelationship]] mode.
+   * span regardless of the chosen `SpanRelationship` mode.
    *
    * @param tracer
    * @param spanNamer
@@ -28,8 +28,8 @@ object KafkaConsumerTracer {
    *   {topic}")
    * @param spanRelationship
    *   controls whether the consumer span is a child of the producer span
-   *   ([[SpanRelationship.ParentChild]]) or starts a new trace context
-   *   ([[SpanRelationship.Link]]). Default: ParentChild.
+   *   (`SpanRelationship.ParentChild`) or starts a new trace context
+   *   (`SpanRelationship.Link`). Default: ParentChild.
    * @param process
    * @return
    */
