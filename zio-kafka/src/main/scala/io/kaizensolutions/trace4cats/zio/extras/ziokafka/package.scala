@@ -19,7 +19,8 @@ package object ziokafka {
       keyDeserializer: Deserializer[R, K],
       valueDeserializer: Deserializer[R, V],
       commitRetryPolicy: Schedule[Any, Any, Any] = Schedule.exponential(1.second) && Schedule.recurs(3),
-      enrichLogs: Boolean = true
+      enrichLogs: Boolean = true,
+      spanRelationship: SpanRelationship = SpanRelationship.ParentChild
     )(f: KafkaConsumerRecord[K, V] => URIO[R1, Unit]): RIO[R & R1 & ZTracer, Unit] =
       ZIO.serviceWithZIO[ZTracer] { tracer =>
         KafkaConsumerTracer.tracedConsumeWith[R, R1, K, V](
@@ -29,7 +30,8 @@ package object ziokafka {
           keyDeserializer,
           valueDeserializer,
           commitRetryPolicy,
-          enrichLogs
+          enrichLogs,
+          spanRelationship
         )(f)
       }
   }

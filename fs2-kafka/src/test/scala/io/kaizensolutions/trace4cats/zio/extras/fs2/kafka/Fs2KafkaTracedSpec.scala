@@ -4,7 +4,7 @@ import cats.data.NonEmptyList
 import cats.implicits.toShow
 import fs2.kafka.*
 import io.github.embeddedkafka.{EmbeddedKafka, EmbeddedKafkaConfig}
-import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, SpanRelationship, ZTracer}
 import trace4cats.model.SpanKind
 import zio.interop.catz.*
 import zio.logging.backend.SLF4J
@@ -82,7 +82,7 @@ object Fs2KafkaTracedSpec extends ZIOSpecDefault {
       }
     ),
     suite("Consumer")(
-      test("Links to producer trace context") {
+      test("ParentChild mode: consumer span is child of producer (same trace ID) and links to producer") {
         val topic = UUID.randomUUID().toString
         ZIO.scoped(
           for {
@@ -91,16 +91,26 @@ object Fs2KafkaTracedSpec extends ZIOSpecDefault {
             consumer <- ZIO.service[Consumer]
             p        <- Promise.make[Nothing, Unit]
             _        <- consumer.subscribeTo(topic)
-            _        <- consumer.consumeChunkTraced(tracer)(_ => p.succeed(()).unit).forkScoped
+            _ <- consumer
+                   .consumeChunkTraced(tracer, spanRelationship = SpanRelationship.ParentChild)(_ => p.succeed(()).unit)
+                   .forkScoped
 
             _     <- producer.produceOne(topic, "key", "value")
             _     <- p.await
             spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.awaitCollected(_.exists(_.name == s"process $topic")))
           } yield assertTrue(
-            // Consumer process span links to producer
+            // Consumer span shares the same trace ID as producer span (parent-child)
             spans.exists(consumerSpan =>
               consumerSpan.name == s"process $topic" &&
                 consumerSpan.kind == SpanKind.Consumer &&
+                spans.exists(producerSpan =>
+                  producerSpan.kind == SpanKind.Producer &&
+                    consumerSpan.context.traceId.show == producerSpan.context.traceId.show
+                )
+            ),
+            // Link is still added
+            spans.exists(consumerSpan =>
+              consumerSpan.name == s"process $topic" &&
                 consumerSpan.links.exists(links =>
                   links.exists(link =>
                     spans.exists(producerSpan =>
@@ -113,7 +123,48 @@ object Fs2KafkaTracedSpec extends ZIOSpecDefault {
             )
           )
         )
+      },
+      test("Link mode: consumer span has different trace ID and links to producer") {
+        val topic = UUID.randomUUID().toString
+        ZIO.scoped(
+          for {
+            tracer   <- ZIO.service[ZTracer]
+            producer <- ZIO.service[Producer]
+            consumer <- ZIO.service[Consumer]
+            p        <- Promise.make[Nothing, Unit]
+            _        <- consumer.subscribeTo(topic)
+            _ <- consumer
+                   .consumeChunkTraced(tracer, spanRelationship = SpanRelationship.Link)(_ => p.succeed(()).unit)
+                   .forkScoped
 
+            _     <- producer.produceOne(topic, "key", "value")
+            _     <- p.await
+            spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.awaitCollected(_.exists(_.name == s"process $topic")))
+          } yield assertTrue(
+            // Consumer span has a different trace ID than producer span
+            spans.exists(consumerSpan =>
+              consumerSpan.name == s"process $topic" &&
+                consumerSpan.kind == SpanKind.Consumer &&
+                spans.exists(producerSpan =>
+                  producerSpan.kind == SpanKind.Producer &&
+                    consumerSpan.context.traceId.show != producerSpan.context.traceId.show
+                )
+            ),
+            // Link is still added
+            spans.exists(consumerSpan =>
+              consumerSpan.name == s"process $topic" &&
+                consumerSpan.links.exists(links =>
+                  links.exists(link =>
+                    spans.exists(producerSpan =>
+                      producerSpan.kind == SpanKind.Producer &&
+                        link.traceId.show == producerSpan.context.traceId.show &&
+                        link.spanId.show == producerSpan.context.spanId.show
+                    )
+                  )
+                )
+            )
+          )
+        )
       },
       test("Experiences no lag after processing all elements") {
         val topic = UUID.randomUUID().toString

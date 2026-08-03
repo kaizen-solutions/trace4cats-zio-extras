@@ -70,7 +70,7 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
       }
     ),
     suite("Consumer")(
-      test("Links to producer trace context") {
+      test("ParentChild mode: consumer span is child of producer (same trace ID) and links to producer") {
         val topic = UUID.randomUUID().toString
         for {
           tracer   <- ZIO.service[ZTracer]
@@ -80,7 +80,8 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
           _ <- KafkaConsumerTracer
                  .traceConsumerStream(
                    tracer,
-                   consumer.plainStream(Subscription.topics(topic), Serde.string, Serde.string)
+                   consumer.plainStream(Subscription.topics(topic), Serde.string, Serde.string),
+                   spanRelationship = SpanRelationship.ParentChild
                  )
                  .endTracingEachElement
                  .tap(_.offset.commit)
@@ -92,7 +93,15 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
           _     <- p.await
           spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.awaitCollected(_.exists(_.name == s"commit $topic")))
         } yield assertTrue(
-          // Consumer process span links to producer
+          // Consumer span shares the same trace ID as producer span (parent-child)
+          spans.exists(consumerSpan =>
+            consumerSpan.name == s"process $topic" &&
+              spans.exists(producerSpan =>
+                producerSpan.kind == SpanKind.Producer &&
+                  consumerSpan.context.traceId.show == producerSpan.context.traceId.show
+              )
+          ),
+          // Link is still added
           spans.exists(consumerSpan =>
             consumerSpan.name == s"process $topic" &&
               consumerSpan.links.exists(links =>
@@ -115,7 +124,53 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
           )
         )
       },
-      test("Consume chunks links to producer trace context") {
+      test("Link mode: consumer span has different trace ID and links to producer") {
+        val topic = UUID.randomUUID().toString
+        for {
+          tracer   <- ZIO.service[ZTracer]
+          p        <- Promise.make[Nothing, Unit]
+          consumer <- ZIO.service[Consumer]
+          producer <- ZIO.service[Producer]
+          _ <- KafkaConsumerTracer
+                 .traceConsumerStream(
+                   tracer,
+                   consumer.plainStream(Subscription.topics(topic), Serde.string, Serde.string),
+                   spanRelationship = SpanRelationship.Link
+                 )
+                 .endTracingEachElement
+                 .tap(_.offset.commit)
+                 .tap(_ => p.succeed(()))
+                 .runDrain
+                 .forkScoped
+
+          _     <- producer.produce(topic, "key", "value", Serde.string, Serde.string)
+          _     <- p.await
+          spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.awaitCollected(_.exists(_.name == s"commit $topic")))
+        } yield assertTrue(
+          // Consumer span has a different trace ID than producer span
+          spans.exists(consumerSpan =>
+            consumerSpan.name == s"process $topic" &&
+              spans.exists(producerSpan =>
+                producerSpan.kind == SpanKind.Producer &&
+                  consumerSpan.context.traceId.show != producerSpan.context.traceId.show
+              )
+          ),
+          // Link is still added
+          spans.exists(consumerSpan =>
+            consumerSpan.name == s"process $topic" &&
+              consumerSpan.links.exists(links =>
+                links.exists(link =>
+                  spans.exists(producerSpan =>
+                    producerSpan.kind == SpanKind.Producer &&
+                      link.traceId.show == producerSpan.context.traceId.show &&
+                      link.spanId.show == producerSpan.context.spanId.show
+                  )
+                )
+              )
+          )
+        )
+      },
+      test("ParentChild mode with tracedConsumeWith: consumer span is child of producer and links to producer") {
         val topic = UUID.randomUUID().toString
         for {
           tracer   <- ZIO.service[ZTracer]
@@ -124,15 +179,75 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
           producer <- ZIO.service[Producer]
           fiber <-
             KafkaConsumerTracer
-              .tracedConsumeWith(tracer, consumer, Subscription.topics(topic), Serde.string, Serde.string)(_ =>
-                p.succeed(()).unit
-              )
+              .tracedConsumeWith(
+                tracer,
+                consumer,
+                Subscription.topics(topic),
+                Serde.string,
+                Serde.string,
+                spanRelationship = SpanRelationship.ParentChild
+              )(_ => p.succeed(()).unit)
               .forkScoped
           _     <- producer.produce(topic, "key", "value", Serde.string, Serde.string)
           _     <- p.await
           _     <- fiber.interrupt
           spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
         } yield assertTrue(
+          // Consumer span shares the same trace ID as producer span
+          spans.exists(consumerSpan =>
+            consumerSpan.name == s"process $topic" &&
+              spans.exists(producerSpan =>
+                producerSpan.kind == SpanKind.Producer &&
+                  consumerSpan.context.traceId.show == producerSpan.context.traceId.show
+              )
+          ),
+          // Link is still added
+          spans.exists(consumerSpan =>
+            consumerSpan.name == s"process $topic" &&
+              consumerSpan.links.exists(links =>
+                links.exists(link =>
+                  spans.exists(producerSpan =>
+                    producerSpan.kind == SpanKind.Producer &&
+                      link.traceId.show == producerSpan.context.traceId.show &&
+                      link.spanId.show == producerSpan.context.spanId.show
+                  )
+                )
+              )
+          )
+        )
+      },
+      test("Link mode with tracedConsumeWith: consumer span has different trace ID and links to producer") {
+        val topic = UUID.randomUUID().toString
+        for {
+          tracer   <- ZIO.service[ZTracer]
+          p        <- Promise.make[Nothing, Unit]
+          consumer <- ZIO.service[Consumer]
+          producer <- ZIO.service[Producer]
+          fiber <-
+            KafkaConsumerTracer
+              .tracedConsumeWith(
+                tracer,
+                consumer,
+                Subscription.topics(topic),
+                Serde.string,
+                Serde.string,
+                spanRelationship = SpanRelationship.Link
+              )(_ => p.succeed(()).unit)
+              .forkScoped
+          _     <- producer.produce(topic, "key", "value", Serde.string, Serde.string)
+          _     <- p.await
+          _     <- fiber.interrupt
+          spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
+        } yield assertTrue(
+          // Consumer span has a different trace ID than producer span
+          spans.exists(consumerSpan =>
+            consumerSpan.name == s"process $topic" &&
+              spans.exists(producerSpan =>
+                producerSpan.kind == SpanKind.Producer &&
+                  consumerSpan.context.traceId.show != producerSpan.context.traceId.show
+              )
+          ),
+          // Link is still added
           spans.exists(consumerSpan =>
             consumerSpan.name == s"process $topic" &&
               consumerSpan.links.exists(links =>
