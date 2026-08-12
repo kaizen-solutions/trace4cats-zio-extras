@@ -2,10 +2,10 @@ package io.kaizensolutions.trace4cats.zio.extras.fs2.kafka
 
 import cats.syntax.foldable.*
 import fs2.kafka.{ConsumerRecord, Headers}
-import io.kaizensolutions.trace4cats.zio.extras.{OtelSemconv, SpanRelationship, ZSpan, ZTracer}
+import io.kaizensolutions.trace4cats.zio.extras.{KafkaLogAnnotations, OtelSemconv, SpanRelationship, ZSpan, ZTracer}
 import trace4cats.ToHeaders
 import trace4cats.model.{AttributeValue, Link, SpanKind, TraceHeaders}
-import zio.{LogAnnotation, RIO, ZIO}
+import zio.{RIO, ZIO}
 
 object KafkaConsumerTracer {
 
@@ -36,9 +36,7 @@ object KafkaConsumerTracer {
     tracer: ZTracer,
     spanNamer: SpanNamer[K, V] = SpanNamer.default[K, V],
     spanRelationship: SpanRelationship = SpanRelationship.ParentChild,
-    logAnnotationsFromAttributes: Map[String, AttributeValue] => Set[LogAnnotation] = _.map { case (k, v) =>
-      LogAnnotation(k, v.toString())
-    }.toSet
+    kafkaLogAnnotations: KafkaLogAnnotations = KafkaLogAnnotations.default
   )(process: (ConsumerRecord[K, V], ZSpan) => RIO[R, Out]): ConsumerRecord[K, V] => RIO[R, Out] = {
     (record: ConsumerRecord[K, V]) =>
       val traceHeaders = extractTraceHeaders(record.headers)
@@ -65,7 +63,7 @@ object KafkaConsumerTracer {
       def body(span: ZSpan): RIO[R, Out] = {
         val addLink = producerLink.fold(ZIO.unit)(span.addLink)
         addLink *> span.putAll(attributes) *>
-          ZIO.logAnnotate(logAnnotationsFromAttributes(attributes))(
+          ZIO.logAnnotate(kafkaLogAnnotations(attributes))(
             process(record, span)
           )
       }
@@ -84,11 +82,9 @@ object KafkaConsumerTracer {
     tracer: ZTracer,
     spanNamer: SpanNamer[K, V] = SpanNamer.default[K, V],
     spanRelationship: SpanRelationship = SpanRelationship.ParentChild,
-    logAnnotationsFromAttributes: Map[String, AttributeValue] => Set[LogAnnotation] = _.map { case (k, v) =>
-      LogAnnotation(k, v.toString())
-    }.toSet
+    kafkaLogAnnotations: KafkaLogAnnotations = KafkaLogAnnotations.default
   )(process: ConsumerRecord[K, V] => RIO[R, Out]): ConsumerRecord[K, V] => RIO[R, Out] =
-    processSpannedConsumerRecord(tracer, spanNamer, spanRelationship, logAnnotationsFromAttributes)((record, _) =>
+    processSpannedConsumerRecord(tracer, spanNamer, spanRelationship, kafkaLogAnnotations)((record, _) =>
       process(record)
     )
 

@@ -19,9 +19,7 @@ package object ziokafka {
       keyDeserializer: Deserializer[R, K],
       valueDeserializer: Deserializer[R, V],
       commitRetryPolicy: Schedule[Any, Any, Any] = Schedule.exponential(1.second) && Schedule.recurs(3),
-      logAnnotationsFromAttributes: Map[String, AttributeValue] => Set[LogAnnotation] = _.map { case (k, v) =>
-        LogAnnotation(k, v.toString())
-      }.toSet,
+      kafkaLogAnnotations: KafkaLogAnnotations = KafkaLogAnnotations.default,
       spanRelationship: SpanRelationship = SpanRelationship.ParentChild
     )(f: KafkaConsumerRecord[K, V] => URIO[R1, Unit]): RIO[R & R1 & ZTracer, Unit] =
       ZIO.serviceWithZIO[ZTracer] { tracer =>
@@ -32,7 +30,7 @@ package object ziokafka {
           keyDeserializer,
           valueDeserializer,
           commitRetryPolicy,
-          logAnnotationsFromAttributes,
+          kafkaLogAnnotations,
           spanRelationship
         )(f)
       }

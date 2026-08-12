@@ -20,9 +20,7 @@ object KafkaConsumerTracer {
     tracer: ZTracer,
     stream: ZStream[R, Throwable, CommittableRecord[K, V]],
     spanNameForElement: SpanNamer[K, V] = SpanNamer.default[K, V],
-    logAnnotationsFromAttributes: Map[String, AttributeValue] => Set[LogAnnotation] = _.map { case (k, v) =>
-      LogAnnotation(k, v.toString())
-    }.toSet,
+    kafkaLogAnnotations: KafkaLogAnnotations = KafkaLogAnnotations.default,
     spanRelationship: SpanRelationship = SpanRelationship.ParentChild
   ): ZStream[R, Throwable, Spanned[CommittableRecord[K, V]]] =
     stream.mapChunksZIO(_.mapZIO { comm =>
@@ -33,19 +31,18 @@ object KafkaConsumerTracer {
 
       val attributes = coreAttributes(topic, record.partition, comm.offset.offset, Option(record.key).map(_.toString))
 
-      withConsumerSpan(tracer, traceHeaders, spanName, spanRelationship, attributes, logAnnotationsFromAttributes) {
-        span =>
-          val enrichedComm = comm.copy(
-            commitHandle = _ =>
-              tracer.fromHeaders(
-                headers = ToHeaders.standard.fromContext(span.context),
-                name = s"commit $topic",
-                kind = SpanKind.Client
-              ) { commitSpan =>
-                commitSpan.putAll(attributes) *> comm.offset.commit
-              }
-          )
-          ZIO.succeed(Spanned(span.extractHeaders(ToHeaders.all), enrichedComm))
+      withConsumerSpan(tracer, traceHeaders, spanName, spanRelationship, attributes, kafkaLogAnnotations) { span =>
+        val enrichedComm = comm.copy(
+          commitHandle = _ =>
+            tracer.fromHeaders(
+              headers = ToHeaders.standard.fromContext(span.context),
+              name = s"commit $topic",
+              kind = SpanKind.Client
+            ) { commitSpan =>
+              commitSpan.putAll(attributes) *> comm.offset.commit
+            }
+        )
+        ZIO.succeed(Spanned(span.extractHeaders(ToHeaders.all), enrichedComm))
       }
     })
 
@@ -56,9 +53,7 @@ object KafkaConsumerTracer {
     keyDeserializer: Deserializer[R, K],
     valueDeserializer: Deserializer[R, V],
     commitRetryPolicy: Schedule[Any, Any, Any] = Schedule.exponential(1.second) && Schedule.recurs(3),
-    logAnnotationsFromAttributes: Map[String, AttributeValue] => Set[LogAnnotation] = _.map { case (k, v) =>
-      LogAnnotation(k, v.toString())
-    }.toSet,
+    kafkaLogAnnotations: KafkaLogAnnotations = KafkaLogAnnotations.default,
     spanRelationship: SpanRelationship = SpanRelationship.ParentChild
   )(f: KafkaConsumerRecord[K, V] => URIO[R1, Unit]): RIO[R & R1, Unit] =
     consumer.consumeWith[R, R1, K, V](subscription, keyDeserializer, valueDeserializer, commitRetryPolicy) {
@@ -72,8 +67,8 @@ object KafkaConsumerTracer {
           Option(consumerRecord.key).map(_.toString)
         )
 
-        withConsumerSpan(tracer, traceHeaders, spanName, spanRelationship, attributes, logAnnotationsFromAttributes) {
-          _ => f(consumerRecord)
+        withConsumerSpan(tracer, traceHeaders, spanName, spanRelationship, attributes, kafkaLogAnnotations) { _ =>
+          f(consumerRecord)
         }
     }
 
@@ -100,7 +95,7 @@ object KafkaConsumerTracer {
     spanName: String,
     spanRelationship: SpanRelationship,
     attributes: Map[String, AttributeValue],
-    logAnnotationsFromAttributes: Map[String, AttributeValue] => Set[LogAnnotation]
+    kafkaLogAnnotations: KafkaLogAnnotations
   )(body: ZSpan => ZIO[R, Nothing, A]): ZIO[R, Nothing, A] = {
     val producerLink =
       ToHeaders.standard.toContext(traceHeaders).map(ctx => trace4cats.model.Link(ctx.traceId, ctx.spanId))
@@ -108,7 +103,7 @@ object KafkaConsumerTracer {
     def run(span: ZSpan): ZIO[R, Nothing, A] = {
       val addLink = producerLink.fold(ZIO.unit)(span.addLink)
       addLink *> span.putAll(attributes) *>
-        ZIO.logAnnotate(logAnnotationsFromAttributes(attributes))(
+        ZIO.logAnnotate(kafkaLogAnnotations(attributes))(
           body(span)
         )
     }
