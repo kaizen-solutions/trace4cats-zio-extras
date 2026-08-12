@@ -16,7 +16,8 @@ import zio.stream.ZStream
  */
 final class ZTracer private (
   private[extras] val current: FiberRef[ZSpan],
-  private[extras] val entryPoint: ZEntryPoint
+  private[extras] val entryPoint: ZEntryPoint,
+  private[extras] val logContextExtractor: LogContextExtractor
 ) { self =>
   def context: UIO[SpanContext] =
     current.get.map(_.context)
@@ -56,7 +57,11 @@ final class ZTracer private (
   )(fn: ZSpan => ZIO[R, E, A]): ZIO[R, E, A] =
     ZIO.scoped[R](
       fromHeadersScoped(headers, name, kind, errorHandler)
-        .flatMap(child => current.locally(child)(fn(child)))
+        .flatMap(child =>
+          current.locally(child)(
+            logContextExtractor.enrichLogs(child.context)(fn(child))
+          )
+        )
     )
 
   /**
@@ -96,7 +101,7 @@ final class ZTracer private (
   )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R, E, A] =
     ZIO.scoped[R] {
       spanScopedManual(s"${fileName.value}:${line.value}", kind)
-        .flatMap(span => current.locally(span)(zio))
+        .flatMap(span => current.locally(span)(logContextExtractor.enrichLogs(span.context)(zio)))
     }
 
   def span[R, E, A](
@@ -105,7 +110,9 @@ final class ZTracer private (
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(zio: ZIO[R, E, A]): ZIO[R, E, A] =
     ZIO.scoped[R] {
-      spanScopedManual(name, kind, errorHandler).flatMap(span => current.locally(span)(zio))
+      spanScopedManual(name, kind, errorHandler).flatMap(span =>
+        current.locally(span)(logContextExtractor.enrichLogs(span.context)(zio))
+      )
     }
 
   /**
@@ -197,8 +204,7 @@ final class ZTracer private (
     extractHeaders: O => TraceHeaders,
     extractName: O => String,
     kind: SpanKind = SpanKind.Internal,
-    errorHandler: ErrorHandler = ErrorHandler.empty,
-    enrichLogs: Boolean = true
+    errorHandler: ErrorHandler = ErrorHandler.empty
   )(stream: ZStream[R, E, O]): ZStream[R, E, Spanned[O]] =
     stream.mapChunksZIO(
       _.mapZIO(o =>
@@ -209,7 +215,7 @@ final class ZTracer private (
           errorHandler = errorHandler
         )(span =>
           // extract the child's span header so that all stream transformations are traced under the element
-          Exit.succeed(Spanned(span.extractHeaders(ToHeaders.all), o, enrichLogs))
+          Exit.succeed(Spanned(span.extractHeaders(ToHeaders.all), o))
         )
       )
     )
@@ -293,12 +299,14 @@ final class ZTracer private (
     errorHandler: ErrorHandler = ErrorHandler.empty
   )(fn: ZSpan => ZIO[R, E, A]): ZIO[R, E, A] =
     ZIO.scoped[R] {
-      spanScopedManual(name, kind, errorHandler).flatMap(span => current.locally(span)(fn(span)))
+      spanScopedManual(name, kind, errorHandler).flatMap(span =>
+        current.locally(span)(logContextExtractor.enrichLogs(span.context)(fn(span)))
+      )
     }
 }
 object ZTracer {
-  def make(current: FiberRef[ZSpan], entryPoint: ZEntryPoint): ZTracer =
-    new ZTracer(current, entryPoint)
+  def make(current: FiberRef[ZSpan], entryPoint: ZEntryPoint, logContextExtractor: LogContextExtractor): ZTracer =
+    new ZTracer(current, entryPoint, logContextExtractor)
 
   def span[R, E, A](
     name: String,
@@ -310,11 +318,10 @@ object ZTracer {
   def traceEachElement[R, E, O](
     extractName: O => String,
     kind: SpanKind = SpanKind.Internal,
-    errorHandler: ErrorHandler = ErrorHandler.empty,
-    enrichLogs: Boolean = true
+    errorHandler: ErrorHandler = ErrorHandler.empty
   )(stream: ZStream[R, E, O])(extractHeaders: O => TraceHeaders): ZStream[R & ZTracer, E, Spanned[O]] =
     ZStream.serviceWithStream[ZTracer](
-      _.traceEachElement(extractHeaders, extractName, kind, errorHandler, enrichLogs)(stream)
+      _.traceEachElement(extractHeaders, extractName, kind, errorHandler)(stream)
     )
 
   def traceEntireStream[R, E, O](
@@ -365,17 +372,19 @@ object ZTracer {
   )(zio: ZIO[R, E, A])(implicit fileName: sourcecode.FileName, line: sourcecode.Line): ZIO[R & ZTracer, E, A] =
     ZIO.serviceWithZIO[ZTracer](_.spanSource(kind)(zio)(fileName, line))
 
-  val layer: URLayer[ZEntryPoint, ZTracer] =
+  def layerWith(logContextExtractor: LogContextExtractor = LogContextExtractor.default): URLayer[ZEntryPoint, ZTracer] =
     ZLayer.scoped(
       for {
         ep      <- ZIO.service[ZEntryPoint]
         spanRef <- FiberRef.make[ZSpan](initial = ZSpan.noop)
-        tracer   = ZTracer.make(spanRef, ep)
+        tracer   = ZTracer.make(spanRef, ep, logContextExtractor)
       } yield tracer
     )
 
+  val layer: URLayer[ZEntryPoint, ZTracer] = layerWith()
+
   val noop: ZIO[Scope, Nothing, ZTracer] =
-    FiberRef.make[ZSpan](initial = ZSpan.noop).map(ref => ZTracer.make(ref, ZEntryPoint.noop))
+    FiberRef.make[ZSpan](initial = ZSpan.noop).map(ref => ZTracer.make(ref, ZEntryPoint.noop, LogContextExtractor.none))
 
   val noopLayer: ULayer[ZTracer] =
     ZLayer.scoped(noop)

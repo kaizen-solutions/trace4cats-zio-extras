@@ -11,6 +11,7 @@ import trace4cats.{ToHeaders, TraceProcess}
 import zio.interop.catz.*
 import zio.test.*
 import zio.{Cause, Scope, Task, ZIO}
+import cats.syntax.show.*
 
 object TraceInterceptorSpec extends ZIOSpecDefault {
 
@@ -61,7 +62,14 @@ object TraceInterceptorSpec extends ZIOSpecDefault {
         spans.flatMap(_.attributes.get("http.response.status_code")).exists(_.value.value == 200),
         logs.exists(e =>
           e.message().startsWith("Request: GET /hello/cal/greeting") &&
-            e.annotations.contains("traceparent")
+            e.annotations
+              .get("trace_id")
+              .zip(e.annotations.get("span_id"))
+              .zip(spans.find(_.name == "GET /hello/{name}/greeting"))
+              .exists { case ((traceId, spanId), span) =>
+                span.context.traceId.show == traceId &&
+                span.context.spanId.show == spanId
+              }
         )
       )
     },
@@ -91,7 +99,14 @@ object TraceInterceptorSpec extends ZIOSpecDefault {
         spans.flatMap(_.attributes.get("http.response.status_code")).exists(_.value.value == 400),
         logs.exists(e =>
           e.message().startsWith("Request: GET /hello/cal/greeting") &&
-            e.annotations.contains("traceparent")
+            e.annotations
+              .get("trace_id")
+              .zip(e.annotations.get("span_id"))
+              .zip(spans.find(_.name == "GET /hello/{name}/greeting"))
+              .exists { case ((traceId, spanId), span) =>
+                span.context.traceId.show == traceId &&
+                span.context.spanId.show == spanId
+              }
         )
       )
     },
@@ -121,7 +136,14 @@ object TraceInterceptorSpec extends ZIOSpecDefault {
         spans.flatMap(_.attributes.get("http.response.status_code")).exists(_.value.value == 401),
         logs.exists(e =>
           e.message().startsWith("Request: GET /hello/cal/greeting") &&
-            e.annotations.contains("traceparent")
+            e.annotations
+              .get("trace_id")
+              .zip(e.annotations.get("span_id"))
+              .zip(spans.find(_.name == "GET /hello/{name}/greeting"))
+              .exists { case ((traceId, spanId), span) =>
+                span.context.traceId.show == traceId &&
+                span.context.spanId.show == spanId
+              }
         )
       )
     }

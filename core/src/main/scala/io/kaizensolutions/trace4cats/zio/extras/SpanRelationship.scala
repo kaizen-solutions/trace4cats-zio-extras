@@ -4,8 +4,8 @@ package io.kaizensolutions.trace4cats.zio.extras
  * Controls how a consumer span relates to the producer span whose context was
  * propagated via message headers.
  *
- * In both modes, a `trace4cats.model.Link` to the producer span is always
- * added to the consumer span.
+ * In both modes, a `trace4cats.model.Link` to the producer span is always added
+ * to the consumer span.
  *
  *   - `SpanRelationship.ParentChild`: The consumer span is created as a child
  *     of the producer's trace context (same trace ID). This ensures tail-based

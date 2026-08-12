@@ -9,7 +9,7 @@ import sttp.monad.MonadError
 import trace4cats.ToHeaders
 import trace4cats.model.*
 import trace4cats.model.AttributeValue.{LongValue, StringValue}
-import zio.{Task, ZIOAspect}
+import zio.Task
 
 // Lifted from io.janstenpickle.trace4cats.sttp.client4 to remain semantically the same
 object BackendTracer {
@@ -19,8 +19,7 @@ object BackendTracer {
     toHeaders: ToHeaders = ToHeaders.standard,
     spanNamer: GenericRequest[?, Effect[Task]] => String = methodWithPathSpanNamer,
     dropHeadersWhen: String => Boolean = HeaderNames.isSensitive,
-    extractResponseAttributes: Response[?] => Map[String, AttributeValue] = _ => Map.empty,
-    enrichLogs: Boolean = true
+    extractResponseAttributes: Response[?] => Map[String, AttributeValue] = _ => Map.empty
   ): Backend[Task] = new Backend[Task] {
     override def send[T](request: GenericRequest[T, Any with Effect[Task]]): Task[Response[T]] = {
       val nameOfRequest = spanNamer(request)
@@ -41,10 +40,6 @@ object BackendTracer {
         val reqExtraAttrs: Map[String, AttributeValue] =
           if (isSampled) toAttributes(request)
           else Map.empty
-
-        val logTraceContext =
-          if (enrichLogs) ZIOAspect.annotated(traceHeaders.values.map { case (k, v) => k.toString -> v }.toSeq*)
-          else ZIOAspect.identity
 
         val tracedRequest =
           for {
@@ -73,7 +68,7 @@ object BackendTracer {
                 "error.cause"         -> AttributeValue.StringValue(cause.prettyPrint)
               )
               .when(cause.isDie && isSampled)
-          ) @@ logTraceContext
+          )
       }
     }
 

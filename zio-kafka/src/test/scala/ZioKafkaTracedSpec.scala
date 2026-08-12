@@ -174,7 +174,7 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
         val topic = UUID.randomUUID().toString
         for {
           tracer   <- ZIO.service[ZTracer]
-          p        <- Promise.make[Nothing, Unit]
+          p        <- Promise.make[Nothing, Map[String, String]]
           consumer <- ZIO.service[Consumer]
           producer <- ZIO.service[Producer]
           fiber <-
@@ -186,12 +186,12 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
                 Serde.string,
                 Serde.string,
                 spanRelationship = SpanRelationship.ParentChild
-              )(_ => p.succeed(()).unit)
+              )(_ => p.complete(ZIO.logAnnotations).unit)
               .forkScoped
-          _     <- producer.produce(topic, "key", "value", Serde.string, Serde.string)
-          _     <- p.await
-          _     <- fiber.interrupt
-          spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
+          _           <- producer.produce(topic, "key", "value", Serde.string, Serde.string)
+          annotations <- p.await
+          _           <- fiber.interrupt
+          spans       <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
         } yield assertTrue(
           // Consumer span shares the same trace ID as producer span
           spans.exists(consumerSpan =>
@@ -199,7 +199,9 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
               spans.exists(producerSpan =>
                 producerSpan.kind == SpanKind.Producer &&
                   consumerSpan.context.traceId.show == producerSpan.context.traceId.show
-              )
+              ) &&
+              annotations.get("trace_id").contains(consumerSpan.context.traceId.show) &&
+              annotations.get("span_id").contains(consumerSpan.context.spanId.show)
           ),
           // Link is still added
           spans.exists(consumerSpan =>

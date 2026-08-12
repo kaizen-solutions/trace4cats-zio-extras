@@ -67,14 +67,4 @@ package object extras {
     def endTracingEachElement: ZStream[R, E, A] =
       s.mapChunks(_.map(s => s.value))
   }
-
-  def toAnnotations(headers: TraceHeaders): List[(String, String)] =
-    headers.values.collect { case (k, v) => k.toString -> v }.toList
-
-  type Aspect0 = ZIOAspect[Nothing, Any, Nothing, Any, Nothing, Any]
-
-  def logAnnotateWithHeaders(traceHeaders: TraceHeaders, enrich: Boolean): Aspect0 =
-    if (enrich)
-      ZIOAspect.annotated(toAnnotations(traceHeaders)*)
-    else ZIOAspect.identity
 }

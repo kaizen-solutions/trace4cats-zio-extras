@@ -9,7 +9,7 @@ import sttp.monad.MonadError
 import trace4cats.ToHeaders
 import trace4cats.model.*
 import trace4cats.model.AttributeValue.{LongValue, StringValue}
-import zio.{Task, ZIOAspect}
+import zio.Task
 
 // Lifted from io.janstenpickle.trace4cats.sttp.client3 to remain semantically the same
 object SttpBackendTracer {
@@ -19,8 +19,7 @@ object SttpBackendTracer {
     toHeaders: ToHeaders = ToHeaders.standard,
     spanNamer: Request[?, ?] => String = methodWithPathSpanNamer,
     dropHeadersWhen: String => Boolean = HeaderNames.isSensitive,
-    extractResponseAttributes: Response[?] => Map[String, AttributeValue] = _ => Map.empty,
-    enrichLogs: Boolean = true
+    extractResponseAttributes: Response[?] => Map[String, AttributeValue] = _ => Map.empty
   ): SttpBackend[Task, Capabilities] = new SttpBackend[Task, Capabilities] {
     override def send[T, R >: Capabilities & Effect[Task]](request: Request[T, R]): Task[Response[T]] = {
       val nameOfRequest = spanNamer(request)
@@ -39,10 +38,6 @@ object SttpBackendTracer {
         val reqExtraAttrs: Map[String, AttributeValue] =
           if (isSampled) toAttributes(request)
           else Map.empty
-
-        val logTraceContext =
-          if (enrichLogs) ZIOAspect.annotated(traceHeaders.values.map { case (k, v) => k.toString -> v }.toSeq*)
-          else ZIOAspect.identity
 
         val tracedRequest =
           for {
@@ -71,7 +66,7 @@ object SttpBackendTracer {
                 "error.cause"         -> AttributeValue.StringValue(cause.prettyPrint)
               )
               .when(cause.isDie && isSampled)
-          ) @@ logTraceContext
+          )
       }
     }
 
@@ -80,10 +75,10 @@ object SttpBackendTracer {
     override def responseMonad: MonadError[Task] = new RIOMonadAsyncError[Any]
   }
 
-  def methodWithPathSpanNamer(req: Request[?, ?]): String =
+  private def methodWithPathSpanNamer(req: Request[?, ?]): String =
     s"${req.method.method} ${req.uri.pathSegments.toString}"
 
-  def convertTraceHeaders(in: TraceHeaders): Headers =
+  private def convertTraceHeaders(in: TraceHeaders): Headers =
     Headers(in.values.map { case (k, v) => Header(k.toString, v) }.toList)
 
   private def toSpanStatus(body: String, statusCode: StatusCode): SpanStatus = (body, statusCode) match {

@@ -89,15 +89,17 @@ object Fs2KafkaTracedSpec extends ZIOSpecDefault {
             tracer   <- ZIO.service[ZTracer]
             producer <- ZIO.service[Producer]
             consumer <- ZIO.service[Consumer]
-            p        <- Promise.make[Nothing, Unit]
+            p        <- Promise.make[Nothing, Map[String, String]]
             _        <- consumer.subscribeTo(topic)
             _ <- consumer
-                   .consumeChunkTraced(tracer, spanRelationship = SpanRelationship.ParentChild)(_ => p.succeed(()).unit)
+                   .consumeChunkTraced(tracer, spanRelationship = SpanRelationship.ParentChild)(_ =>
+                     p.complete(ZIO.logAnnotations).unit
+                   )
                    .forkScoped
 
-            _     <- producer.produceOne(topic, "key", "value")
-            _     <- p.await
-            spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.awaitCollected(_.exists(_.name == s"process $topic")))
+            _           <- producer.produceOne(topic, "key", "value")
+            annotations <- p.await
+            spans       <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.awaitCollected(_.exists(_.name == s"process $topic")))
           } yield assertTrue(
             // Consumer span shares the same trace ID as producer span (parent-child)
             spans.exists(consumerSpan =>
@@ -106,7 +108,9 @@ object Fs2KafkaTracedSpec extends ZIOSpecDefault {
                 spans.exists(producerSpan =>
                   producerSpan.kind == SpanKind.Producer &&
                     consumerSpan.context.traceId.show == producerSpan.context.traceId.show
-                )
+                ) &&
+                annotations.get("trace_id").contains(consumerSpan.context.traceId.show) &&
+                annotations.get("span_id").contains(consumerSpan.context.spanId.show)
             ),
             // Link is still added
             spans.exists(consumerSpan =>
