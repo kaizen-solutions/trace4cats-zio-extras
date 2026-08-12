@@ -1,0 +1,2 @@
+alias fmt = scalafmtAll; scalafmtSbt
+alias lint = scalafmtCheckAll; scalafmtSbtCheck; doc; mdoc

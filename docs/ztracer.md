@@ -70,3 +70,33 @@ Running the stream above, we'd expect to see something along the lines of:
 ![Jaegar span](https://github.com/kaizen-solutions/trace4cats-zio-extras/assets/14280155/59ae4606-2728-4be2-b76c-367ecaff175c)
 
 Have a look at the [example](https://github.com/kaizen-solutions/trace4cats-zio-extras/blob/main/core-examples/src/main/scala/io/kaizensolutions/trace4cats/zio/core/examples/ExampleApp.scala) if you want to learn more.
+
+## Log Context Enrichment
+
+ZTracer automatically enriches the ZIO log context with trace information via `LogContextExtractor`. This means 
+any `ZIO.log*` calls within a traced span will include trace/span IDs in the log output without any additional 
+configuration.
+
+By default, `ZTracer.layer` uses `LogContextExtractor.default` which adds OpenTelemetry-compatible `trace_id` and 
+`span_id` annotations to the log context. You can customize this behavior when constructing the tracer layer:
+
+```scala mdoc:compile-only
+import io.kaizensolutions.trace4cats.zio.extras.{LogContextExtractor, ZTracer, ZEntryPoint}
+import cats.Show
+import trace4cats.model.{SpanContext, SpanId, TraceId}
+import zio.*
+
+// Use the default (OTel-compatible trace_id and span_id)
+val defaultLayer: URLayer[ZEntryPoint, ZTracer] = ZTracer.layer
+
+// Customize the log annotations
+val customLayer: URLayer[ZEntryPoint, ZTracer] = ZTracer.layerWith(
+  logContextExtractor = (spanContext: SpanContext) => Set(
+    LogAnnotation("myTraceId", Show[TraceId].show(spanContext.traceId)),
+    LogAnnotation("mySpanId", Show[SpanId].show(spanContext.spanId))
+  )
+)
+
+// Disable log enrichment entirely
+val noEnrichmentLayer: URLayer[ZEntryPoint, ZTracer] = ZTracer.layerWith(LogContextExtractor.none)
+```

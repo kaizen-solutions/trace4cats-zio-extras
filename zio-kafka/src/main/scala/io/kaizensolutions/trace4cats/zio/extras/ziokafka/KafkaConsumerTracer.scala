@@ -1,14 +1,14 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziokafka
 
 import io.kaizensolutions.trace4cats.zio.extras.*
+import izumi.reflect.Tag
+import org.apache.kafka.clients.consumer.ConsumerRecord as KafkaConsumerRecord
 import trace4cats.model.AttributeValue
 import trace4cats.{SpanKind, ToHeaders}
+import zio.*
 import zio.kafka.consumer.*
-import org.apache.kafka.clients.consumer.ConsumerRecord as KafkaConsumerRecord
 import zio.kafka.serde.Deserializer
 import zio.stream.ZStream
-import izumi.reflect.Tag
-import zio.*
 
 object KafkaConsumerTracer {
   type SpanNamer[K, V] = CommittableRecord[K, V] => String
@@ -16,11 +16,28 @@ object KafkaConsumerTracer {
     def default[K, V]: SpanNamer[K, V] = record => s"process ${record.record.topic}"
   }
 
+  /**
+   * Wraps a ZIO Kafka consumer stream with tracing. Each record is consumed
+   * within a span whose context is derived from the record's headers (if
+   * present). The resulting stream emits [[Spanned]] records so that downstream
+   * operators can continue the trace.
+   *
+   * Commits are also traced under a child span of the consumer span.
+   *
+   * @param tracer
+   *   the ZTracer instance
+   * @param stream
+   *   the source stream of committable records
+   * @param spanNameForElement
+   *   derives the span name from each record (default: "process {topic}")
+   * @param spanRelationship
+   *   controls whether the consumer span is a child of the producer span
+   *   (ParentChild) or starts a new trace with a link (Link)
+   */
   def traceConsumerStream[R, K, V](
     tracer: ZTracer,
     stream: ZStream[R, Throwable, CommittableRecord[K, V]],
     spanNameForElement: SpanNamer[K, V] = SpanNamer.default[K, V],
-    enrichLogs: Boolean = true,
     spanRelationship: SpanRelationship = SpanRelationship.ParentChild
   ): ZStream[R, Throwable, Spanned[CommittableRecord[K, V]]] =
     stream.mapChunksZIO(_.mapZIO { comm =>
@@ -31,7 +48,8 @@ object KafkaConsumerTracer {
 
       val attributes = coreAttributes(topic, record.partition, comm.offset.offset, Option(record.key).map(_.toString))
 
-      withConsumerSpan(tracer, traceHeaders, spanName, spanRelationship, attributes) { span =>
+      // Because there are no logs inside the consumer span, there is no meaning to kafka log annotations here
+      withConsumerSpan(tracer, traceHeaders, spanName, spanRelationship, attributes, KafkaLogAnnotations.none) { span =>
         val enrichedComm = comm.copy(
           commitHandle = _ =>
             tracer.fromHeaders(
@@ -42,10 +60,37 @@ object KafkaConsumerTracer {
               commitSpan.putAll(attributes) *> comm.offset.commit
             }
         )
-        ZIO.succeed(Spanned(span.extractHeaders(ToHeaders.all), enrichedComm, enrichLogs))
+        ZIO.succeed(Spanned(span.extractHeaders(ToHeaders.all), enrichedComm))
       }
     })
 
+  /**
+   * Consumes records from a Kafka subscription with automatic tracing and
+   * offset commits. Each record is processed within a traced span. This is a
+   * convenience method that combines consumption, tracing, and committing in
+   * one call using ZIO Kafka's `consumeWith` under the hood.
+   *
+   * @param tracer
+   *   the ZTracer instance
+   * @param consumer
+   *   the ZIO Kafka consumer
+   * @param subscription
+   *   the topic subscription
+   * @param keyDeserializer
+   *   deserializer for record keys
+   * @param valueDeserializer
+   *   deserializer for record values
+   * @param commitRetryPolicy
+   *   retry policy for offset commits
+   * @param kafkaLogAnnotations
+   *   controls which span attributes are surfaced as ZIO log annotations
+   *   (default: topic, partition, offset, key)
+   * @param spanRelationship
+   *   controls whether the consumer span is a child of the producer span
+   *   (ParentChild) or starts a new trace with a link (Link)
+   * @param f
+   *   the processing function for each record
+   */
   def tracedConsumeWith[R: Tag, R1: Tag, K, V](
     tracer: ZTracer,
     consumer: Consumer,
@@ -53,7 +98,7 @@ object KafkaConsumerTracer {
     keyDeserializer: Deserializer[R, K],
     valueDeserializer: Deserializer[R, V],
     commitRetryPolicy: Schedule[Any, Any, Any] = Schedule.exponential(1.second) && Schedule.recurs(3),
-    enrichLogs: Boolean = true,
+    kafkaLogAnnotations: KafkaLogAnnotations = KafkaLogAnnotations.default,
     spanRelationship: SpanRelationship = SpanRelationship.ParentChild
   )(f: KafkaConsumerRecord[K, V] => URIO[R1, Unit]): RIO[R & R1, Unit] =
     consumer.consumeWith[R, R1, K, V](subscription, keyDeserializer, valueDeserializer, commitRetryPolicy) {
@@ -67,12 +112,8 @@ object KafkaConsumerTracer {
           Option(consumerRecord.key).map(_.toString)
         )
 
-        val logAspect =
-          if (enrichLogs) ZIOAspect.annotated(attributes.map { case (k, v) => (k, v.toString) }.toSeq*)
-          else ZIOAspect.identity
-
-        withConsumerSpan(tracer, traceHeaders, spanName, spanRelationship, attributes) { _ =>
-          f(consumerRecord) @@ logAspect
+        withConsumerSpan(tracer, traceHeaders, spanName, spanRelationship, attributes, kafkaLogAnnotations) { _ =>
+          f(consumerRecord)
         }
     }
 
@@ -98,14 +139,18 @@ object KafkaConsumerTracer {
     traceHeaders: trace4cats.model.TraceHeaders,
     spanName: String,
     spanRelationship: SpanRelationship,
-    attributes: Map[String, AttributeValue]
+    attributes: Map[String, AttributeValue],
+    kafkaLogAnnotations: KafkaLogAnnotations
   )(body: ZSpan => ZIO[R, Nothing, A]): ZIO[R, Nothing, A] = {
     val producerLink =
       ToHeaders.standard.toContext(traceHeaders).map(ctx => trace4cats.model.Link(ctx.traceId, ctx.spanId))
 
     def run(span: ZSpan): ZIO[R, Nothing, A] = {
       val addLink = producerLink.fold(ZIO.unit)(span.addLink)
-      addLink *> span.putAll(attributes) *> body(span)
+      addLink *> span.putAll(attributes) *>
+        ZIO.logAnnotate(kafkaLogAnnotations(attributes))(
+          body(span)
+        )
     }
 
     spanRelationship match {

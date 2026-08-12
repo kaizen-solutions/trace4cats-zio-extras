@@ -20,17 +20,11 @@ object ZioHttpServerTracer {
    *   you have path parameters
    * @param errorHandler
    *   is used to handle errors
-   * @param enrichLogs
-   *   whether to enrich logs with trace information
-   * @param logHeaders
-   *   which headers to log
    * @return
    */
   def trace(
     dropHeadersWhen: String => Boolean = SensitiveHeaders.contains,
-    errorHandler: ErrorHandler = ErrorHandler.empty,
-    enrichLogs: Boolean = false,
-    logHeaders: ToHeaders = ToHeaders.standard
+    errorHandler: ErrorHandler = ErrorHandler.empty
   ): Middleware[ZTracer] = new Middleware[ZTracer] {
     override def apply[Env <: ZTracer, Err](routes: Routes[Env, Err]): Routes[Env, Err] =
       Routes.fromIterable(
@@ -43,16 +37,12 @@ object ZioHttpServerTracer {
 
                 ZIO.serviceWithZIO[ZTracer](
                   _.fromHeaders(traceHeaders, nameOfSpan, SpanKind.Server, errorHandler) { span =>
-                    val logTraceContext =
-                      if (enrichLogs) ZIOAspect.annotated(annotations = extractKVHeaders(span, logHeaders).toList*)
-                      else ZIOAspect.identity
-
                     enrichSpanFromRequest(request, dropHeadersWhen, span) *>
                       span
                         .put(OtelSemconv.HttpRoute, AttributeValue.StringValue(route.routePattern.pathCodec.render))
                         .when(span.isSampled) *>
                       // NOTE: We need to call handler.runZIO and have the code executed within our span for propagation to take place
-                      (h.runZIO(request) @@ logTraceContext).onExit {
+                      h.runZIO(request).onExit {
                         case Exit.Success(response) => enrichSpanFromResponse(response, dropHeadersWhen, span)
                         case Exit.Failure(cause)    => span.setStatus(SpanStatus.Internal(cause.prettyPrint))
                       }
@@ -99,12 +89,6 @@ object ZioHttpServerTracer {
         .values
         .collect { case (k, v) if v.nonEmpty => Header.Custom(k.toString, v) }
     )
-
-  private def extractKVHeaders(span: ZSpan, whichHeaders: ToHeaders): Map[String, String] =
-    span
-      .extractHeaders(whichHeaders)
-      .values
-      .collect { case (k, v) if v.nonEmpty => (k.toString, v) }
 
   private def enrichSpanFromRequest(request: Request, dropHeadersWhen: String => Boolean, span: ZSpan): UIO[Unit] = {
     val reqFields = requestFields(request, dropHeadersWhen)

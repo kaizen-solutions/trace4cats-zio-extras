@@ -74,7 +74,7 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
         val topic = UUID.randomUUID().toString
         for {
           tracer   <- ZIO.service[ZTracer]
-          p        <- Promise.make[Nothing, Unit]
+          p        <- Promise.make[Nothing, Map[String, String]]
           consumer <- ZIO.service[Consumer]
           producer <- ZIO.service[Producer]
           _ <- KafkaConsumerTracer
@@ -83,15 +83,17 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
                    consumer.plainStream(Subscription.topics(topic), Serde.string, Serde.string),
                    spanRelationship = SpanRelationship.ParentChild
                  )
+                 .tapWithTracer(tracer, "internal") { _ =>
+                   p.complete(ZIO.logAnnotations)
+                 }
                  .endTracingEachElement
                  .tap(_.offset.commit)
-                 .tap(_ => p.succeed(()))
                  .runDrain
                  .forkScoped
 
-          _     <- producer.produce(topic, "key", "value", Serde.string, Serde.string)
-          _     <- p.await
-          spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.awaitCollected(_.exists(_.name == s"commit $topic")))
+          _           <- producer.produce(topic, "key", "value", Serde.string, Serde.string)
+          annotations <- p.await
+          spans       <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.awaitCollected(_.exists(_.name == s"commit $topic")))
         } yield assertTrue(
           // Consumer span shares the same trace ID as producer span (parent-child)
           spans.exists(consumerSpan =>
@@ -99,8 +101,18 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
               spans.exists(producerSpan =>
                 producerSpan.kind == SpanKind.Producer &&
                   consumerSpan.context.traceId.show == producerSpan.context.traceId.show
-              )
+              ) &&
+              consumerSpan.attributes.contains(OtelSemconv.MessagingKafkaOffset)
           ),
+          spans
+            .find(_.name == "internal")
+            .zip(annotations.get("trace_id"))
+            .zip(annotations.get("span_id"))
+            .exists { case ((span, traceId), spanId) =>
+              span.context.spanId.show == spanId &&
+              span.context.traceId.show == traceId
+            },
+
           // Link is still added
           spans.exists(consumerSpan =>
             consumerSpan.name == s"process $topic" &&
@@ -174,7 +186,7 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
         val topic = UUID.randomUUID().toString
         for {
           tracer   <- ZIO.service[ZTracer]
-          p        <- Promise.make[Nothing, Unit]
+          p        <- Promise.make[Nothing, Map[String, String]]
           consumer <- ZIO.service[Consumer]
           producer <- ZIO.service[Producer]
           fiber <-
@@ -186,12 +198,12 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
                 Serde.string,
                 Serde.string,
                 spanRelationship = SpanRelationship.ParentChild
-              )(_ => p.succeed(()).unit)
+              )(_ => p.complete(ZIO.logAnnotations).unit)
               .forkScoped
-          _     <- producer.produce(topic, "key", "value", Serde.string, Serde.string)
-          _     <- p.await
-          _     <- fiber.interrupt
-          spans <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
+          _           <- producer.produce(topic, "key", "value", Serde.string, Serde.string)
+          annotations <- p.await
+          _           <- fiber.interrupt
+          spans       <- ZIO.serviceWithZIO[InMemorySpanCompleter](_.retrieveCollected)
         } yield assertTrue(
           // Consumer span shares the same trace ID as producer span
           spans.exists(consumerSpan =>
@@ -199,7 +211,9 @@ object ZioKafkaTracedSpec extends ZIOSpecDefault {
               spans.exists(producerSpan =>
                 producerSpan.kind == SpanKind.Producer &&
                   consumerSpan.context.traceId.show == producerSpan.context.traceId.show
-              )
+              ) &&
+              annotations.get("trace_id").contains(consumerSpan.context.traceId.show) &&
+              annotations.get("span_id").contains(consumerSpan.context.spanId.show)
           ),
           // Link is still added
           spans.exists(consumerSpan =>

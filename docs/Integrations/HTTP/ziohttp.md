@@ -39,20 +39,22 @@ val http =
 val app: Routes[ZTracer, Nothing] =
   http.handleError(error => Response.text(error.getMessage).status(Status.InternalServerError))
 
-val tracedApp: Routes[ZTracer, Nothing] = app @@ trace(enrichLogs = true) // the tracing middleware
+val tracedApp: Routes[ZTracer, Nothing] = app @@ trace() // the tracing middleware
 ```
 
-Notice how `enrichLogs` is set to true, this will start augmenting the log context with trace header information. You 
-can also customize the trace headers and change the name of the span in order to reduce cardinality. 
+Log context enrichment (augmenting the log context with trace header information) is now configured at the `ZTracer` 
+level via `LogContextExtractor`. You can also customize the trace headers and change the name of the span in order to 
+reduce cardinality. 
 
 Here is an example of a trace when you hit the `/plaintext` endpoint:
 <img width="1114" alt="image" src="https://github.com/kaizen-solutions/trace4cats-zio-extras/assets/14280155/3ea7da5f-5ceb-43d5-a2d5-c51c88d776c9"></img>
 
-Accompanying this trace is the following log:
+Accompanying this trace is the following log (using `LogContextExtractor.default`, which adds OTel-compatible `trace_id` 
+and `span_id` annotations):
 ```
-10:39:57.712 [KQueueEventLoopGroup-2-2] [b3=5e66b278533ccb68db1610c56b464b31-3fd736b93350db66-1, X-B3-Sampled=1, X-B3-TraceId=5e66b278533ccb68db1610c56b464b31, X-B3-SpanId=3fd736b93350db66, traceparent=00-5e66b278533ccb68db1610c56b464b31-3fd736b93350db66-01] INFO  i.k.t.z.e.z.e.E.http - HELLO
+10:39:57.712 [KQueueEventLoopGroup-2-2] [trace_id=5e66b278533ccb68db1610c56b464b31, span_id=3fd736b93350db66] INFO  i.k.t.z.e.z.e.E.http - HELLO
 ```
-Notice how the log is enriched with the trace headers.
+Notice how the log is enriched with the trace context.
 
 ## Client
 We provide a traced client that calls out the zio-http client. It will automatically propagate the trace headers when making

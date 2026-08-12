@@ -37,7 +37,7 @@ object ExampleServerApp extends ZIOAppDefault {
 
   override val run: ZIO[ZIOAppArgs & Scope, Any, Any] =
     Server
-      .serve(app @@ trace(enrichLogs = true))
+      .serve(app @@ trace())
       .provide(
         Server.default,
         JaegerEntrypoint.live,

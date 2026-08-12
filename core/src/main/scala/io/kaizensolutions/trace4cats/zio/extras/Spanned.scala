@@ -10,12 +10,10 @@ import zio.ZIO
  *   is the span that is attached to the element.
  * @param value
  *   is the element that is being traced.
- * @param enrichLogs
- *   whether to enrich the logs with the span context
  * @tparam A
  *   is the element type that is being traced.
  */
-final case class Spanned[+A](headers: TraceHeaders, value: A, enrichLogs: Boolean = true) {
+final case class Spanned[+A](headers: TraceHeaders, value: A) {
   def map[B](f: A => B): Spanned[B] =
     copy(value = f(value))
 
@@ -23,21 +21,15 @@ final case class Spanned[+A](headers: TraceHeaders, value: A, enrichLogs: Boolea
     copy(value = b)
 
   def mapZIO[R, E, B](f: A => ZIO[R, E, B]): ZIO[R, E, Spanned[B]] =
-    f(value).map(b => copy(value = b)) @@ logAnnotateWithHeaders(headers, enrichLogs)
+    f(value).map(b => copy(value = b))
 
   def mapZIOTraced[R, E, B](name: String, kind: SpanKind = SpanKind.Internal)(
     f: A => ZIO[R, E, B]
   ): ZIO[R & ZTracer, E, Spanned[B]] =
-    ZTracer.fromHeaders(headers, name, kind)(_ => f(value).map(b => copy(value = b))) @@ logAnnotateWithHeaders(
-      headers,
-      enrichLogs
-    )
+    ZTracer.fromHeaders(headers, name, kind)(_ => f(value).map(b => copy(value = b)))
 
   def mapZIOWithTracer[R, E, B](tracer: ZTracer, name: String, kind: SpanKind = SpanKind.Internal)(
     f: A => ZIO[R, E, B]
   ): ZIO[R, E, Spanned[B]] =
-    tracer.fromHeaders(headers, name, kind)(_ => f(value).map(b => copy(value = b))) @@ logAnnotateWithHeaders(
-      headers,
-      enrichLogs
-    )
+    tracer.fromHeaders(headers, name, kind)(_ => f(value).map(b => copy(value = b)))
 }

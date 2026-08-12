@@ -51,7 +51,7 @@ object InMemorySpanCompleter {
     val zep = new ZEntryPoint(in)
     FiberRef
       .make(ZSpan.noop)
-      .map(ZTracer.make(_, zep))
+      .map(ZTracer.make(_, zep, LogContextExtractor.default))
   }
 
   def layer(serviceName: String) =

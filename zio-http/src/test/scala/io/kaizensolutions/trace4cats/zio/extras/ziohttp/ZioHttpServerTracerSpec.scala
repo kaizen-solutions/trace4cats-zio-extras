@@ -1,5 +1,6 @@
 package io.kaizensolutions.trace4cats.zio.extras.ziohttp
 
+import cats.syntax.show.*
 import io.kaizensolutions.trace4cats.zio.extras.ziohttp.server.ZioHttpServerTracer
 import io.kaizensolutions.trace4cats.zio.extras.{InMemorySpanCompleter, OtelSemconv, ZTracer}
 import trace4cats.model.CompletedSpan
@@ -14,14 +15,15 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
     Routes(
       Method.GET / "plaintext" -> handler(
         ZTracer.withSpan("plaintext-fetch") { _ =>
-          Random
-            .nextIntBetween(1, 3)
-            .map(sleep =>
-              Response
-                .text(sleep.toString)
-                .updateHeaders(_.addHeader(customHeaderName, sleep.toString))
-                .status(Status.Ok)
-            )
+          ZIO.log("server") *>
+            Random
+              .nextIntBetween(1, 3)
+              .map(sleep =>
+                Response
+                  .text(sleep.toString)
+                  .updateHeaders(_.addHeader(customHeaderName, sleep.toString))
+                  .status(Status.Ok)
+              )
         }
       ),
       Method.GET / "user" / string("userId") -> handler((userId: String, _: Request) =>
@@ -50,11 +52,16 @@ object ZioHttpServerTracerSpec extends ZIOSpecDefault {
             spanIdOfHttp         = httpSpan.context.spanId
             // This is done because assertTrue gets confused response.status and response.status(...)
             responseStatus = response.status
+            logs          <- ZTestLogger.logOutput
           } yield assertTrue(
             responseStatus == Status.Ok,
             spans.length == 2,
             httpSpan.attributes.contains(s"http.response.header.${customHeaderName.toLowerCase}"),
-            parentSpanIdOfFetch == spanIdOfHttp
+            parentSpanIdOfFetch == spanIdOfHttp,
+            logs.exists(entry =>
+              entry.annotations.get("trace_id").contains(fetchSpan.context.traceId.show) &&
+                entry.annotations.get("span_id").contains(fetchSpan.context.spanId.show)
+            )
           )
         } +
           test("spans with path parameters have reduced cardinality automatically") {

@@ -24,8 +24,6 @@ import zio.*
  *   trace
  * @param enrichResponseHeadersWithTraceIds
  *   whether to add trace headers to the response
- * @param enrichLogs
- *   whether to add trace headers to the logs
  * @param headerFormat
  *   the format to use for trace headers
  */
@@ -33,7 +31,6 @@ final class TraceInterceptor[Env, Err] private (
   private val tracer: ZTracer,
   private val dropHeadersWhen: String => Boolean,
   private val enrichResponseHeadersWithTraceIds: Boolean,
-  private val enrichLogs: Boolean,
   private val headerFormat: ToHeaders
 ) extends RequestInterceptor[ZIO[Env, Err, *]] {
 
@@ -45,7 +42,6 @@ final class TraceInterceptor[Env, Err] private (
       tracer,
       dropHeadersWhen,
       enrichResponseHeadersWithTraceIds,
-      enrichLogs,
       headerFormat
     )
 
@@ -60,13 +56,11 @@ object TraceInterceptor {
     tracer: ZTracer,
     dropHeadersWhen: String => Boolean = HeaderNames.isSensitive,
     enrichResponseHeadersWithTraceIds: Boolean = true,
-    enrichLogs: Boolean = true,
     headerFormat: ToHeaders = ToHeaders.standard
   ): TraceInterceptor[Env, Err] = new TraceInterceptor(
     tracer,
     dropHeadersWhen,
     enrichResponseHeadersWithTraceIds,
-    enrichLogs,
     headerFormat
   )
 
@@ -74,26 +68,23 @@ object TraceInterceptor {
     tracer: ZTracer,
     dropHeadersWhen: String => Boolean = HeaderNames.isSensitive,
     enrichResponseHeadersWithTraceIds: Boolean = true,
-    enrichLogs: Boolean = true,
     headerFormat: ToHeaders = ToHeaders.standard
   ): TraceInterceptor[Any, Throwable] =
-    apply(tracer, dropHeadersWhen, enrichResponseHeadersWithTraceIds, enrichLogs, headerFormat)
+    apply(tracer, dropHeadersWhen, enrichResponseHeadersWithTraceIds, headerFormat)
 
   def rio[R, E <: Throwable](
     tracer: ZTracer,
     dropHeadersWhen: String => Boolean = HeaderNames.isSensitive,
     enrichResponseHeadersWithTraceIds: Boolean = true,
-    enrichLogs: Boolean = true,
     headerFormat: ToHeaders = ToHeaders.standard
   ): TraceInterceptor[R, E] =
-    apply(tracer, dropHeadersWhen, enrichResponseHeadersWithTraceIds, enrichLogs, headerFormat)
+    apply(tracer, dropHeadersWhen, enrichResponseHeadersWithTraceIds, headerFormat)
 }
 
 private class TraceEndpointInterceptor[Env, Err](
   private val tracer: ZTracer,
   private val dropHeadersWhen: String => Boolean,
   private val enrichResponseHeadersWithTraceIds: Boolean,
-  private val enrichLogs: Boolean,
   private val headerFormat: ToHeaders
 ) extends EndpointInterceptor[ZIO[Env, Err, *]] {
   override def apply[B](
@@ -155,14 +146,10 @@ private class TraceEndpointInterceptor[Env, Err](
       val traceHeaders = TraceHeaders.of(request.headers.map(h => (h.name, h.value))*)
 
       tracer.fromHeaders(traceHeaders, name = spanName, kind = SpanKind.Server) { span =>
-        val logTraceContext =
-          if (enrichLogs) ZIOAspect.annotated(annotations = extractKVHeaders(span, headerFormat).toList*)
-          else ZIOAspect.identity
-
         for {
           _ <- span.put(OtelSemconv.HttpRoute, ctx.endpoint.showPathTemplate(showQueryParam = None))
           _ <- enrichSpanFromRequest(request, dropHeadersWhen, span)
-          response <- (zio @@ logTraceContext)
+          response <- zio
                         .tapErrorCause(cause => span.setStatus(SpanStatus.Internal(cause.prettyPrint)))
           enriched <- EnrichSpanFromResponse[A].apply(response, span)
         } yield enriched
@@ -176,12 +163,6 @@ private class TraceEndpointInterceptor[Env, Err](
       .values
       .collect { case (k, v) if v.nonEmpty => Header(k.toString, v) }
       .toSeq
-
-  private def extractKVHeaders(span: ZSpan, whichHeaders: ToHeaders): Map[String, String] =
-    span
-      .extractHeaders(whichHeaders)
-      .values
-      .collect { case (k, v) if v.nonEmpty => (k.toString, v) }
 
   private def enrichSpanFromRequest(
     request: ServerRequest,
