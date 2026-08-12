@@ -16,11 +16,28 @@ object KafkaConsumerTracer {
     def default[K, V]: SpanNamer[K, V] = record => s"process ${record.record.topic}"
   }
 
+  /**
+   * Wraps a ZIO Kafka consumer stream with tracing. Each record is consumed
+   * within a span whose context is derived from the record's headers (if
+   * present). The resulting stream emits [[Spanned]] records so that downstream
+   * operators can continue the trace.
+   *
+   * Commits are also traced under a child span of the consumer span.
+   *
+   * @param tracer
+   *   the ZTracer instance
+   * @param stream
+   *   the source stream of committable records
+   * @param spanNameForElement
+   *   derives the span name from each record (default: "process {topic}")
+   * @param spanRelationship
+   *   controls whether the consumer span is a child of the producer span
+   *   (ParentChild) or starts a new trace with a link (Link)
+   */
   def traceConsumerStream[R, K, V](
     tracer: ZTracer,
     stream: ZStream[R, Throwable, CommittableRecord[K, V]],
     spanNameForElement: SpanNamer[K, V] = SpanNamer.default[K, V],
-    kafkaLogAnnotations: KafkaLogAnnotations = KafkaLogAnnotations.default,
     spanRelationship: SpanRelationship = SpanRelationship.ParentChild
   ): ZStream[R, Throwable, Spanned[CommittableRecord[K, V]]] =
     stream.mapChunksZIO(_.mapZIO { comm =>
@@ -31,7 +48,8 @@ object KafkaConsumerTracer {
 
       val attributes = coreAttributes(topic, record.partition, comm.offset.offset, Option(record.key).map(_.toString))
 
-      withConsumerSpan(tracer, traceHeaders, spanName, spanRelationship, attributes, kafkaLogAnnotations) { span =>
+      // Because there are no logs inside the consumer span, there is no meaning to kafka log annotations here
+      withConsumerSpan(tracer, traceHeaders, spanName, spanRelationship, attributes, KafkaLogAnnotations.none) { span =>
         val enrichedComm = comm.copy(
           commitHandle = _ =>
             tracer.fromHeaders(
@@ -46,6 +64,33 @@ object KafkaConsumerTracer {
       }
     })
 
+  /**
+   * Consumes records from a Kafka subscription with automatic tracing and
+   * offset commits. Each record is processed within a traced span. This is a
+   * convenience method that combines consumption, tracing, and committing in
+   * one call using ZIO Kafka's `consumeWith` under the hood.
+   *
+   * @param tracer
+   *   the ZTracer instance
+   * @param consumer
+   *   the ZIO Kafka consumer
+   * @param subscription
+   *   the topic subscription
+   * @param keyDeserializer
+   *   deserializer for record keys
+   * @param valueDeserializer
+   *   deserializer for record values
+   * @param commitRetryPolicy
+   *   retry policy for offset commits
+   * @param kafkaLogAnnotations
+   *   controls which span attributes are surfaced as ZIO log annotations
+   *   (default: topic, partition, offset, key)
+   * @param spanRelationship
+   *   controls whether the consumer span is a child of the producer span
+   *   (ParentChild) or starts a new trace with a link (Link)
+   * @param f
+   *   the processing function for each record
+   */
   def tracedConsumeWith[R: Tag, R1: Tag, K, V](
     tracer: ZTracer,
     consumer: Consumer,
