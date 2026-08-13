@@ -19,7 +19,7 @@ object KafkaConsumerTracer {
   /**
    * Wraps a ZIO Kafka consumer stream with tracing. Each record is consumed
    * within a span whose context is derived from the record's headers (if
-   * present). The resulting stream emits [[Spanned]] records so that downstream
+   * present). The resulting stream emits `Spanned` records so that downstream
    * operators can continue the trace.
    *
    * Commits are also traced under a child span of the consumer span.

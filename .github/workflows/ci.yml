@@ -23,7 +23,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        scala: [2.13.18, 3.3.7]
+        scala: [2.13.18, 3.3.8]
         java: [temurin@17, temurin@21]
     runs-on: ${{ matrix.os }}
     steps:
@@ -54,8 +54,8 @@ jobs:
       - name: Check that workflows are up to date
         run: sbt '++ ${{ matrix.scala }}' githubWorkflowCheck
 
-      - name: Build project
-        run: sbt '++ ${{ matrix.scala }}' test
+      - name: Build and test
+        run: sbt '++ ${{ matrix.scala }}' test doc
 
       - name: Compress target directories
         run: tar cf targets.tar sttp/target core-examples/target sttp-examples/target caliban/target http4s/target fs2/target tapir/target target zio-http/target doobie/target trace4cats-zio-extras-docs/target skunk/target fs2-examples/target fs2-kafka/target skunk-examples/target sttp4/target virgil-examples/target fs2-kafka-examples/target zio-http-examples/target http4s-examples/target sttp4-examples/target doobie-examples/target tapir-examples/target zio-kafka-examples/target core/target zquery/target zio-kafka/target virgil/target project/target
@@ -111,12 +111,12 @@ jobs:
           tar xf targets.tar
           rm targets.tar
 
-      - name: Download target directories (3.3.7)
+      - name: Download target directories (3.3.8)
         uses: actions/download-artifact@v4
         with:
-          name: target-${{ matrix.os }}-3.3.7-${{ matrix.java }}
+          name: target-${{ matrix.os }}-3.3.8-${{ matrix.java }}
 
-      - name: Inflate target directories (3.3.7)
+      - name: Inflate target directories (3.3.8)
         run: |
           tar xf targets.tar
           rm targets.tar
