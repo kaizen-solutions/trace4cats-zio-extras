@@ -23,7 +23,7 @@ inThisBuild {
     ),
     githubWorkflowBuild := Seq(
       WorkflowStep.Sbt(
-        commands = List("test", "docs"),
+        commands = List("test", "doc"),
         name = Some("Build and test")
       )
     ),
