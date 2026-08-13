@@ -55,7 +55,7 @@ jobs:
         run: sbt '++ ${{ matrix.scala }}' githubWorkflowCheck
 
       - name: Build project
-        run: sbt '++ ${{ matrix.scala }}' test
+        run: sbt "'++ ${{ matrix.scala }}' test doc"
 
       - name: Compress target directories
         run: tar cf targets.tar sttp/target core-examples/target sttp-examples/target caliban/target http4s/target fs2/target tapir/target target zio-http/target doobie/target trace4cats-zio-extras-docs/target skunk/target fs2-examples/target fs2-kafka/target skunk-examples/target sttp4/target virgil-examples/target fs2-kafka-examples/target zio-http-examples/target http4s-examples/target sttp4-examples/target doobie-examples/target tapir-examples/target zio-kafka-examples/target core/target zquery/target zio-kafka/target virgil/target project/target
