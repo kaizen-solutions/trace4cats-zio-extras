@@ -2,7 +2,7 @@ import org.typelevel.scalacoptions.ScalacOptions
 
 inThisBuild {
   val scala213 = "2.13.18"
-  val scala3   = "3.3.7"
+  val scala3   = "3.3.8"
 
   Seq(
     scalaVersion       := scala213,
@@ -20,6 +20,12 @@ inThisBuild {
     githubWorkflowPublishTargetBranches := Seq(
       RefPredicate.StartsWith(Ref.Tag("v")),
       RefPredicate.Equals(Ref.Branch("main"))
+    ),
+    githubWorkflowBuild := Seq(
+      WorkflowStep.Sbt(
+        commands = List("test", "docs"),
+        name = Some("Build and test")
+      )
     ),
     githubWorkflowPublish := Seq(
       WorkflowStep.Sbt(
